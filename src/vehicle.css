@@ -1,0 +1,60 @@
+/* src/vehicle.css */
+
+.container {
+  padding: 20px; /* Container padding */
+  background-color: #ffffff; /* White background for contrast */
+  border-radius: 8px; /* Rounded corners */
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+  height: 860px;
+}
+
+.header {
+  display: flex; /* Flexbox for alignment */
+  justify-content: space-between; /* Space between title and button */
+  align-items: center; /* Center vertically */
+  margin-bottom: 20px; /* Space below header */
+}
+
+.title {
+  font-size: 2rem; /* Title font size */
+  color: #333; /* Title color */
+}
+
+.add-button {
+  background-color: #28a745; /* Green background */
+  color: white; /* White text */
+  border: none; /* Remove border */
+  border-radius: 5px; /* Rounded corners */
+  padding: 10px 15px; /* Padding */
+  font-size: 1rem; /* Font size */
+  cursor: pointer; /* Pointer cursor */
+  transition: background-color 0.3s; /* Smooth transition */
+}
+
+.add-button:hover {
+  background-color: #218838; /* Darker green on hover */
+}
+
+.vehicle-table {
+  width: 100%; /* Full width */
+  border-collapse: collapse; /* Merge borders */
+}
+
+.vehicle-table th, .vehicle-table td {
+  border: 1px solid #ddd; /* Table cell border */
+  padding: 12px; /* Padding inside cells */
+  text-align: left; /* Align text to the left */
+}
+
+.vehicle-table th {
+  background-color: #007BFF; /* Header background color */
+  color: white; /* Header text color */
+}
+
+.vehicle-table tr:nth-child(even) {
+  background-color: #f2f2f2; /* Zebra striping for rows */
+}
+
+.vehicle-table tr:hover {
+  background-color: #ddd; /* Highlight row on hover */
+}
