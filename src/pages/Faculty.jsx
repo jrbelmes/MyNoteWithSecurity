@@ -13,7 +13,9 @@ const UserManagement = () => {
     const [departments, setDepartments] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+    const [selectedUserId, setSelectedUserId] = useState(null);
     const [newUser, setNewUser] = useState({
         name: '',
         schoolId: '',
@@ -21,7 +23,6 @@ const UserManagement = () => {
         username: '',
         password: '',
         departmentId: '',
-        isActive: true,
     });
     const navigate = useNavigate();
     const adminLevel = localStorage.getItem('adminLevel');
@@ -44,11 +45,8 @@ const UserManagement = () => {
 
         try {
             const response = await axios.post(url, new URLSearchParams({ operation: "fetchUsers" }), {
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             });
-            
             if (response.data.status === 'success') {
                 setUsers(response.data.data);
             } else {
@@ -66,11 +64,8 @@ const UserManagement = () => {
 
         try {
             const response = await axios.post(url, new URLSearchParams({ operation: "fetchDepartments" }), {
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             });
-
             if (response.data.status === 'success') {
                 setDepartments(response.data.data);
             } else {
@@ -81,54 +76,94 @@ const UserManagement = () => {
         }
     };
 
-    const handleSubmit = async () => {
-        console.log("Submitting:", newUser); // Log to check the values
-    
+    const fetchUserDetails = async (userId) => {
+        const url = "http://localhost/coc/gsd/update_master1.php";
+
+        try {
+            const response = await axios.post(url, new URLSearchParams({ 
+                operation: "getUserDetails", 
+                json: JSON.stringify({ userId }) 
+            }), {
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            });
+            if (response.data.status === 'success') {
+                const userDetails = response.data.data;
+                setNewUser({
+                    name: userDetails.users_name,
+                    schoolId: userDetails.users_school_id,
+                    contact: userDetails.users_contact_number,
+                    username: userDetails.users_username,
+                    password: userDetails.users_password,
+                    departmentId: departments.find(department => department.departments_name === userDetails.departments_name)?.departments_id || '',
+                });
+                setSelectedUserId(userId);
+                setIsUpdateModalOpen(true);
+            } else {
+                toast.error("Error fetching user details: " + response.data.message);
+            }
+        } catch (error) {
+            toast.error("An error occurred while fetching user details.");
+        }
+    };
+
+    const deleteUser = async (userId) => {
+        if (window.confirm("Are you sure you want to delete this user?")) {
+            const url = "http://localhost/coc/gsd/delete_master.php";
+
+            try {
+                const response = await axios.post(url, new URLSearchParams({ 
+                    operation: "deleteUser", 
+                    user_id: userId 
+                }), {
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                });
+                if (response.data.status === 'success') {
+                    toast.success("User deleted successfully!");
+                    fetchUsers(); // Refresh the user list
+                } else {
+                    toast.error("Error deleting user: " + response.data.message);
+                }
+            } catch (error) {
+                toast.error("An error occurred while deleting the user.");
+            }
+        }
+    };
+
+    const handleUserSubmit = async (operation) => {
         const { name, schoolId, contact, username, password, departmentId } = newUser;
-    
-        // Check if all required fields are filled
+
         if (!name || !schoolId || !contact || !username || !password || !departmentId) {
             toast.error("All fields are required!");
             return;
         }
-    
-        // Create the userData object
-        const userData = {
-            name: name,
-            schoolId: schoolId,
-            contact: contact,
-            username: username,
-            password: password,
-            departmentId: departmentId,
-            isActive: newUser.isActive, // Include active status
-            userLevel: 'users' // Set user level to 'users'
-        };
-    
+
+        const userData = { name, schoolId, contact, username, password, departmentId };
         const formData = new FormData();
-        formData.append("operation", "saveUser");
-        formData.append("json", JSON.stringify(userData));
-    
+        formData.append("operation", operation);
+        formData.append("json", JSON.stringify({ ...userData, userId: selectedUserId }));
+
         setLoading(true);
         try {
-            const url = "http://localhost/coc/gsd/insert_master.php";
+            const url = operation === 'saveUser' ? "http://localhost/coc/gsd/insert_master.php" : "http://localhost/coc/gsd/update_master1.php";
             const response = await axios.post(url, formData);
-    
             if (response.data.status === 'success') {
-                toast.success("User successfully added!");
+                toast.success(`User successfully ${operation === 'saveUser' ? 'added' : 'updated'}!`);
                 fetchUsers();
                 resetForm();
             } else {
-                toast.error("Failed to add user: " + (response.data.message || "Unknown error"));
+                toast.error(`Failed to ${operation === 'saveUser' ? 'add' : 'update'} user: ` + (response.data.message || "Unknown error"));
             }
         } catch (error) {
-            toast.error("An error occurred while adding user.");
+            toast.error(`An error occurred while ${operation === 'saveUser' ? 'adding' : 'updating'} user.`);
         } finally {
             setLoading(false);
-            setIsModalOpen(false);
+            setIsAddModalOpen(false);
+            setIsUpdateModalOpen(false);
         }
     };
-    
-    
+
+    const handleAddUserSubmit = () => handleUserSubmit('saveUser');
+    const handleUpdateUserSubmit = () => handleUserSubmit('updateUser');
 
     const resetForm = () => {
         setNewUser({
@@ -138,8 +173,8 @@ const UserManagement = () => {
             username: '',
             password: '',
             departmentId: '',
-            isActive: true,
         });
+        setSelectedUserId(null);
     };
 
     const filteredUsers = users.filter(user =>
@@ -151,7 +186,7 @@ const UserManagement = () => {
             <Sidebar />
             <div className="flex-grow ml-0 lg:ml-10 p-6">
                 <h2 className="text-2xl font-bold">User Management</h2>
-                <div className="flex flex-col lg:flex-row items-center mb-4">
+                <div className="flex justify-between mb-4">
                     <input
                         type="text"
                         value={searchTerm}
@@ -159,6 +194,9 @@ const UserManagement = () => {
                         placeholder="Search by Name..."
                         className="border border-gray-300 p-2 rounded w-full max-w-xs"
                     />
+                    <Button variant="primary" onClick={() => { resetForm(); setIsAddModalOpen(true); }}>
+                        <FaPlus /> Add User
+                    </Button>
                 </div>
 
                 {loading ? (
@@ -172,9 +210,7 @@ const UserManagement = () => {
                                 <th className="py-3 px-6 text-left">Name</th>
                                 <th className="py-3 px-6 text-left">School ID</th>
                                 <th className="py-3 px-6 text-left">Contact</th>
-                                <th className="py-3 px-6 text-left">Username</th>
-                                <th className="py-3 px-6 text-left">Department ID</th>
-                               
+                                <th className="py-3 px-6 text-left">Department</th>
                                 <th className="py-3 px-6 text-left">Actions</th>
                             </tr>
                         </thead>
@@ -185,35 +221,35 @@ const UserManagement = () => {
                                         <td className="py-3 px-6">{user.users_name}</td>
                                         <td className="py-3 px-6">{user.users_school_id}</td>
                                         <td className="py-3 px-6">{user.users_contact_number}</td>
-                                        <td className="py-3 px-6">{user.users_username}</td>
-                                        <td className="py-3 px-6">{user.users_department_id}</td>
-                                        
+                                        <td className="py-3 px-6">{user.departments_name}</td> {/* Updated this line */}
                                         <td className="py-3 px-6">
-                                            <button className="text-blue-500" onClick={() => {/* editUser logic */}}>
+                                            <button className="text-blue-500" onClick={() => fetchUserDetails(user.users_id)}>
                                                 <FaEdit />
                                             </button>
-                                            <button className="text-red-500 ml-2" onClick={() => {/* deleteUser logic */}}>
+                                            <button className="text-red-500 ml-2" onClick={() => deleteUser(user.users_id)}>
                                                 <FaTrash />
                                             </button>
                                         </td>
                                     </tr>
+
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="7" className="text-center py-3">NO USERS FOUND</td>
+                                    <td colSpan="6" className="py-3 px-6 text-center">No users found.</td>
                                 </tr>
                             )}
                         </tbody>
                     </table>
                 )}
 
-                <Modal show={isModalOpen} onHide={() => setIsModalOpen(false)}>
+                {/* Add User Modal */}
+                <Modal show={isAddModalOpen} onHide={() => setIsAddModalOpen(false)}>
                     <Modal.Header closeButton>
                         <Modal.Title>Add User</Modal.Title>
                     </Modal.Header>
                     <Modal.Body>
                         {Object.keys(newUser).map((key) => (
-                            key !== 'userLevel' && key !== 'departmentId' && (
+                            key !== 'departmentId' && (
                                 <div className="mb-3" key={key}>
                                     <label htmlFor={key} className="form-label">{key.replace(/_/g, ' ').toUpperCase()}</label>
                                     <input
@@ -242,21 +278,58 @@ const UserManagement = () => {
                                 ))}
                             </select>
                         </div>
-                        <div className="form-check">
-                            <input
-                                type="checkbox"
-                                className="form-check-input"
-                                checked={newUser.isActive}
-                                onChange={(e) => setNewUser({ ...newUser, isActive: e.target.checked })}
-                            />
-                            <label className="form-check-label">Active</label>
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button variant="secondary" onClick={() => setIsAddModalOpen(false)}>
+                            Close
+                        </Button>
+                        <Button variant="primary" onClick={handleAddUserSubmit}>
+                            Submit
+                        </Button>
+                    </Modal.Footer>
+                </Modal>
+
+                {/* Update User Modal */}
+                <Modal show={isUpdateModalOpen} onHide={() => setIsUpdateModalOpen(false)}>
+                    <Modal.Header closeButton>
+                        <Modal.Title>Update User</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        {Object.keys(newUser).map((key) => (
+                            key !== 'departmentId' && (
+                                <div className="mb-3" key={key}>
+                                    <label htmlFor={key} className="form-label">{key.replace(/_/g, ' ').toUpperCase()}</label>
+                                    <input
+                                        type={key === 'password' ? 'password' : 'text'}
+                                        id={key}
+                                        className="form-control"
+                                        value={newUser[key]}
+                                        onChange={(e) => setNewUser({ ...newUser, [key]: e.target.value })}
+                                    />
+                                </div>
+                            )
+                        ))}
+                        <div className="mb-3">
+                            <label htmlFor="departmentId" className="form-label">Department</label>
+                            <select
+                                id="departmentId"
+                                className="form-control"
+                                value={newUser.departmentId}
+                                onChange={(e) => setNewUser({ ...newUser, departmentId: e.target.value })}
+                            >
+                                {departments.map((department) => (
+                                    <option key={department.departments_id} value={department.departments_id}>
+                                        {department.departments_name}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
                     </Modal.Body>
                     <Modal.Footer>
-                        <Button variant="secondary" onClick={() => setIsModalOpen(false)}>
+                        <Button variant="secondary" onClick={() => setIsUpdateModalOpen(false)}>
                             Close
                         </Button>
-                        <Button variant="primary" onClick={handleSubmit}>
+                        <Button variant="primary" onClick={handleUpdateUserSubmit}>
                             Submit
                         </Button>
                     </Modal.Footer>

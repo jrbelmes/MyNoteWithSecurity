@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FaSignOutAlt, FaTachometerAlt, FaCar, FaCog, FaFileAlt, FaHeadset, FaChevronDown, FaBars, FaHome, FaTools, FaUserCircle } from 'react-icons/fa';
+import { FaFolder, FaSignOutAlt, FaTachometerAlt, FaCar, FaCog, FaFileAlt, FaHeadset, FaChevronDown, FaBars, FaHome, FaTools, FaUserCircle } from 'react-icons/fa';
 
 const Sidebar = () => {
   const navigate = useNavigate();
   const [isMasterFileOpen, setMasterFileOpen] = useState(false);
   const [isUsersOpen, setUsersOpen] = useState(false);
   const [isReservationOpen, setReservationOpen] = useState(false);
-  const [isSidebarOpen, setSidebarOpen] = useState(true);
+  const [isSidebarOpen, setSidebarOpen] = useState(false);
 
   const adminName = localStorage.getItem('adminName') || '';
 
@@ -35,21 +35,21 @@ const Sidebar = () => {
 
   return (
     <div className="flex">
-      <button className="lg:hidden p-2" onClick={toggleSidebar}>
-        <FaBars className="text-white" />
+      <button className="p-2 fixed top-4 left-4 z-50 text-[#495E57]" onClick={toggleSidebar}>
+        <FaBars />
       </button>
-      <aside className={`fixed h-full bg-gray-800 text-white shadow-lg transition-transform ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-16'} lg:translate-x-0 lg:w-64`}>
-        <div className="sidebar-header p-5 text-center bg-gray-700 border-b border-gray-600">
+      <aside className={`fixed h-full bg-gray-800 text-white shadow-lg transition-transform ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-0'} flex flex-col z-40`}>
+        <div className="sidebar-header p-5 text-center">
           <div className="flex items-center justify-center mb-2">
             <FaUserCircle className="text-3xl" />
           </div>
           <h1 className={`text-xl font-bold ${isSidebarOpen ? '' : 'hidden'}`}>{adminName}</h1>
           <p className={`text-sm ${isSidebarOpen ? '' : 'hidden'}`}>admin@example.com</p>
         </div>
-        <nav className="sidebar-nav p-5">
+        <nav className="sidebar-nav p-5 flex-grow overflow-y-auto">
           <ul>
             <li className="mb-4">
-              <Link to="/dashboard" className="flex items-center p-2 hover:bg-blue-600 rounded transition">
+              <Link to="/adminDashboard" className="flex items-center p-2 hover:bg-blue-600 rounded transition">
                 <FaTachometerAlt className="mr-3" /> {isSidebarOpen ? 'Dashboard' : ''}
               </Link>
             </li>
@@ -75,6 +75,11 @@ const Sidebar = () => {
                       <FaTools className="mr-2" /> {isSidebarOpen ? 'Equipments' : ''}
                     </Link>
                   </li>
+                  <li className="mb-2">
+                    <Link to="/Master" className="flex items-center p-2 hover:bg-blue-600 rounded transition">
+                      <FaFolder className="mr-2" /> {isSidebarOpen ? 'Master' : ''}
+                    </Link>
+                  </li>
                 </ul>
               )}
             </li>
@@ -86,7 +91,7 @@ const Sidebar = () => {
               {isUsersOpen && (
                 <ul className="ml-4 mt-2 bg-gray-700 rounded shadow-md">
                   <li className="mb-2">
-                    <Link to="/Personnel" className="flex items-center p-2 hover:bg-blue-600 rounded transition">
+                    <Link to="/personnel" className="flex items-center p-2 hover:bg-blue-600 rounded transition">
                       <FaUserCircle className="mr-2" /> {isSidebarOpen ? 'Personnel' : ''}
                     </Link>
                   </li>
@@ -141,7 +146,7 @@ const Sidebar = () => {
           </ul>
         </nav>
       </aside>
-      <div className={`flex-grow transition-all ${isSidebarOpen ? 'ml-64' : 'ml-16'}`}>
+      <div className={`flex-grow transition-all ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>
         {/* Content goes here */}
       </div>
     </div>

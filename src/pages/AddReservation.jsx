@@ -215,113 +215,156 @@ const AddReservation = () => {
   };
 
   return (
-    <div className="flex">
+    <div className="flex bg-gray-100 min-h-screen">
       <Sidebar />
-      <div className="flex-grow p-5">
-        <h2 className="text-2xl font-bold mb-4">Add Reservation</h2>
-        <Form onSubmit={handleAddReservation}>
-          <Form.Group controlId="formReservationName">
-            <Form.Label>Reservation Name</Form.Label>
-            <Form.Control
-              type="text"
-              placeholder="Enter reservation name"
-              name="reservationName"
-              value={formData.reservationName}
-              onChange={handleInputChange}
-              required
-            />
-          </Form.Group>
-          <Form.Group controlId="formEventTitle">
-            <Form.Label>Event Title</Form.Label>
-            <Form.Control
-              type="text"
-              placeholder="Enter event title"
-              name="eventTitle"
-              value={formData.eventTitle}
-              onChange={handleInputChange}
-              required
-            />
-          </Form.Group>
-          <Form.Group controlId="formDescription">
-            <Form.Label>Description</Form.Label>
-            <Form.Control
-              as="textarea"
-              rows={3}
-              placeholder="Enter description"
-              name="description"
-              value={formData.description}
-              onChange={handleInputChange}
-            />
-          </Form.Group>
-          <Form.Group controlId="formVenue">
-            <Form.Label>Venue</Form.Label>
-            <Form.Control
-              as="select"
-              name="venue"
-              value={formData.venue}
-              onChange={handleInputChange}
-              required
-            >
-              <option value="">Select venue</option>
-              {venues.map(venue => (
-                <option key={venue.ven_id} value={venue.ven_id}>
-                  {venue.ven_name}
-                </option>
-              ))}
-            </Form.Control>
-          </Form.Group>
-          <Form.Group controlId="formUser">
-            <Form.Label>Select User</Form.Label>
-            <Form.Control
-              as="select"
-              name="selectedUserId"
-              value={formData.selectedUserId}
-              onChange={handleInputChange}
-              required
-            >
-              <option value="">Select user</option>
-              {users.map(user => (
-                <option key={user.users_id} value={user.users_id}>
-                  {user.users_name}
-                </option>
-              ))}
-            </Form.Control>
-          </Form.Group>
-          <Form.Group controlId="formStartDate">
-            <Form.Label>Start Date</Form.Label>
-            <Form.Control
-              type="date"
-              name="startDate"
-              value={formData.startDate}
-              onChange={handleInputChange}
-              required
-            />
-          </Form.Group>
-          <Form.Group controlId="formEndDate">
-            <Form.Label>End Date</Form.Label>
-            <Form.Control
-              type="date"
-              name="endDate"
-              value={formData.endDate}
-              onChange={handleInputChange}
-              required
-            />
-          </Form.Group>
+      <div className="flex-grow p-8">
+        <Card className="shadow-lg">
+          <Card.Body>
+            <h2 className="text-3xl font-bold mb-6 text-gray-800">Add Reservation</h2>
+            <Form onSubmit={handleAddReservation}>
+              <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-4" controlId="formReservationName">
+                    <Form.Label className="text-gray-700">Reservation Name</Form.Label>
+                    <Form.Control
+                      type="text"
+                      placeholder="Enter reservation name"
+                      name="reservationName"
+                      value={formData.reservationName}
+                      onChange={handleInputChange}
+                      required
+                      className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring focus:ring-blue-200"
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-4" controlId="formEventTitle">
+                    <Form.Label className="text-gray-700">Event Title</Form.Label>
+                    <Form.Control
+                      type="text"
+                      placeholder="Enter event title"
+                      name="eventTitle"
+                      value={formData.eventTitle}
+                      onChange={handleInputChange}
+                      required
+                      className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring focus:ring-blue-200"
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
 
-          <div className="mt-3">
-            <Button variant="primary" type="submit" disabled={loading}>
-              {loading ? (
-                <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-              ) : 'Add Reservation'}
-            </Button>
-            <Button variant="secondary" className="ms-2" onClick={() => setShowAddVehicleModal(true)}>
-              Select Vehicles
-            </Button>
-            <Button variant="secondary" className="ms-2" onClick={() => setShowAddEquipmentModal(true)}>
-              Select Equipment
-            </Button>
-          </div>
-        </Form>
+              <Form.Group className="mb-4" controlId="formDescription">
+                <Form.Label className="text-gray-700">Description</Form.Label>
+                <Form.Control
+                  as="textarea"
+                  rows={3}
+                  placeholder="Enter description"
+                  name="description"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring focus:ring-blue-200"
+                />
+              </Form.Group>
+
+              <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-4" controlId="formVenue">
+                    <Form.Label className="text-gray-700">Venue</Form.Label>
+                    <Form.Select
+                      name="venue"
+                      value={formData.venue}
+                      onChange={handleInputChange}
+                      required
+                      className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring focus:ring-blue-200"
+                    >
+                      <option value="">Select venue</option>
+                      {venues.map(venue => (
+                        <option key={venue.ven_id} value={venue.ven_id}>
+                          {venue.ven_name}
+                        </option>
+                      ))}
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-4" controlId="formUser">
+                    <Form.Label className="text-gray-700">Select User</Form.Label>
+                    <Form.Select
+                      name="selectedUserId"
+                      value={formData.selectedUserId}
+                      onChange={handleInputChange}
+                      required
+                      className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring focus:ring-blue-200"
+                    >
+                      <option value="">Select user</option>
+                      {users.map(user => (
+                        <option key={user.users_id} value={user.users_id}>
+                          {user.users_name}
+                        </option>
+                      ))}
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+              </Row>
+
+              <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-4" controlId="formStartDate">
+                    <Form.Label className="text-gray-700">Start Date</Form.Label>
+                    <Form.Control
+                      type="date"
+                      name="startDate"
+                      value={formData.startDate}
+                      onChange={handleInputChange}
+                      required
+                      className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring focus:ring-blue-200"
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-4" controlId="formEndDate">
+                    <Form.Label className="text-gray-700">End Date</Form.Label>
+                    <Form.Control
+                      type="date"
+                      name="endDate"
+                      value={formData.endDate}
+                      onChange={handleInputChange}
+                      required
+                      className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring focus:ring-blue-200"
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
+
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Button
+                  variant="primary"
+                  type="submit"
+                  disabled={loading}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-300"
+                >
+                  {loading ? (
+                    <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                  ) : 'Add Reservation'}
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowAddVehicleModal(true)}
+                  className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition duration-300"
+                >
+                  Select Vehicles
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowAddEquipmentModal(true)}
+                  className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition duration-300"
+                >
+                  Select Equipment
+                </Button>
+              </div>
+            </Form>
+          </Card.Body>
+        </Card>
       </div>
 
       {/* Select Vehicle Modal */}
