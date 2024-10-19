@@ -5,8 +5,10 @@ import Sidebar from './Sidebar'; // Ensure you have this component
 import { FaArrowLeft } from 'react-icons/fa';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'react-toastify/dist/ReactToastify.css';
+import { useNavigate } from 'react-router-dom';
 
 const VehicleMakes = () => {
+    const navigate = useNavigate();
   const [makes, setMakes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({ id: '', name: '' });

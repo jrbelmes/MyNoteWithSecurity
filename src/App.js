@@ -5,7 +5,7 @@ import { Route, Routes } from 'react-router-dom';
 import Register from './pages/Register';
 import VehicleEntry from './pages/VehicleEntry';
 import Venue from './pages/Venue';
-// import Dashboard from './pages/dashboard';
+//  Dashboard from './pages/dashboard';import
 import Equipment from './pages/Equipment';
 import ViewRequest from './pages/viewRequest';
 import ViewReservation from './pages/viewReservation';

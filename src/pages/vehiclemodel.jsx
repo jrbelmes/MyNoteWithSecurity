@@ -4,54 +4,93 @@ import { ToastContainer, toast } from 'react-toastify';
 import Sidebar from './Sidebar';
 import { FaArrowLeft } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'react-toastify/dist/ReactToastify.css';
 
 const VehicleModels = () => {
   const navigate = useNavigate();
   const [models, setModels] = useState([]);
+  const [makes, setMakes] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [formData, setFormData] = useState({ id: '', name: '' });
+  const [formData, setFormData] = useState({ id: '', name: '', makeId: '', categoryId: '' });
   const [showModal, setShowModal] = useState(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [selectedModelId, setSelectedModelId] = useState(null);
   const [editMode, setEditMode] = useState(false);
+  const [message, setMessage] = useState('');
+  const [isSuccess, setIsSuccess] = useState(true);
+
+  const fetchMakes = async () => {
+    try {
+      const response = await axios.post('http://localhost/coc/gsd/fetchMaster.php', {
+        operation: 'fetchMakes',
+      });
+      const data = response.data;
+
+      if (data.status === 'success') {
+        setMakes(data.data);
+      } else {
+        setMessage(`Error fetching makes: ${data.message}`);
+        setIsSuccess(false);
+      }
+    } catch (error) {
+      setMessage('Error fetching makes.');
+      setIsSuccess(false);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const response = await axios.post('http://localhost/coc/gsd/fetchMaster.php', {
+        operation: 'fetchVehicleCategories',
+      });
+      const data = response.data;
+
+      if (data.status === 'success') {
+        setCategories(data.data);
+      } else {
+        setMessage(`Error fetching categories: ${data.message}`);
+        setIsSuccess(false);
+      }
+    } catch (error) {
+      setMessage('Error fetching categories.');
+      setIsSuccess(false);
+    }
+  };
 
   useEffect(() => {
     const fetchModels = async () => {
       try {
-        const response = await fetch('http://localhost/coc/gsd/fetchMaster.php', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: new URLSearchParams({ operation: 'fetchModels' }),
+        const response = await axios.post('http://localhost/coc/gsd/fetchMaster.php', {
+          operation: 'fetchModels',
         });
 
-        if (!response.ok) {
-          throw new Error('Network response was not ok');
-        }
-
-        const data = await response.json();
-        if (data.status === 'success') {
-          setModels(data.data);
+        if (response.data.status === 'success') {
+          setModels(response.data.data);
         } else {
-          console.error(data.message);
+          console.error(response.data.message);
         }
       } catch (error) {
         console.error('Error fetching vehicle models:', error);
-      } finally {
-        setLoading(false);
       }
     };
 
     fetchModels();
+    fetchMakes();       // Fetch vehicle makes
+    fetchCategories();  // Fetch vehicle categories
   }, []);
 
   const handleEdit = (id) => {
     const modelToEdit = models.find(model => model.vehicle_model_id === id);
     if (modelToEdit) {
-      setFormData({ id: modelToEdit.vehicle_model_id, name: modelToEdit.vehicle_model_name });
+      setFormData({
+        id: modelToEdit.vehicle_model_id,
+        name: modelToEdit.vehicle_model_name,
+        makeId: modelToEdit.vehicle_model_vehicle_make_id,
+        categoryId: modelToEdit.vehicle_category_id
+      });
       setEditMode(true);
       setShowModal(true);
     }
@@ -64,20 +103,16 @@ const VehicleModels = () => {
 
   const confirmDelete = async () => {
     try {
-      const response = await fetch('http://localhost/coc/gsd/delete_master.php', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({ operation: 'deleteModel', model_id: selectedModelId }),
+      const response = await axios.post('http://localhost/coc/gsd/delete_master.php', {
+        operation: 'deleteModel',
+        model_id: selectedModelId,
       });
 
-      const data = await response.json();
-      if (data.status === 'success') {
+      if (response.data.status === 'success') {
         setModels(models.filter(model => model.vehicle_model_id !== selectedModelId));
         toast.success('Vehicle model deleted successfully!');
       } else {
-        toast.error(data.message || 'Failed to delete vehicle model.');
+        toast.error(response.data.message || 'Failed to delete vehicle model.');
       }
     } catch (error) {
       console.error('Error deleting vehicle model:', error);
@@ -92,27 +127,26 @@ const VehicleModels = () => {
     const operation = editMode ? 'updateModel' : 'createModel';
 
     try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({ operation, id: formData.id, name: formData.name }),
+      const response = await axios.post(url, {
+        operation,
+        id: formData.id,
+        name: formData.name,
+        makeId: formData.makeId,
+        categoryId: formData.categoryId
       });
 
-      const data = await response.json();
-      if (data.status === 'success') {
+      if (response.data.status === 'success') {
         if (editMode) {
           setModels(models.map(model => 
-            model.vehicle_model_id === formData.id ? { ...model, vehicle_model_name: formData.name } : model
+            model.vehicle_model_id === formData.id ? { ...model, vehicle_model_name: formData.name, vehicle_model_vehicle_make_id: formData.makeId, vehicle_category_id: formData.categoryId } : model
           ));
           toast.success('Vehicle model updated successfully!');
         } else {
-          setModels([...models, { vehicle_model_id: data.data.id, vehicle_model_name: formData.name }]);
+          setModels([...models, { vehicle_model_id: response.data.data.id, vehicle_model_name: formData.name, vehicle_model_vehicle_make_id: formData.makeId, vehicle_category_id: formData.categoryId }]);
           toast.success('Vehicle model created successfully!');
         }
       } else {
-        toast.error(data.message || 'Failed to save vehicle model.');
+        toast.error(response.data.message || 'Failed to save vehicle model.');
       }
     } catch (error) {
       console.error('Error saving vehicle model:', error);
@@ -125,12 +159,10 @@ const VehicleModels = () => {
   const closeModal = () => {
     setShowModal(false);
     setEditMode(false);
-    setFormData({ id: '', name: '' });
+    setFormData({ id: '', name: '', makeId: '', categoryId: '' });
   };
 
-  if (loading) {
-    return <div className="text-center text-xl">Loading...</div>;
-  }
+
 
   return (
     <div className="d-flex">
@@ -185,6 +217,28 @@ const VehicleModels = () => {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 />
+              </Form.Group>
+              <Form.Group controlId="formMakeSelect">
+                <Form.Label>Select Make:</Form.Label>
+                <Form.Control as="select" value={formData.makeId} onChange={(e) => setFormData({ ...formData, makeId: e.target.value })}>
+                  <option value="">Select a make...</option>
+                  {makes.map((make) => (
+                    <option key={make.vehicle_make_id} value={make.vehicle_make_id}>
+                      {make.vehicle_make_name}
+                    </option>
+                  ))}
+                </Form.Control>
+              </Form.Group>
+              <Form.Group controlId="formCategorySelect">
+                <Form.Label>Select Category:</Form.Label>
+                <Form.Control as="select" value={formData.categoryId} onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}>
+                  <option value="">Select a category...</option>
+                  {categories.map((category) => (
+                    <option key={category.vehicle_category_id} value={category.vehicle_category_id}>
+                      {category.vehicle_category_name}
+                    </option>
+                  ))}
+                </Form.Control>
               </Form.Group>
             </Form>
           </Modal.Body>

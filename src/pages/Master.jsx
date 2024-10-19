@@ -1,26 +1,28 @@
-
 import React, { useState, useEffect } from 'react';
-import { FaCar, FaPlus, FaTools, FaCogs, FaListAlt, FaUserShield, FaEye  } from 'react-icons/fa';
+import { FaCar, FaPlus, FaTools, FaCogs, FaListAlt, FaUserShield, FaEye } from 'react-icons/fa';
 import axios from 'axios';
 import Sidebar from './Sidebar';
 import { useNavigate } from 'react-router-dom';
 
-
 const Master = () => {
-    const navigate = useNavigate();
+  const navigate = useNavigate();
   const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false);
   const [isAddMakeModalOpen, setIsAddMakeModalOpen] = useState(false);
   const [isAddModelModalOpen, setIsAddModelModalOpen] = useState(false);
   const [isAddEquipmentModalOpen, setIsAddEquipmentModalOpen] = useState(false);
   const [isAddPositionModalOpen, setIsAddPositionModalOpen] = useState(false);
-  const [isAddUserLevelModalOpen, setIsAddUserLevelModalOpen] = useState(false); // New state for User Level modal
+  const [isAddUserLevelModalOpen, setIsAddUserLevelModalOpen] = useState(false);
+  const [isAddDepartmentModalOpen, setIsAddDepartmentModalOpen] = useState(false);
+  
   const [categoryName, setCategoryName] = useState('');
   const [makeName, setMakeName] = useState('');
   const [modelName, setModelName] = useState('');
   const [equipmentName, setEquipmentName] = useState('');
   const [positionName, setPositionName] = useState('');
-  const [userLevelName, setUserLevelName] = useState(''); // New state for User Level Name
-  const [userLevelDesc, setUserLevelDesc] = useState(''); // New state for User Level Description
+  const [userLevelName, setUserLevelName] = useState('');
+  const [userLevelDesc, setUserLevelDesc] = useState('');
+  const [departmentName, setDepartmentName] = useState('');
+  
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedMake, setSelectedMake] = useState('');
   const [categories, setCategories] = useState([]);
@@ -34,7 +36,7 @@ const Master = () => {
     setLoading(true);
     try {
       const response = await axios.post('http://localhost/coc/gsd/vehicle_master.php', {
-        operation: 'fetchCategoriesAndMakes'
+        operation: 'fetchCategoriesAndMakes',
       });
       const data = response.data;
 
@@ -66,16 +68,18 @@ const Master = () => {
 
       if (response.data.status === 'success') {
         const name = operation === 'saveCategoryData' 
-        ? 'Category' 
-        : operation === 'saveMakeData' 
-        ? 'Make' 
-        : operation === 'saveModelData' 
-        ? 'Model'
-        : operation === 'saveEquipmentCategory'
-        ? 'Equipment'
-        : operation === 'saveUserLevelData'
-        ? 'User Level'  // Add User Level
-        : 'Position';
+          ? 'Category' 
+          : operation === 'saveMakeData' 
+          ? 'Make' 
+          : operation === 'saveModelData' 
+          ? 'Model'
+          : operation === 'saveEquipmentCategory'
+          ? 'Equipment'
+          : operation === 'saveUserLevelData'
+          ? 'User Level' 
+          : operation === 'saveDepartmentData'
+          ? 'Department'
+          : 'Position';
 
         setMessage(`${name} added successfully!`);
         setIsSuccess(true);
@@ -102,7 +106,10 @@ const Master = () => {
     setMakeName('');
     setModelName('');
     setEquipmentName('');
-    setPositionName(''); // Reset position name
+    setPositionName('');
+    setUserLevelName('');
+    setUserLevelDesc('');
+    setDepartmentName('');
     setSelectedCategory('');
     setSelectedMake('');
     setIsAddCategoryModalOpen(false);
@@ -110,7 +117,8 @@ const Master = () => {
     setIsAddModelModalOpen(false);
     setIsAddEquipmentModalOpen(false);
     setIsAddPositionModalOpen(false);
-    setIsAddUserLevelModalOpen(false); // Close position modal
+    setIsAddUserLevelModalOpen(false);
+    setIsAddDepartmentModalOpen(false);
     setMessage('');
   };
 
@@ -141,14 +149,18 @@ const Master = () => {
 
   const handleSavePositionData = (e) => {
     e.preventDefault();
-    handleSaveData('savePosition', { position_name: positionName }); // Save position data
+    handleSaveData('savePosition', { position_name: positionName });
   };
 
-  
-const handleSaveUserLevelData = (e) => {
-  e.preventDefault();
-  handleSaveData('saveUserLevelData', { user_level_name: userLevelName, user_level_desc: userLevelDesc });
-};
+  const handleSaveUserLevelData = (e) => {
+    e.preventDefault();
+    handleSaveData('saveUserLevelData', { user_level_name: userLevelName, user_level_desc: userLevelDesc });
+  };
+
+  const handleSaveDepartmentData = async (e) => {
+    e.preventDefault();
+    handleSaveData('saveDepartmentData', { departments_name: departmentName });
+  };
 
   return (
     <div className="flex">
@@ -157,99 +169,31 @@ const handleSaveUserLevelData = (e) => {
         <h1 className="text-2xl font-bold mb-4">Vehicle Master Page</h1>
         
         <div className="flex flex-wrap gap-6">
-    <div className="card mx-2 my-4 w-56 h-40 bg-gray-300 bg-opacity-50 border border-white shadow-lg backdrop-blur-md rounded-lg flex flex-col items-center justify-center">
-        <div className="flex items-center">
-            <FaCar className="mr-2 text-2xl text-black" />
-            <h3 className="text-lg font-bold">Vehicle Category</h3>
+          {/* Card Components */}
+          {[
+            { title: 'Vehicle Category', icon: <FaCar />, action: () => setIsAddCategoryModalOpen(true), viewPath: '/vehicleCategory' },
+            { title: 'Vehicle Make', icon: <FaTools />, action: () => setIsAddMakeModalOpen(true), viewPath: '/vehiclemake' },
+            { title: 'Vehicle Model', icon: <FaCogs />, action: () => setIsAddModelModalOpen(true), viewPath: '/vehiclemodel' },
+            { title: 'Departments', icon: <FaListAlt />, action: () => setIsAddDepartmentModalOpen(true), viewPath: '/departments' },
+            { title: 'Position', icon: <FaCar />, action: () => setIsAddPositionModalOpen(true), viewPath: '/position' },
+            { title: 'User Level', icon: <FaUserShield />, action: () => setIsAddUserLevelModalOpen(true), viewPath: '/userlevel' },
+          ].map((card, index) => (
+            <div key={index} className="card mx-2 my-4 w-56 h-40 bg-gray-300 bg-opacity-50 border border-white shadow-lg backdrop-blur-md rounded-lg flex flex-col items-center justify-center">
+              <div className="flex items-center">
+                {card.icon}
+                <h3 className="text-lg font-bold">{card.title}</h3>
+              </div>
+              <div className="flex justify-between w-full">
+                <button onClick={() => { card.action(); setMessage(''); }} className="p-2 text-black hover:bg-gray-200 rounded-full">
+                  <FaPlus />
+                </button>
+                <button onClick={() => navigate(card.viewPath)} className="p-2 text-black hover:bg-gray-200 rounded-full">
+                  <FaEye />
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
-        <div className="flex justify-between w-full">
-            <button onClick={() => { setIsAddCategoryModalOpen(true); setMessage(''); }} className="p-2 text-black hover:bg-gray-200 rounded-full">
-                <FaPlus />
-            </button>
-            <button onClick={() => navigate('/vehicleCategory')} className="p-2 text-black hover:bg-gray-200 rounded-full">
-                <FaEye />
-            </button>
-        </div>
-    </div>
-
-    <div className="card mx-2 my-4 w-56 h-40 bg-gray-300 bg-opacity-50 border border-white shadow-lg backdrop-blur-md rounded-lg flex flex-col items-center justify-center">
-        <div className="flex items-center">
-            <FaTools className="mr-2 text-2xl text-black" />
-            <h3 className="text-lg font-bold">Vehicle Make</h3>
-        </div>
-        <div className="flex justify-between w-full">
-            <button onClick={() => { setIsAddMakeModalOpen(true); setMessage(''); }} className="p-2 text-black hover:bg-gray-200 rounded-full">
-                <FaPlus />
-            </button>
-            <button onClick={() => navigate('/vehiclemake')} className="p-2 text-black hover:bg-gray-200 rounded-full">
-                <FaEye />
-            </button>
-        </div>
-    </div>
-
-    <div className="card mx-2 my-4 w-56 h-40 bg-gray-300 bg-opacity-50 border border-white shadow-lg backdrop-blur-md rounded-lg flex flex-col items-center justify-center">
-        <div className="flex items-center">
-            <FaCogs className="mr-2 text-2xl text-black" />
-            <h3 className="text-lg font-bold">Vehicle Model</h3>
-        </div>
-        <div className="flex justify-between w-full">
-            <button onClick={() => { setIsAddModelModalOpen(true); setMessage(''); }} className="p-2 text-black hover:bg-gray-200 rounded-full">
-                <FaPlus />
-            </button>
-            <button onClick={() => navigate('/vehiclemodel')} className="p-2 text-black hover:bg-gray-200 rounded-full">
-                <FaEye />
-            </button>
-        </div>
-    </div>
-
-    <div className="card mx-2 my-4 w-56 h-40 bg-gray-300 bg-opacity-50 border border-white shadow-lg backdrop-blur-md rounded-lg flex flex-col items-center justify-center">
-        <div className="flex items-center">
-            <FaListAlt className="mr-2 text-2xl text-black" />
-            <h3 className="text-lg font-bold">Departments</h3>
-        </div>
-        <div className="flex justify-between w-full">
-            <button onClick={() => { setIsAddEquipmentModalOpen(true); setMessage(''); }} className="p-2 text-black hover:bg-gray-200 rounded-full">
-                <FaPlus />
-            </button>
-            <button onClick={() => navigate('/departments')} className="p-2 text-black hover:bg-gray-200 rounded-full">
-                <FaEye />
-            </button>
-        </div>
-    </div>
-
-    <div className="card mx-2 my-4 w-56 h-40 bg-gray-300 bg-opacity-50 border border-white shadow-lg backdrop-blur-md rounded-lg flex flex-col items-center justify-center">
-        <div className="flex items-center">
-            <FaCar className="mr-2 text-2xl text-black" />
-            <h3 className="text-lg font-bold">Position</h3>
-        </div>
-        <div className="flex justify-between w-full">
-            <button onClick={() => { setIsAddPositionModalOpen(true); setMessage(''); }} className="p-2 text-black hover:bg-gray-200 rounded-full">
-                <FaPlus />
-            </button>
-            <button onClick={() => navigate('/position')} className="p-2 text-black hover:bg-gray-200 rounded-full">
-                <FaEye />
-            </button>
-        </div>
-    </div>
-
-    <div className="card mx-2 my-4 w-56 h-40 bg-gray-300 bg-opacity-50 border border-white shadow-lg backdrop-blur-md rounded-lg flex flex-col items-center justify-center">
-        <div className="flex items-center">
-            <FaUserShield className="mr-2 text-2xl text-black" />
-            <h3 className="text-lg font-bold">User Level</h3>
-        </div>
-        <div className="flex justify-between w-full">
-            <button onClick={() => { setIsAddUserLevelModalOpen(true); setMessage(''); }} className="p-2 text-black hover:bg-gray-200 rounded-full">
-                <FaPlus />
-            </button>
-            <button onClick={() => navigate('/userlevel')} className="p-2 text-black hover:bg-gray-200 rounded-full">
-                <FaEye />
-            </button>
-        </div>
-    </div>
-</div>
-
-
-        
 
         {/* Modal for Adding Category */}
         {isAddCategoryModalOpen && (
@@ -308,9 +252,7 @@ const handleSaveUserLevelData = (e) => {
                 >
                   <option value="">Select Category</option>
                   {categories.map((category) => (
-                    <option key={category.vehicle_category_id} value={category.vehicle_category_id}>
-                      {category.vehicle_category_name}
-                    </option>
+                    <option key={category.id} value={category.id}>{category.vehicle_category_name}</option>
                   ))}
                 </select>
                 <select
@@ -320,9 +262,7 @@ const handleSaveUserLevelData = (e) => {
                 >
                   <option value="">Select Make</option>
                   {makes.map((make) => (
-                    <option key={make.vehicle_make_id} value={make.vehicle_make_id}>
-                      {make.vehicle_make_name}
-                    </option>
+                    <option key={make.id} value={make.id}>{make.vehicle_make_name}</option>
                   ))}
                 </select>
                 <input
@@ -385,55 +325,64 @@ const handleSaveUserLevelData = (e) => {
           </div>
         )}
 
-{isAddUserLevelModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-96">
-            <h2 className="text-xl font-bold mb-4">Add User Level</h2>
-            <form onSubmit={handleSaveUserLevelData}>
-              <div className="mb-4">
-                <label className="block mb-2">User Level Name:</label>
+        {/* Modal for Adding User Level */}
+        {isAddUserLevelModalOpen && (
+          <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
+            <div className="bg-white p-8 rounded-lg shadow-lg">
+              <h2 className="text-xl font-bold mb-4">Add User Level</h2>
+              <form onSubmit={handleSaveUserLevelData}>
                 <input
                   type="text"
                   value={userLevelName}
                   onChange={(e) => setUserLevelName(e.target.value)}
-                  className="border border-gray-400 p-2 w-full"
-                  required
+                  placeholder="Enter user level name"
+                  className="border border-gray-300 rounded px-4 py-2 w-full mb-4"
                 />
-              </div>
-              <div className="mb-4">
-                <label className="block mb-2">User Level Description:</label>
-                <input
-                  type="text"
+                <textarea
                   value={userLevelDesc}
                   onChange={(e) => setUserLevelDesc(e.target.value)}
-                  className="border border-gray-400 p-2 w-full"
-                  required
+                  placeholder="Enter user level description"
+                  className="border border-gray-300 rounded px-4 py-2 w-full mb-4"
                 />
-              </div>
-              <div className="flex justify-end">
-                <button type="submit" className="bg-blue-500 text-white p-2 rounded">Save</button>
-                <button
-                  type="button"
-                  onClick={() => setIsAddUserLevelModalOpen(false)}
-                  className="ml-2 bg-gray-300 p-2 rounded"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
+                <div className="flex justify-end">
+                  <button type="button" onClick={resetForm} className="mr-2 py-2 px-4 bg-gray-500 text-white rounded">Cancel</button>
+                  <button type="submit" className="py-2 px-4 bg-blue-500 text-white rounded">Save</button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* Modal for Adding Department */}
+        {isAddDepartmentModalOpen && (
+          <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
+            <div className="bg-white p-8 rounded-lg shadow-lg">
+              <h2 className="text-xl font-bold mb-4">Add Department</h2>
+              <form onSubmit={handleSaveDepartmentData}>
+                <input
+                  type="text"
+                  value={departmentName}
+                  onChange={(e) => setDepartmentName(e.target.value)}
+                  placeholder="Enter department name"
+                  className="border border-gray-300 rounded px-4 py-2 w-full mb-4"
+                />
+                <div className="flex justify-end">
+                  <button type="button" onClick={resetForm} className="mr-2 py-2 px-4 bg-gray-500 text-white rounded">Cancel</button>
+                  <button type="submit" className="py-2 px-4 bg-blue-500 text-white rounded">Save</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {popupMessage && (
-          <div className="fixed top-4 right-4 p-4 bg-green-500 text-white rounded shadow-lg">
+          <div className={`fixed bottom-4 right-4 bg-green-500 text-white p-4 rounded shadow-lg`}>
             {popupMessage}
           </div>
         )}
 
-        {loading && <div>Loading...</div>}
         {message && (
-          <div className={`mt-4 p-4 rounded ${isSuccess ? 'bg-green-500' : 'bg-red-500'} text-white`}>
+          <div className={`fixed bottom-4 right-4 bg-red-500 text-white p-4 rounded shadow-lg`}>
             {message}
           </div>
         )}

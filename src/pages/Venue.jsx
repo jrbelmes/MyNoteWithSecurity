@@ -91,17 +91,16 @@ const VenueEntry = () => {
 
         const venueData = {
             venue_name: venueName,
-            max_occupancy: maxOccupancy,
-            adminId: adminId,
+            max_occupancy: maxOccupancy
         };
 
         let url, operation;
         if (editMode) {
-            venueData.venue_id = currentVenueId;
-            url = "http://localhost/coc/gsd/update_master1.php";
-            operation = "updateVenueData";
+            venueData.venue_id = currentVenueId; // Use venue_id for the update
+            url = "http://localhost/coc/gsd/update_master1.php"; // Update endpoint
+            operation = "updateVenue";
         } else {
-            url = "http://localhost/coc/gsd/insert_master.php";
+            url = "http://localhost/coc/gsd/insert_master.php"; // Insert endpoint
             operation = "saveVenueData";
         }
 
@@ -140,14 +139,14 @@ const VenueEntry = () => {
 
         setLoading(true);
         try {
-            const response = await axios.post("http://localhost/gsd/delete_master.php", new URLSearchParams({
+            const response = await axios.post("http://localhost/coc/gsd/delete_master.php", new URLSearchParams({
                 operation: "deleteVenue",
-                venue_id: venueId
+                venue_id: venueId // Ensure this matches the expected key
             }));
 
             if (response.data.status === 'success') {
                 toast.success("Venue successfully deleted!");
-                fetchVenues();
+                fetchVenues(); // Refresh the venue list
             } else {
                 toast.error("Failed to delete venue: " + response.data.message);
             }

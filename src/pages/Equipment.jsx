@@ -15,7 +15,8 @@ const EquipmentEntry = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [entriesPerPage] = useState(10);
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [newEquipmentName, setNewEquipmentName] = useState('');
     const [newEquipmentQuantity, setNewEquipmentQuantity] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('');
@@ -93,26 +94,26 @@ const EquipmentEntry = () => {
             toast.error("All fields are required!");
             return;
         }
-
+    
         const equipmentData = {
             name: newEquipmentName,
             quantity: newEquipmentQuantity,
-            category_id: selectedCategory
+            categoryId: selectedCategory, // Updated to match the JSON structure
         };
-
+    
         let url = "http://localhost/coc/gsd/insert_master.php";
         let operation = "saveEquipment";
-
+    
         if (editingEquipment) {
-            equipmentData.equip_id = editingEquipment.equip_id;
+            equipmentData.equipmentId = editingEquipment.equip_id; // Update to match PHP
             url = "http://localhost/coc/gsd/update_master1.php";
             operation = "updateEquipment";
         }
-
+    
         const formData = new FormData();
         formData.append("operation", operation);
-        formData.append("json", JSON.stringify(equipmentData));
-
+        formData.append("json", JSON.stringify(equipmentData)); // No need to add equipmentId separately
+    
         setLoading(true);
         try {
             const response = await axios.post(url, formData);
@@ -128,9 +129,15 @@ const EquipmentEntry = () => {
             console.error("Error saving equipment:", error);
         } finally {
             setLoading(false);
-            setIsModalOpen(false);
+            if (editingEquipment) {
+                setIsEditModalOpen(false);
+            } else {
+                setIsAddModalOpen(false);
+            }
         }
     };
+    
+    
 
     const resetForm = () => {
         setNewEquipmentName('');
@@ -139,12 +146,30 @@ const EquipmentEntry = () => {
         setEditingEquipment(null);
     };
 
-    const handleEditClick = (equipment) => {
-        setNewEquipmentName(equipment.equip_name);
-        setNewEquipmentQuantity(equipment.equip_quantity);
-        setSelectedCategory(equipment.category_id);
-        setEditingEquipment(equipment);
-        setIsModalOpen(true);
+    const handleEditClick = async (equipment) => {
+        await getEquipmentDetails(equipment.equip_id);
+        setIsEditModalOpen(true);
+    };
+
+    const getEquipmentDetails = async (equip_id) => {
+        const url = "http://localhost/coc/gsd/fetchMaster.php";
+        const jsonData = { operation: "fetchEquipmentById", id: equip_id };
+
+        try {
+            const response = await axios.post(url, new URLSearchParams(jsonData));
+            if (response.data.status === 'success') {
+                const equipment = response.data.data[0];
+                setNewEquipmentName(equipment.equip_name);
+                setNewEquipmentQuantity(equipment.equip_quantity);
+                setSelectedCategory(equipment.equipment_equipment_category_id);
+                setEditingEquipment(equipment);
+            } else {
+                toast.error("Error fetching equipment details: " + response.data.message);
+            }
+        } catch (error) {
+            toast.error("An error occurred while fetching equipment details.");
+            console.error("Error fetching equipment details:", error);
+        }
     };
 
     const handleDeleteClick = async (equip_id) => {
@@ -190,13 +215,13 @@ const EquipmentEntry = () => {
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 placeholder="Search equipment..."
-                               className="w-full pl-10 pr-4 py-2 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full pl-10 pr-4 py-2 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                 <FaSearch className="text-gray-400" />
                             </div>
                         </div>
-                        <button onClick={() => setIsModalOpen(true)} className="bg-[#495E57] text-white px-4 py-2 rounded-lg hover:bg-[#3a4a45] transition duration-300 flex items-center">
+                        <button onClick={() => setIsAddModalOpen(true)} className="bg-[#495E57] text-white px-4 py-2 rounded-lg hover:bg-[#3a4a45] transition duration-300 flex items-center">
                             <FaPlus className="mr-2" />
                             Add Equipment
                         </button>
@@ -267,10 +292,10 @@ const EquipmentEntry = () => {
                     )}
                 </div>
 
-                {/* Modal */}
-                <Modal show={isModalOpen} onHide={() => setIsModalOpen(false)}>
+                {/* Add Equipment Modal */}
+                <Modal show={isAddModalOpen} onHide={() => setIsAddModalOpen(false)}>
                     <Modal.Header closeButton>
-                        <Modal.Title className="text-[#495E57]">{editingEquipment ? "Edit Equipment" : "Add Equipment"}</Modal.Title>
+                        <Modal.Title className="text-[#495E57]">Add Equipment</Modal.Title>
                     </Modal.Header>
                     <Modal.Body>
                         <div className="mb-4">
@@ -308,11 +333,61 @@ const EquipmentEntry = () => {
                         </div>
                     </Modal.Body>
                     <Modal.Footer>
-                        <Button variant="secondary" onClick={() => setIsModalOpen(false)}>
+                        <Button variant="secondary" onClick={() => setIsAddModalOpen(false)}>
                             Close
                         </Button>
                         <Button variant="primary" onClick={handleSubmit}>
-                            {editingEquipment ? "Update Equipment" : "Add Equipment"}
+                            Add Equipment
+                        </Button>
+                    </Modal.Footer>
+                </Modal>
+
+                {/* Update Equipment Modal */}
+                <Modal show={isEditModalOpen} onHide={() => setIsEditModalOpen(false)}>
+                    <Modal.Header closeButton>
+                        <Modal.Title className="text-[#495E57]">Edit Equipment</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-[#495E57] mb-2">Equipment Name</label>
+                            <input
+                                type="text"
+                                value={newEquipmentName}
+                                onChange={(e) => setNewEquipmentName(e.target.value)}
+                                className="w-full px-3 py-2 border border-[#495E57] rounded-md focus:outline-none focus:ring-2 focus:ring-[#F4CE14]"
+                            />
+                        </div>
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-[#495E57] mb-2">Equipment Quantity</label>
+                            <input
+                                type="number"
+                                value={newEquipmentQuantity}
+                                onChange={(e) => setNewEquipmentQuantity(e.target.value)}
+                                className="w-full px-3 py-2 border border-[#495E57] rounded-md focus:outline-none focus:ring-2 focus:ring-[#F4CE14]"
+                            />
+                        </div>
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-[#495E57] mb-2">Select Category</label>
+                            <select
+                                value={selectedCategory}
+                                onChange={(e) => setSelectedCategory(e.target.value)}
+                                className="w-full px-3 py-2 border border-[#495E57] rounded-md focus:outline-none focus:ring-2 focus:ring-[#F4CE14]"
+                            >
+                                <option value="">Select a category</option>
+                                {categories.map(category => (
+                                    <option key={category.equipments_category_id} value={category.equipments_category_id}>
+                                        {category.equipments_category_name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button variant="secondary" onClick={() => setIsEditModalOpen(false)}>
+                            Close
+                        </Button>
+                        <Button variant="primary" onClick={handleSubmit}>
+                            Update Equipment
                         </Button>
                     </Modal.Footer>
                 </Modal>
