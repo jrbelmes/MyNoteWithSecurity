@@ -1,60 +1,101 @@
-/* src/vehicle.css */
-
-.container {
-  padding: 20px; /* Container padding */
-  background-color: #ffffff; /* White background for contrast */
-  border-radius: 8px; /* Rounded corners */
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); /* Subtle shadow */
-  height: 860px;
+/* General table styling */
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+  margin-top: 20px;
 }
 
-.header {
-  display: flex; /* Flexbox for alignment */
-  justify-content: space-between; /* Space between title and button */
-  align-items: center; /* Center vertically */
-  margin-bottom: 20px; /* Space below header */
+table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 10px; /* Create spacing between rows */
+  border-radius: 20px;
+  
 }
 
-.title {
-  font-size: 2rem; /* Title font size */
-  color: #333; /* Title color */
+thead th {
+  background-color: #f4f4f4;
+  color: #333;
+  text-transform: uppercase;
+  font-size: 14px;
+  padding: 12px;
+  text-align: left;
+ 
+ 
 }
 
-.add-button {
-  background-color: #28a745; /* Green background */
-  color: white; /* White text */
-  border: none; /* Remove border */
-  border-radius: 5px; /* Rounded corners */
-  padding: 10px 15px; /* Padding */
-  font-size: 1rem; /* Font size */
-  cursor: pointer; /* Pointer cursor */
-  transition: background-color 0.3s; /* Smooth transition */
+tbody tr {
+  background-color: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.2s ease;
 }
 
-.add-button:hover {
-  background-color: #218838; /* Darker green on hover */
+tbody tr:hover {
+  background-color: #f9f9f9;
 }
 
-.vehicle-table {
-  width: 100%; /* Full width */
-  border-collapse: collapse; /* Merge borders */
+tbody td {
+  padding: 12px;
+  font-size: 14px;
+  color: #555;
+  text-align: left;
+  border-bottom: 1px solid #e6e6e6;
 }
 
-.vehicle-table th, .vehicle-table td {
-  border: 1px solid #ddd; /* Table cell border */
-  padding: 12px; /* Padding inside cells */
-  text-align: left; /* Align text to the left */
+tbody tr:last-child td {
+  border-bottom: none; /* Remove border for the last row */
 }
 
-.vehicle-table th {
-  background-color: #007BFF; /* Header background color */
-  color: white; /* Header text color */
+/* Action button styles */
+.action-buttons {
+  display: flex;
+  gap: 10px;
 }
 
-.vehicle-table tr:nth-child(even) {
-  background-color: #f2f2f2; /* Zebra striping for rows */
+.action-buttons button {
+  background-color: #fff;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  transition: background-color 0.2s ease;
 }
 
-.vehicle-table tr:hover {
-  background-color: #ddd; /* Highlight row on hover */
+.action-buttons button:hover {
+  background-color: #e6e6e6;
+}
+
+.text-blue-600 {
+  color: #007bff;
+}
+
+.text-red-600 {
+  color: #ff4d4d;
+}
+
+/* Pagination styling */
+.pagination-buttons {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.pagination-buttons button {
+  background-color: #007bff;
+  color: #fff;
+  border: none;
+  padding: 8px 12px;
+  margin: 0 5px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.pagination-buttons button:hover {
+  background-color: #0056b3;
+}
+
+.pagination-buttons button.active {
+  background-color: #0056b3;
+  font-weight: bold;
 }

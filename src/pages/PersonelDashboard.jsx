@@ -56,23 +56,14 @@ const Dashboard = () => {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-screen bg-gray-100">
-                <div className="animate-pulse flex flex-col items-center gap-4 w-60">
-                    <div>
-                        <div className="w-48 h-6 bg-slate-400 rounded-md"></div>
-                        <div className="w-28 h-4 bg-slate-400 mx-auto mt-3 rounded-md"></div>
-                    </div>
-                    <div className="h-7 bg-slate-400 w-full rounded-md"></div>
-                    <div className="h-7 bg-slate-400 w-full rounded-md"></div>
-                    <div className="h-7 bg-slate-400 w-full rounded-md"></div>
-                    <div className="h-7 bg-slate-400 w-1/2 rounded-md"></div>
-                </div>
+            <div className="flex items-center justify-center h-screen bg-[#F4CE14] bg-opacity-10">
+                <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-gray-900"></div>
             </div>
         );
     }
 
     return (
-        <div className={`dashboard-container flex ${fadeIn ? 'fade-in' : ''}`}>
+        <div className={`dashboard-container flexbg-[#F4CE14] bg-opacity-10 ${fadeIn ? 'fade-in' : ''}`}>
             <Sidebar />
             <div className="main-content flex-1 p-8 ml-4">
                 <h2 className="text-2xl font-bold mb-6">Admin Dashboard</h2>

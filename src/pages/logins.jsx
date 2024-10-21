@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import axios from 'axios';
+import { motion } from 'framer-motion';
+import { FaEye, FaEyeSlash, FaLock, FaUser } from 'react-icons/fa';
 
 function Logins() {
     const [username, setUsername] = useState("");
@@ -11,6 +13,9 @@ function Logins() {
     const [captchaNum2, setCaptchaNum2] = useState(Math.floor(Math.random() * 10));
     const [captchaAnswer, setCaptchaAnswer] = useState("");
     const [isCaptchaCorrect, setIsCaptchaCorrect] = useState(null);
+    const [showPassword, setShowPassword] = useState(false);
+    const [rememberMe, setRememberMe] = useState(false);
+    const [loginAttempts, setLoginAttempts] = useState(0);
     const navigateTo = useNavigate();
 
     useEffect(() => {
@@ -76,6 +81,13 @@ function Logins() {
 
                 sessionStorage.setItem('adminId', admin_id);
 
+                if (rememberMe) {
+                    localStorage.setItem('rememberedUsername', username);
+                } else {
+                    localStorage.removeItem('rememberedUsername');
+                }
+                setLoginAttempts(0);
+
                 // Add a delay before redirecting
                 setTimeout(() => {
                     navigateTo("/adminDashboard");
@@ -83,7 +95,14 @@ function Logins() {
 
                 toast.success("Login Successful");
             } else {
-                toast.error("Invalid Credentials");
+                const newAttempts = loginAttempts + 1;
+                setLoginAttempts(newAttempts);
+                if (newAttempts >= 3) {
+                    toast.error("Too many failed attempts. Please try again later.");
+                    setTimeout(() => setLoginAttempts(0), 300000); // Reset after 5 minutes
+                } else {
+                    toast.error("Invalid Credentials");
+                }
             }
         } catch (error) {
             console.error("Login error:", error.response ? error.response.data : error.message);
@@ -94,95 +113,113 @@ function Logins() {
     };
 
     useEffect(() => {
-        generateCaptcha(); // Generate CAPTCHA on component mount
+        generateCaptcha();
+        const rememberedUsername = localStorage.getItem('rememberedUsername');
+        if (rememberedUsername) {
+            setUsername(rememberedUsername);
+            setRememberMe(true);
+        }
     }, []);
 
     return (
-        <div className='flex flex-col justify-center items-center h-screen bg-gray-100'>
-            <div className='flex justify-center items-center mb-5'>
-                <h1 className='text-4xl text-blue-600 font-bold'>Welcome Back!</h1>
-            </div>
-
-            <div className="w-full max-w-xs">
-                <form className="bg-white shadow-lg rounded-lg px-8 pt-6 pb-8 mb-4" onSubmit={handleLogin}>
-                    <div className="mb-4">
-                        <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="username">
+        <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            transition={{ duration: 0.5 }}
+            className='flex flex-col justify-center items-center h-screen bg-gradient-to-br from-green-100 to-green-200'
+        >
+            <motion.div 
+                initial={{ y: -50 }} 
+                animate={{ y: 0 }} 
+                transition={{ type: 'spring', stiffness: 300 }}
+                className='w-full max-w-md bg-white rounded-xl shadow-lg overflow-hidden p-8'
+            >
+                <h2 className='text-center text-3xl font-bold text-gray-800 mb-6'>User Login</h2>
+                <form onSubmit={handleLogin}>
+                    <div className='mb-4 relative'>
+                        <label className='block text-gray-700 font-semibold mb-2' htmlFor='username'>
                             Username
                         </label>
-                        <input 
-                            value={username} 
-                            onChange={(e) => setUsername(e.target.value)} 
-                            className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring focus:ring-blue-500" 
-                            id="username" 
-                            type="text" 
-                            placeholder="Enter your username" 
-                            required 
-                        />
+                        <div className='relative'>
+                            <FaUser className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400' />
+                            <input 
+                                value={username} 
+                                onChange={(e) => setUsername(e.target.value)} 
+                                className='w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-300' 
+                                id='username' 
+                                type='text' 
+                                placeholder='Enter your username' 
+                                required 
+                            />
+                        </div>
                     </div>
 
-                    <div className="mb-6">
-                        <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="password">
+                    <div className='mb-4 relative'>
+                        <label className='block text-gray-700 font-semibold mb-2' htmlFor='password'>
                             Password
                         </label>
-                        <input 
-                            value={password} 
-                            onChange={(e) => setPassword(e.target.value)} 
-                            className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 mb-3 leading-tight focus:outline-none focus:ring focus:ring-blue-500" 
-                            id="password" 
-                            type="password" 
-                            placeholder="Enter your password" 
-                            required 
-                        />
+                        <div className='relative'>
+                            <FaLock className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400' />
+                            <input 
+                                value={password} 
+                                onChange={(e) => setPassword(e.target.value)} 
+                                className='w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-300' 
+                                id='password' 
+                                type={showPassword ? 'text' : 'password'} 
+                                placeholder='Enter your password' 
+                                required 
+                            />
+                            <button 
+                                type="button" 
+                                onClick={() => setShowPassword(!showPassword)} 
+                                className='absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600'
+                            >
+                                {showPassword ? <FaEyeSlash /> : <FaEye />}
+                            </button>
+                        </div>
                     </div>
 
-                    <div className="mb-4">
-                        <label className="block text-gray-700 text-sm font-semibold mb-2">
+                    <div className='mb-4'>
+                        <label className='block text-gray-700 font-semibold mb-2'>
                             Solve this: {captchaNum1} + {captchaNum2} = ?
                         </label>
-                        <input
-                            type="text"
+                        <input 
                             value={captchaAnswer}
                             onChange={handleCaptchaChange}
-                            className={`shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring focus:ring-blue-500 ${isCaptchaCorrect === false ? 'border-red-500' : isCaptchaCorrect === true ? 'border-green-500' : ''}`}
-                            placeholder="Your answer"
+                            className={`w-full px-4 py-2 border ${isCaptchaCorrect === false ? 'border-red-500' : 'border-gray-300'} rounded-md focus:outline-none focus:border-pink-500`}
+                            placeholder='Your answer'
                         />
-                        {isCaptchaCorrect === false && <p className="text-red-500 text-sm">Incorrect answer.</p>}
-                        {isCaptchaCorrect === true && <p className="text-green-500 text-sm">Correct!</p>}
+                        {isCaptchaCorrect === false && <p className='text-red-500 text-sm mt-1'>Incorrect answer.</p>}
+                        {isCaptchaCorrect === true && <p className='text-green-500 text-sm mt-1'>Correct!</p>}
                     </div>
 
-                    <div className="flex items-center justify-center">
-                        <button 
-                            className={`bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline ${loading ? 'opacity-50 cursor-not-allowed' : ''}`} 
-                            type="submit" 
-                            disabled={loading}
-                        >
-                            {loading ? 'Logging in...' : 'Login'}
-                        </button>
+                    <div className='mb-4 flex items-center'>
+                        <input
+                            type="checkbox"
+                            id="rememberMe"
+                            checked={rememberMe}
+                            onChange={(e) => setRememberMe(e.target.checked)}
+                            className='mr-2'
+                        />
+                        <label htmlFor="rememberMe" className='text-sm text-gray-600'>Remember me</label>
                     </div>
 
-                    <div className="flex items-center justify-center mt-4">
-                        <a className="inline-block align-baseline font-semibold text-sm text-blue-500 hover:text-blue-800" href="#">
-                            Forgot Password?
-                        </a>
-                    </div>
+                    <motion.button 
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className={`w-full py-2 px-4 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-300 ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-green-400 to-green-600 hover:from-green-500 hover:to-green-700'}`}
+                        type='submit'
+                        disabled={loading || loginAttempts >= 3}
+                    >
+                        {loading ? 'Logging in...' : 'Login'}
+                    </motion.button>
                 </form>
 
-                <form className="bg-white shadow-lg rounded-lg px-3 pt-6 pb-2 mb-4 mt-2">
-                    <div className="flex items-center justify-center">
-                        <p className='text-black'>Don't have an account? </p>
-                        <span className='ms-2'>
-                            <p className='cursor-pointer text-sm text-blue-600 hover:text-blue-800' onClick={() => navigateTo('/register')}>
-                                Register
-                            </p>
-                        </span>
-                    </div>
-                </form>
-
-                <p className="text-center text-gray-500 text-xs">
-                    &copy;{new Date().getFullYear()} Acme Corp. All rights reserved.
-                </p>
-            </div>
-        </div>
+                <div className='mt-4 text-center'>
+                    <a href="#" className='text-sm text-green-600 hover:text-green-800 transition duration-300'>Forgot password?</a>
+                </div>
+            </motion.div>
+        </motion.div>
     );
 }
 

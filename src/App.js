@@ -5,7 +5,7 @@ import { Route, Routes } from 'react-router-dom';
 import Register from './pages/Register';
 import VehicleEntry from './pages/VehicleEntry';
 import Venue from './pages/Venue';
-// import Dashboard from './pages/dashboard';
+//  Dashboard from './pages/dashboard';import
 import Equipment from './pages/Equipment';
 import ViewRequest from './pages/viewRequest';
 import ViewReservation from './pages/viewReservation';
@@ -15,6 +15,20 @@ import './App.css';
 import Logins from './pages/logins';
 import AdminDashboard from './pages/adminDashboard';
 import Faculty from './pages/Faculty';
+import Personnel from './pages/Personnel';
+import Master from './pages/Master';
+import Vehiclem from './pages/vehiclemake';
+import Departments from './pages/departments';
+import Vehiclec from './pages/vehiclecategory';
+import Position from './pages/position';
+import Equipmentc from './pages/equipmentCategory';
+import Userlevel from './pages/userLevel';
+import VehicleModel from './pages/vehiclemodel';
+import PersonnelDashboard from './pages/PersonelDashboard';
+
+
+
+
 
 const App = () => {
     const defaultUrl = "http://localhost/coc/gsd/";
@@ -27,7 +41,15 @@ const App = () => {
             <Toaster richColors position='top-center' duration={1500} />
             <main className="main-content">
                 <Routes>
-                    <Route path="/gsd" element={<Logins />} /> 
+                    <Route path="/gsd" element={<Logins />} />
+                    <Route path="/departments" element={<Departments />} />
+                    <Route path="/vehiclemodel" element={<VehicleModel />} />
+                    <Route path="/personeldashboard" element={<PersonnelDashboard />} />
+                    <Route path="/userlevel" element={<Userlevel /> } /> 
+                    <Route path="/position" element={<Position />} />
+                    <Route path="/equipmentCat" element={<Equipmentc />} />
+                    <Route path="/vehiclemake" element={<Vehiclem />} /> 
+                    <Route path="/vehicleCategory" element={<Vehiclec />} /> 
                     <Route path="/VehicleEntry" element={<VehicleEntry />} /> 
                     <Route path="/viewReservation" element={<ViewReservation />} /> 
                     <Route path="/addReservation" element={<AddReservation />} /> {/* Add new route for AddReservation */}
@@ -37,6 +59,9 @@ const App = () => {
                     <Route path="/Faculty" element={<Faculty />} />
                     <Route path="/Register" element={<Register />} />
                     <Route path="/viewRequest" element={<ViewRequest />} />
+                    <Route path="/personel" element={<Personnel />} />
+                    <Route path="/Master" element={<Master />} />
+                    
                     <Route path="*" element={<div>404 Not Found</div>} /> 
                 </Routes>
             </main>

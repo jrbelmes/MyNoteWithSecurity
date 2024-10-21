@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
-import { FaPlus, FaSearch, FaEdit, FaTrash } from 'react-icons/fa';
+import { FaPlus, FaSearch, FaPencilAlt, FaTrashAlt } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import axios from 'axios';
@@ -15,13 +15,15 @@ const EquipmentEntry = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [entriesPerPage] = useState(10);
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [newEquipmentName, setNewEquipmentName] = useState('');
     const [newEquipmentQuantity, setNewEquipmentQuantity] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('');
     const [editingEquipment, setEditingEquipment] = useState(null);
     const navigate = useNavigate();
     const adminLevel = localStorage.getItem('adminLevel');
+    const [filteredEquipments, setFilteredEquipments] = useState([]);
 
     useEffect(() => {
         if (adminLevel !== '100') {
@@ -34,6 +36,18 @@ const EquipmentEntry = () => {
         fetchEquipments();
         fetchCategories();
     }, []);
+
+    useEffect(() => {
+        const delayDebounceFn = setTimeout(() => {
+            const filtered = equipments.filter(equipment =>
+                equipment.equip_name && equipment.equip_name.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+            setFilteredEquipments(filtered);
+            setCurrentPage(1);
+        }, 300);
+
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchTerm, equipments]);
 
     const fetchEquipments = async () => {
         setLoading(true);
@@ -80,26 +94,26 @@ const EquipmentEntry = () => {
             toast.error("All fields are required!");
             return;
         }
-
+    
         const equipmentData = {
             name: newEquipmentName,
             quantity: newEquipmentQuantity,
-            category_id: selectedCategory
+            categoryId: selectedCategory, // Updated to match the JSON structure
         };
-
+    
         let url = "http://localhost/coc/gsd/insert_master.php";
         let operation = "saveEquipment";
-
+    
         if (editingEquipment) {
-            equipmentData.equip_id = editingEquipment.equip_id;
+            equipmentData.equipmentId = editingEquipment.equip_id; // Update to match PHP
             url = "http://localhost/coc/gsd/update_master1.php";
             operation = "updateEquipment";
         }
-
+    
         const formData = new FormData();
         formData.append("operation", operation);
-        formData.append("json", JSON.stringify(equipmentData));
-
+        formData.append("json", JSON.stringify(equipmentData)); // No need to add equipmentId separately
+    
         setLoading(true);
         try {
             const response = await axios.post(url, formData);
@@ -115,9 +129,15 @@ const EquipmentEntry = () => {
             console.error("Error saving equipment:", error);
         } finally {
             setLoading(false);
-            setIsModalOpen(false);
+            if (editingEquipment) {
+                setIsEditModalOpen(false);
+            } else {
+                setIsAddModalOpen(false);
+            }
         }
     };
+    
+    
 
     const resetForm = () => {
         setNewEquipmentName('');
@@ -126,12 +146,30 @@ const EquipmentEntry = () => {
         setEditingEquipment(null);
     };
 
-    const handleEditClick = (equipment) => {
-        setNewEquipmentName(equipment.equip_name);
-        setNewEquipmentQuantity(equipment.equip_quantity);
-        setSelectedCategory(equipment.category_id);
-        setEditingEquipment(equipment);
-        setIsModalOpen(true);
+    const handleEditClick = async (equipment) => {
+        await getEquipmentDetails(equipment.equip_id);
+        setIsEditModalOpen(true);
+    };
+
+    const getEquipmentDetails = async (equip_id) => {
+        const url = "http://localhost/coc/gsd/fetchMaster.php";
+        const jsonData = { operation: "fetchEquipmentById", id: equip_id };
+
+        try {
+            const response = await axios.post(url, new URLSearchParams(jsonData));
+            if (response.data.status === 'success') {
+                const equipment = response.data.data[0];
+                setNewEquipmentName(equipment.equip_name);
+                setNewEquipmentQuantity(equipment.equip_quantity);
+                setSelectedCategory(equipment.equipment_equipment_category_id);
+                setEditingEquipment(equipment);
+            } else {
+                toast.error("Error fetching equipment details: " + response.data.message);
+            }
+        } catch (error) {
+            toast.error("An error occurred while fetching equipment details.");
+            console.error("Error fetching equipment details:", error);
+        }
     };
 
     const handleDeleteClick = async (equip_id) => {
@@ -157,10 +195,6 @@ const EquipmentEntry = () => {
         }
     };
 
-    const filteredEquipments = equipments.filter(equipment =>
-        equipment.equip_name && equipment.equip_name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
     const indexOfLastEquipment = currentPage * entriesPerPage;
     const indexOfFirstEquipment = indexOfLastEquipment - entriesPerPage;
     const currentEquipments = filteredEquipments.slice(indexOfFirstEquipment, indexOfLastEquipment);
@@ -169,113 +203,125 @@ const EquipmentEntry = () => {
     const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
     return (
-        <div className="flex flex-col lg:flex-row">
+        <div className="flex flex-col lg:flex-row min-h-screen bg-[#F4CE14] bg-opacity-10">
             <Sidebar />
-            <div className="flex-grow ml-0 lg:ml-10 p-6">
-                <h2 className="text-2xl font-bold">Equipment Entry</h2>
-                <div className="flex flex-col lg:flex-row items-center mb-4">
-                    <input
-                        type="text"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="Search..."
-                        className="border border-gray-300 p-2 rounded w-full max-w-xs"
-                    />
-                    <button onClick={fetchEquipments} className="flex items-center bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 ml-4">
-                        <FaSearch className="mr-2" /> Search
-                    </button>
-                    <button onClick={() => setIsModalOpen(true)} className="flex items-center bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 ml-4">
-                        <FaPlus className="mr-2" /> Add Equipment
-                    </button>
-                </div>
-
-                {loading ? (
-                    <div className="flex justify-center py-10">
-                        <div className="loader"></div>
-                    </div>
-                ) : (
-                    <table className="min-w-full bg-white shadow-md rounded-lg overflow-hidden">
-                        <thead>
-                            <tr className="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
-                                <th className="py-3 px-6 text-left">No.</th>
-                                <th className="py-3 px-6 text-left">Equipment Name</th>
-                                <th className="py-3 px-6 text-left">Equipment Quantity</th>
-                                <th className="py-3 px-6 text-left">Status</th>
-                                <th className="py-3 px-6 text-left">Equipment Created</th>
-                                <th className="py-3 px-6 text-left">Equipment Updated</th>
-                                <th className="py-3 px-6 text-left">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="text-gray-600 text-sm font-light">
-                            {currentEquipments.length > 0 ? (
-                                currentEquipments.map((equipment, index) => (
-                                    <tr key={equipment.equip_id} className="border-b border-gray-200 hover:bg-gray-100">
-                                        <td className="py-3 px-6">{indexOfFirstEquipment + index + 1}</td>
-                                        <td className="py-3 px-6">{equipment.equip_name}</td>
-                                        <td className="py-3 px-6">{equipment.equip_quantity}</td>
-                                        <td className="py-3 px-6">{equipment.equip_status}</td>
-                                        <td className="py-3 px-6">{equipment.equip_created_at}</td>
-                                        <td className="py-3 px-6">{equipment.equip_updated_at}</td>
-                                        <td className="py-3 px-6">
-                                            <button className="text-blue-500" onClick={() => handleEditClick(equipment)}>
-                                                <FaEdit />
-                                            </button>
-                                            <button className="text-red-500 ml-2" onClick={() => handleDeleteClick(equipment.equip_id)}>
-                                                <FaTrash />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))
-                            ) : (
-                                <tr>
-                                    <td colSpan="7" className="py-3 px-6 text-center">No equipment found.</td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                )}
-
-                <div className="flex justify-center mt-4">
-                    {Array.from({ length: totalPages }, (_, index) => (
-                        <button
-                            key={index}
-                            onClick={() => paginate(index + 1)}
-                            className={`mx-1 px-3 py-1 rounded ${currentPage === index + 1 ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-600'}`}
-                        >
-                            {index + 1}
-                        </button>
-                    ))}
-                </div>
-
-                <Modal show={isModalOpen} onHide={() => setIsModalOpen(false)}>
-                    <Modal.Header closeButton>
-                        <Modal.Title>{editingEquipment ? "Edit Equipment" : "Add Equipment"}</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
-                        <div className="mb-3">
-                            <label className="form-label">Equipment Name</label>
+            <div className="flex-grow p-8">
+                <h2 className="text-3xl font-bold text-[#495E57] mb-6">Equipment Management</h2>
+                <div className="bg-white rounded-lg shadow-md p-6">
+                    <div className="flex flex-col md:flex-row justify-between items-center mb-6">
+                        <div className="relative w-full md:w-96 mb-4 md:mb-0">
                             <input
                                 type="text"
-                                className="form-control"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                placeholder="Search equipment..."
+                                className="w-full pl-10 pr-4 py-2 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <FaSearch className="text-gray-400" />
+                            </div>
+                        </div>
+                        <button onClick={() => setIsAddModalOpen(true)} className="bg-[#495E57] text-white px-4 py-2 rounded-lg hover:bg-[#3a4a45] transition duration-300 flex items-center">
+                            <FaPlus className="mr-2" />
+                            Add Equipment
+                        </button>
+                    </div>
+
+                    {loading ? (
+                        <div className="flex justify-center py-10">
+                            <div className="loader"></div>
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead>
+                                    <tr className="bg-[#495E57] text-left text-xs font-semibold text-white uppercase tracking-wider">
+                                        <th className="px-6 py-3">No.</th>
+                                        <th className="px-6 py-3">Equipment Name</th>
+                                        <th className="px-6 py-3">Quantity</th>
+                                        <th className="px-6 py-3">Status</th>
+                                        <th className="px-6 py-3">Created At</th>
+                                        <th className="px-6 py-3">Updated At</th>
+                                        <th className="px-6 py-3">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-[#495E57] divide-opacity-20">
+                                    {currentEquipments.length > 0 ? (
+                                        currentEquipments.map((equipment, index) => (
+                                            <tr key={equipment.equip_id} className="hover:bg-[#F4CE14] hover:bg-opacity-10 transition-all">
+                                                <td className="px-6 py-4 whitespace-nowrap">{indexOfFirstEquipment + index + 1}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap">{equipment.equip_name}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap">{equipment.equip_quantity}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap">{equipment.equip_status}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap">{equipment.equip_created_at}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap">{equipment.equip_updated_at}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <button className="text-[#495E57] hover:text-[#3a4a45] mr-3" onClick={() => handleEditClick(equipment)}>
+                                                        <FaPencilAlt />
+                                                    </button>
+                                                    <button className="text-red-600 hover:text-red-800" onClick={() => handleDeleteClick(equipment.equip_id)}>
+                                                        <FaTrashAlt />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan="7" className="px-6 py-4 text-center text-[#495E57]">
+                                                No equipment found.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
+                    {totalPages > 1 && (
+                        <div className="flex justify-center mt-6">
+                            {Array.from({ length: totalPages }, (_, i) => (
+                                <button
+                                    key={i}
+                                    onClick={() => paginate(i + 1)}
+                                    className={`mx-1 px-4 py-2 rounded-md ${currentPage === i + 1 ? 'bg-[#495E57] text-white' : 'bg-[#F4CE14] text-[#495E57] hover:bg-[#f3d44a]'}`}
+                                >
+                                    {i + 1}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Add Equipment Modal */}
+                <Modal show={isAddModalOpen} onHide={() => setIsAddModalOpen(false)}>
+                    <Modal.Header closeButton>
+                        <Modal.Title className="text-[#495E57]">Add Equipment</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-[#495E57] mb-2">Equipment Name</label>
+                            <input
+                                type="text"
                                 value={newEquipmentName}
                                 onChange={(e) => setNewEquipmentName(e.target.value)}
+                                className="w-full px-3 py-2 border border-[#495E57] rounded-md focus:outline-none focus:ring-2 focus:ring-[#F4CE14]"
                             />
                         </div>
-                        <div className="mb-3">
-                            <label className="form-label">Equipment Quantity</label>
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-[#495E57] mb-2">Equipment Quantity</label>
                             <input
                                 type="number"
-                                className="form-control"
                                 value={newEquipmentQuantity}
                                 onChange={(e) => setNewEquipmentQuantity(e.target.value)}
+                                className="w-full px-3 py-2 border border-[#495E57] rounded-md focus:outline-none focus:ring-2 focus:ring-[#F4CE14]"
                             />
                         </div>
-                        <div className="mb-3">
-                            <label className="form-label">Select Category</label>
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-[#495E57] mb-2">Select Category</label>
                             <select
-                                className="form-select"
                                 value={selectedCategory}
                                 onChange={(e) => setSelectedCategory(e.target.value)}
+                                className="w-full px-3 py-2 border border-[#495E57] rounded-md focus:outline-none focus:ring-2 focus:ring-[#F4CE14]"
                             >
                                 <option value="">Select a category</option>
                                 {categories.map(category => (
@@ -287,11 +333,61 @@ const EquipmentEntry = () => {
                         </div>
                     </Modal.Body>
                     <Modal.Footer>
-                        <Button variant="secondary" onClick={() => setIsModalOpen(false)}>
+                        <Button variant="secondary" onClick={() => setIsAddModalOpen(false)}>
                             Close
                         </Button>
                         <Button variant="primary" onClick={handleSubmit}>
-                            {editingEquipment ? "Update Equipment" : "Add Equipment"}
+                            Add Equipment
+                        </Button>
+                    </Modal.Footer>
+                </Modal>
+
+                {/* Update Equipment Modal */}
+                <Modal show={isEditModalOpen} onHide={() => setIsEditModalOpen(false)}>
+                    <Modal.Header closeButton>
+                        <Modal.Title className="text-[#495E57]">Edit Equipment</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-[#495E57] mb-2">Equipment Name</label>
+                            <input
+                                type="text"
+                                value={newEquipmentName}
+                                onChange={(e) => setNewEquipmentName(e.target.value)}
+                                className="w-full px-3 py-2 border border-[#495E57] rounded-md focus:outline-none focus:ring-2 focus:ring-[#F4CE14]"
+                            />
+                        </div>
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-[#495E57] mb-2">Equipment Quantity</label>
+                            <input
+                                type="number"
+                                value={newEquipmentQuantity}
+                                onChange={(e) => setNewEquipmentQuantity(e.target.value)}
+                                className="w-full px-3 py-2 border border-[#495E57] rounded-md focus:outline-none focus:ring-2 focus:ring-[#F4CE14]"
+                            />
+                        </div>
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-[#495E57] mb-2">Select Category</label>
+                            <select
+                                value={selectedCategory}
+                                onChange={(e) => setSelectedCategory(e.target.value)}
+                                className="w-full px-3 py-2 border border-[#495E57] rounded-md focus:outline-none focus:ring-2 focus:ring-[#F4CE14]"
+                            >
+                                <option value="">Select a category</option>
+                                {categories.map(category => (
+                                    <option key={category.equipments_category_id} value={category.equipments_category_id}>
+                                        {category.equipments_category_name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button variant="secondary" onClick={() => setIsEditModalOpen(false)}>
+                            Close
+                        </Button>
+                        <Button variant="primary" onClick={handleSubmit}>
+                            Update Equipment
                         </Button>
                     </Modal.Footer>
                 </Modal>

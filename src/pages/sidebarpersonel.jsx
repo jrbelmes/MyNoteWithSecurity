@@ -24,8 +24,8 @@ const Sidebar = () => {
       <button className="lg:hidden p-2" onClick={toggleSidebar}>
         <FaBars className="text-white" />
       </button>
-      <aside className={`fixed h-full bg-gray-800 text-white shadow-lg transition-transform ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-16'} lg:translate-x-0 lg:w-64`}>
-        <div className="sidebar-header p-5 text-center bg-gray-700 border-b border-gray-600">
+      <aside className={`fixed h-full bg-emerald-800 text-white shadow-lg transition-transform ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-16'} lg:translate-x-0 lg:w-64`}>
+        <div className="sidebar-header p-5 text-center bg-emerald-950 border-b border-gray-600">
           <div className="flex items-center justify-center mb-2">
             <FaUserCircle className="text-3xl" />
           </div>
