@@ -24,7 +24,10 @@ import Position from './pages/position';
 import Equipmentc from './pages/equipmentCategory';
 import Userlevel from './pages/userLevel';
 import VehicleModel from './pages/vehiclemodel';
+<<<<<<< HEAD
 import PersonnelDashboard from './pages/PersonelDashboard';
+=======
+>>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271
 
 
 
@@ -44,7 +47,10 @@ const App = () => {
                     <Route path="/gsd" element={<Logins />} />
                     <Route path="/departments" element={<Departments />} />
                     <Route path="/vehiclemodel" element={<VehicleModel />} />
+<<<<<<< HEAD
                     <Route path="/personeldashboard" element={<PersonnelDashboard />} />
+=======
+>>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271
                     <Route path="/userlevel" element={<Userlevel /> } /> 
                     <Route path="/position" element={<Position />} />
                     <Route path="/equipmentCat" element={<Equipmentc />} />

@@ -220,4 +220,8 @@ const Departments = () => {
     );
 };
 
+<<<<<<< HEAD
 export default Departments;
+=======
+export default Departments;
+>>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271

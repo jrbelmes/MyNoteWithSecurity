@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 
+=======
+>>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271
 import React, { useState, useEffect } from 'react';
 import { FaCar, FaPlus, FaTools, FaCogs, FaListAlt, FaUserShield, FaEye } from 'react-icons/fa';
 import axios from 'axios';
@@ -96,8 +99,13 @@ const Master = () => {
         setIsSuccess(false);
       }
     } catch (error) {
+<<<<<<< HEAD
       console.error(Error `adding ${operation}:, error`);
       setMessage(Error `adding ${operation}.`);
+=======
+      console.error(`Error adding ${operation}:`, error);
+      setMessage(`Error adding ${operation}.`);
+>>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271
       setIsSuccess(false);
     }
   };
@@ -140,7 +148,11 @@ const Master = () => {
       setIsSuccess(false);
       return;
     }
+<<<<<<< HEAD
     handleSaveData('saveModelData', { name: modelName, category_id: selectedCategory, make_id: selectedMake });
+=======
+    handleSaveData('saveModelData', { vehicle_model_name: modelName, category_id: selectedCategory, make_id: selectedMake });
+>>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271
   };
 
   const handleSaveEquipmentData = (e) => {
@@ -176,7 +188,10 @@ const Master = () => {
             { title: 'Vehicle Make', icon: <FaTools />, action: () => setIsAddMakeModalOpen(true), viewPath: '/vehiclemake' },
             { title: 'Vehicle Model', icon: <FaCogs />, action: () => setIsAddModelModalOpen(true), viewPath: '/vehiclemodel' },
             { title: 'Departments', icon: <FaListAlt />, action: () => setIsAddDepartmentModalOpen(true), viewPath: '/departments' },
+<<<<<<< HEAD
             { title: 'Equipments', icon: <FaListAlt />, action: () => setIsAddEquipmentModalOpen(true), viewPath: '/equipmentCat' },
+=======
+>>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271
             { title: 'Position', icon: <FaCar />, action: () => setIsAddPositionModalOpen(true), viewPath: '/position' },
             { title: 'User Level', icon: <FaUserShield />, action: () => setIsAddUserLevelModalOpen(true), viewPath: '/userlevel' },
           ].map((card, index) => (
@@ -254,9 +269,13 @@ const Master = () => {
                 >
                   <option value="">Select Category</option>
                   {categories.map((category) => (
+<<<<<<< HEAD
                     <option key={category.vehicle_category_id} value={category.vehicle_category_id}>
                       {category.vehicle_category_name}
                     </option>
+=======
+                    <option key={category.id} value={category.id}>{category.vehicle_category_name}</option>
+>>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271
                   ))}
                 </select>
                 <select
@@ -266,9 +285,13 @@ const Master = () => {
                 >
                   <option value="">Select Make</option>
                   {makes.map((make) => (
+<<<<<<< HEAD
                     <option key={make.vehicle_make_id} value={make.vehicle_make_id}>
                       {make.vehicle_make_name}
                     </option>
+=======
+                    <option key={make.id} value={make.id}>{make.vehicle_make_name}</option>
+>>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271
                   ))}
                 </select>
                 <input
@@ -388,7 +411,11 @@ const Master = () => {
         )}
 
         {message && (
+<<<<<<< HEAD
           <div className={`fixed bottom-4 right-4 bg-red-500 text<?phpwhite p-4 rounded shadow-lg`}>
+=======
+          <div className={`fixed bottom-4 right-4 bg-red-500 text-white p-4 rounded shadow-lg`}>
+>>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271
             {message}
           </div>
         )}
@@ -397,4 +424,8 @@ const Master = () => {
   );
 };
 
+<<<<<<< HEAD
 export default Master;
+=======
+export default Master;
+>>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271

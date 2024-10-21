@@ -184,6 +184,7 @@ const UserManagement = () => {
     return (
         <div className="flex h-screen  bg-[#F4CE14] bg-opacity-10">
             <Sidebar />
+<<<<<<< HEAD
             <div className="flex-1 flex flex-col overflow-hidden">
                 <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[#F4CE14] bg-opacity-10">
                     <div className="container mx-auto px-6 py-8">
@@ -257,6 +258,72 @@ const UserManagement = () => {
                 </Modal.Header>
                 <Modal.Body>
                     <div className="grid grid-cols-2 gap-4">
+=======
+            <div className="flex-grow ml-0 lg:ml-10 p-6">
+                <h2 className="text-2xl font-bold">User Management</h2>
+                <div className="flex justify-between mb-4">
+                    <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Search by Name..."
+                        className="border border-gray-300 p-2 rounded w-full max-w-xs"
+                    />
+                    <Button variant="primary" onClick={() => { resetForm(); setIsAddModalOpen(true); }}>
+                        <FaPlus /> Add User
+                    </Button>
+                </div>
+
+                {loading ? (
+                    <div className="flex justify-center py-10">
+                        <div className="loader"></div>
+                    </div>
+                ) : (
+                    <table className="min-w-full bg-white shadow-md rounded-lg overflow-hidden">
+                        <thead>
+                            <tr className="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
+                                <th className="py-3 px-6 text-left">Name</th>
+                                <th className="py-3 px-6 text-left">School ID</th>
+                                <th className="py-3 px-6 text-left">Contact</th>
+                                <th className="py-3 px-6 text-left">Department</th>
+                                <th className="py-3 px-6 text-left">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="text-gray-600 text-sm font-light">
+                            {filteredUsers.length > 0 ? (
+                                filteredUsers.map((user) => (
+                                    <tr key={user.users_id} className="border-b border-gray-200 hover:bg-gray-100">
+                                        <td className="py-3 px-6">{user.users_name}</td>
+                                        <td className="py-3 px-6">{user.users_school_id}</td>
+                                        <td className="py-3 px-6">{user.users_contact_number}</td>
+                                        <td className="py-3 px-6">{user.departments_name}</td> {/* Updated this line */}
+                                        <td className="py-3 px-6">
+                                            <button className="text-blue-500" onClick={() => fetchUserDetails(user.users_id)}>
+                                                <FaEdit />
+                                            </button>
+                                            <button className="text-red-500 ml-2" onClick={() => deleteUser(user.users_id)}>
+                                                <FaTrash />
+                                            </button>
+                                        </td>
+                                    </tr>
+
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan="6" className="py-3 px-6 text-center">No users found.</td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                )}
+
+                {/* Add User Modal */}
+                <Modal show={isAddModalOpen} onHide={() => setIsAddModalOpen(false)}>
+                    <Modal.Header closeButton>
+                        <Modal.Title>Add User</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+>>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271
                         {Object.keys(newUser).map((key) => (
                             key !== 'departmentId' && (
                                 <div className="mb-3" key={key}>
@@ -287,6 +354,7 @@ const UserManagement = () => {
                                 ))}
                             </select>
                         </div>
+<<<<<<< HEAD
                     </div>
                 </Modal.Body>
                 <Modal.Footer>
@@ -314,6 +382,33 @@ const UserManagement = () => {
                                         type={key === 'password' ? 'password' : 'text'}
                                         id={key}
                                         className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+=======
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button variant="secondary" onClick={() => setIsAddModalOpen(false)}>
+                            Close
+                        </Button>
+                        <Button variant="primary" onClick={handleAddUserSubmit}>
+                            Submit
+                        </Button>
+                    </Modal.Footer>
+                </Modal>
+
+                {/* Update User Modal */}
+                <Modal show={isUpdateModalOpen} onHide={() => setIsUpdateModalOpen(false)}>
+                    <Modal.Header closeButton>
+                        <Modal.Title>Update User</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        {Object.keys(newUser).map((key) => (
+                            key !== 'departmentId' && (
+                                <div className="mb-3" key={key}>
+                                    <label htmlFor={key} className="form-label">{key.replace(/_/g, ' ').toUpperCase()}</label>
+                                    <input
+                                        type={key === 'password' ? 'password' : 'text'}
+                                        id={key}
+                                        className="form-control"
+>>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271
                                         value={newUser[key]}
                                         onChange={(e) => setNewUser({ ...newUser, [key]: e.target.value })}
                                     />
@@ -321,10 +416,17 @@ const UserManagement = () => {
                             )
                         ))}
                         <div className="mb-3">
+<<<<<<< HEAD
                             <label htmlFor="departmentId" className="block text-sm font-medium text-gray-700">Department</label>
                             <select
                                 id="departmentId"
                                 className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+=======
+                            <label htmlFor="departmentId" className="form-label">Department</label>
+                            <select
+                                id="departmentId"
+                                className="form-control"
+>>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271
                                 value={newUser.departmentId}
                                 onChange={(e) => setNewUser({ ...newUser, departmentId: e.target.value })}
                             >
@@ -335,6 +437,7 @@ const UserManagement = () => {
                                 ))}
                             </select>
                         </div>
+<<<<<<< HEAD
                     </div>
                 </Modal.Body>
                 <Modal.Footer>
@@ -346,6 +449,19 @@ const UserManagement = () => {
                     </Button>
                 </Modal.Footer>
             </Modal>
+=======
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button variant="secondary" onClick={() => setIsUpdateModalOpen(false)}>
+                            Close
+                        </Button>
+                        <Button variant="primary" onClick={handleUpdateUserSubmit}>
+                            Submit
+                        </Button>
+                    </Modal.Footer>
+                </Modal>
+            </div>
+>>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271
         </div>
     );
 };

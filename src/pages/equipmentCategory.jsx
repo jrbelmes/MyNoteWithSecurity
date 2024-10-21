@@ -213,4 +213,8 @@ const EquipmentCategories = () => {
   );
 };
 
+<<<<<<< HEAD
 export default EquipmentCategories;
+=======
+export default EquipmentCategories;
+>>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271
