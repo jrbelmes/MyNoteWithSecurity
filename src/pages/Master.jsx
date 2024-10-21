@@ -1,12 +1,9 @@
-<<<<<<< HEAD
-
-=======
->>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271
 import React, { useState, useEffect } from 'react';
 import { FaCar, FaPlus, FaTools, FaCogs, FaListAlt, FaUserShield, FaEye } from 'react-icons/fa';
 import axios from 'axios';
 import Sidebar from './Sidebar';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 
 const Master = () => {
   const navigate = useNavigate();
@@ -99,13 +96,8 @@ const Master = () => {
         setIsSuccess(false);
       }
     } catch (error) {
-<<<<<<< HEAD
-      console.error(Error `adding ${operation}:, error`);
-      setMessage(Error `adding ${operation}.`);
-=======
       console.error(`Error adding ${operation}:`, error);
       setMessage(`Error adding ${operation}.`);
->>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271
       setIsSuccess(false);
     }
   };
@@ -148,11 +140,7 @@ const Master = () => {
       setIsSuccess(false);
       return;
     }
-<<<<<<< HEAD
-    handleSaveData('saveModelData', { name: modelName, category_id: selectedCategory, make_id: selectedMake });
-=======
     handleSaveData('saveModelData', { vehicle_model_name: modelName, category_id: selectedCategory, make_id: selectedMake });
->>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271
   };
 
   const handleSaveEquipmentData = (e) => {
@@ -176,39 +164,59 @@ const Master = () => {
   };
 
   return (
-    <div className="flex">
+    <div className="flex h-screen bg-gradient-to-br from-green-100 to-white">
       <Sidebar />
-      <div className="flex-grow p-8">
-        <h1 className="text-2xl font-bold mb-4">Vehicle Master Page</h1>
+      <div className="flex-grow p-8 overflow-y-auto">
+        <motion.h1 
+          initial={{ opacity: 0, y: -50 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="text-4xl font-bold mb-8 text-green-800"
+        >
+          Vehicle Master Dashboard
+        </motion.h1>
         
-        <div className="flex flex-wrap gap-6">
-          {/* Card Components */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {[
             { title: 'Vehicle Category', icon: <FaCar />, action: () => setIsAddCategoryModalOpen(true), viewPath: '/vehicleCategory' },
             { title: 'Vehicle Make', icon: <FaTools />, action: () => setIsAddMakeModalOpen(true), viewPath: '/vehiclemake' },
             { title: 'Vehicle Model', icon: <FaCogs />, action: () => setIsAddModelModalOpen(true), viewPath: '/vehiclemodel' },
             { title: 'Departments', icon: <FaListAlt />, action: () => setIsAddDepartmentModalOpen(true), viewPath: '/departments' },
-<<<<<<< HEAD
             { title: 'Equipments', icon: <FaListAlt />, action: () => setIsAddEquipmentModalOpen(true), viewPath: '/equipmentCat' },
-=======
->>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271
             { title: 'Position', icon: <FaCar />, action: () => setIsAddPositionModalOpen(true), viewPath: '/position' },
             { title: 'User Level', icon: <FaUserShield />, action: () => setIsAddUserLevelModalOpen(true), viewPath: '/userlevel' },
           ].map((card, index) => (
-            <div key={index} className="card mx-2 my-4 w-56 h-40 bg-gray-300 bg-opacity-50 border border-white shadow-lg backdrop-blur-md rounded-lg flex flex-col items-center justify-center">
-              <div className="flex items-center">
-                {card.icon}
-                <h3 className="text-lg font-bold">{card.title}</h3>
+            <motion.div 
+              key={index}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.3, delay: index * 0.1 }}
+              whileHover={{ scale: 1.05 }}
+              className="bg-white rounded-lg shadow-lg overflow-hidden"
+            >
+              <div className="p-6 bg-gradient-to-r from-green-400 to-green-600">
+                <div className="text-white text-3xl mb-2">{card.icon}</div>
+                <h3 className="text-xl font-semibold text-white">{card.title}</h3>
               </div>
-              <div className="flex justify-between w-full">
-                <button onClick={() => { card.action(); setMessage(''); }} className="p-2 text-black hover:bg-gray-200 rounded-full">
+              <div className="p-4 flex justify-between">
+                <motion.button 
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => { card.action(); setMessage(''); }} 
+                  className="p-2 bg-green-500 text-white rounded-full hover:bg-green-600 transition duration-300"
+                >
                   <FaPlus />
-                </button>
-                <button onClick={() => navigate(card.viewPath)} className="p-2 text-black hover:bg-gray-200 rounded-full">
+                </motion.button>
+                <motion.button 
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => navigate(card.viewPath)} 
+                  className="p-2 bg-green-500 text-white rounded-full hover:bg-green-600 transition duration-300"
+                >
                   <FaEye />
-                </button>
+                </motion.button>
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
 
@@ -269,13 +277,9 @@ const Master = () => {
                 >
                   <option value="">Select Category</option>
                   {categories.map((category) => (
-<<<<<<< HEAD
                     <option key={category.vehicle_category_id} value={category.vehicle_category_id}>
                       {category.vehicle_category_name}
                     </option>
-=======
-                    <option key={category.id} value={category.id}>{category.vehicle_category_name}</option>
->>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271
                   ))}
                 </select>
                 <select
@@ -285,13 +289,9 @@ const Master = () => {
                 >
                   <option value="">Select Make</option>
                   {makes.map((make) => (
-<<<<<<< HEAD
                     <option key={make.vehicle_make_id} value={make.vehicle_make_id}>
                       {make.vehicle_make_name}
                     </option>
-=======
-                    <option key={make.id} value={make.id}>{make.vehicle_make_name}</option>
->>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271
                   ))}
                 </select>
                 <input
@@ -405,27 +405,29 @@ const Master = () => {
         )}
 
         {popupMessage && (
-          <div className={`fixed bottom-4 right-4 bg-green-500 text-white p-4 rounded shadow-lg`}>
+          <motion.div 
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-4 right-4 bg-green-500 text-white p-4 rounded-lg shadow-lg"
+          >
             {popupMessage}
-          </div>
+          </motion.div>
         )}
 
         {message && (
-<<<<<<< HEAD
-          <div className={`fixed bottom-4 right-4 bg-red-500 text<?phpwhite p-4 rounded shadow-lg`}>
-=======
-          <div className={`fixed bottom-4 right-4 bg-red-500 text-white p-4 rounded shadow-lg`}>
->>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271
+          <motion.div 
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-4 right-4 bg-red-500 text-white p-4 rounded-lg shadow-lg"
+          >
             {message}
-          </div>
+          </motion.div>
         )}
       </div>
     </div>
   );
 };
 
-<<<<<<< HEAD
 export default Master;
-=======
-export default Master;
->>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271

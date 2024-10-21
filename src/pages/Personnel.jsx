@@ -1,33 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
-<<<<<<< HEAD
-import { FiUserPlus, FiEdit, FiTrash2, FiSearch } from 'react-icons/fi';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faEdit, faTrashAlt, faSearch, faPlus, faUser, faCheck, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { Modal, Button, Form } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const Personnel = () => {
-=======
-import { FaPlus, FaEdit, FaTrash } from 'react-icons/fa';
-import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
-import axios from 'axios';
-import { Modal, Button } from 'react-bootstrap';
-import 'bootstrap/dist/css/bootstrap.min.css';
-
-const UserManagement = () => {
-    const adminId = localStorage.getItem('adminId') || '';
->>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271
     const [personnel, setPersonnel] = useState([]);
     const [positions, setPositions] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-<<<<<<< HEAD
     const [modalState, setModalState] = useState({ isOpen: false, type: '', user: null });
     const navigate = useNavigate();
     const adminLevel = localStorage.getItem('adminLevel');
+    const [sortConfig, setSortConfig] = useState({ key: null, direction: 'ascending' });
 
     useEffect(() => {
         if (adminLevel !== '100') {
@@ -126,80 +116,126 @@ const UserManagement = () => {
         (person.jo_personel_lname && person.jo_personel_lname.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
-    return (
-        <div className="flex h-screen bg-[#F4CE14] bg-opacity-10">
-            <Sidebar />
-            <div className="flex-1 flex flex-col overflow-hidden">
-                <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[#F4CE14] bg-opacity-10">
-                    <div className="container mx-auto px-6 py-8">
-                        <h3 className="text-gray-700 text-3xl font-medium">Personnel Management</h3>
-                        
-                        <div className="mt-8">
-                            <div className="flex flex-col lg:flex-row items-center justify-between mb-4">
-                                <div className="relative w-full max-w-xs mb-4 lg:mb-0">
-                                    <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                                    <input
-                                        type="text"
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        placeholder="Search by Full Name..."
-                                        className="pl-10 pr-4 py-2 border border-gray-300 rounded-md w-full"
-                                    />
-                                </div>
-                                <Button 
-                                    variant="primary" 
-                                    onClick={() => setModalState({ isOpen: true, type: 'add', user: null })}
-                                    className="flex items-center bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded"
-                                >
-                                    <FiUserPlus className="mr-2" /> Add Personnel
-                                </Button>
-                            </div>
-                        </div>
+    const sortedPersonnel = React.useMemo(() => {
+        let sortableItems = [...filteredPersonnel];
+        if (sortConfig.key !== null) {
+            sortableItems.sort((a, b) => {
+                if (a[sortConfig.key] < b[sortConfig.key]) {
+                    return sortConfig.direction === 'ascending' ? -1 : 1;
+                }
+                if (a[sortConfig.key] > b[sortConfig.key]) {
+                    return sortConfig.direction === 'ascending' ? 1 : -1;
+                }
+                return 0;
+            });
+        }
+        return sortableItems;
+    }, [filteredPersonnel, sortConfig]);
 
-                        <div className="mt-8">
-                            <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-                                {loading ? (
-                                    <div className="flex justify-center py-10">
-                                        <div className="loader"></div>
-                                    </div>
-                                ) : (
-                                    <div className="overflow-x-auto">
-                                        <table className="min-w-full divide-y divide-gray-200">
-                                            <thead className="bg-gray-50">
-                                                <tr>
-                                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Full Name</th>
-                                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
-                                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
-                                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Position</th>
-                                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="bg-white divide-y divide-gray-200">
-                                                {filteredPersonnel.map((person, index) => (
-                                                    <tr key={index}>
-                                                        <td className="px-6 py-4 whitespace-nowrap">{person.jo_personel_fname} {person.jo_personel_lname}</td>
-                                                        <td className="px-6 py-4 whitespace-nowrap">{person.jo_personel_contact}</td>
-                                                        <td className="px-6 py-4 whitespace-nowrap">{person.username}</td>
-                                                        <td className="px-6 py-4 whitespace-nowrap">{person.position_name}</td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                            <button onClick={() => setModalState({ isOpen: true, type: 'edit', user: person })} className="text-indigo-600 hover:text-indigo-900 mr-2">
-                                                                <FiEdit />
-                                                            </button>
-                                                            <button onClick={() => setModalState({ isOpen: true, type: 'delete', user: person })} className="text-red-600 hover:text-red-900">
-                                                                <FiTrash2 />
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
+    const requestSort = (key) => {
+        let direction = 'ascending';
+        if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+            direction = 'descending';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    return (
+        <div className="flex flex-col lg:flex-row min-h-screen bg-gradient-to-br from-white to-green-500">
+            <Sidebar />
+            <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="flex-grow p-6 lg:p-10"
+            >
+                <h2 className="text-4xl font-bold mb-6 text-green-800 drop-shadow-lg">Personnel Management</h2>
+                <div className="bg-white bg-opacity-90 rounded-lg shadow-xl p-6 mb-6 backdrop-filter backdrop-blur-lg">
+                    <div className="flex flex-col md:flex-row items-center justify-between mb-4">
+                        <motion.div 
+                            whileHover={{ scale: 1.05 }}
+                            className="relative w-full md:w-64 mb-4 md:mb-0"
+                        >
+                            <input
+                                type="text"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                placeholder="Search by Full Name..."
+                                className="w-full pl-10 pr-4 py-2 rounded-full border border-green-300 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-300"
+                            />
+                            <FontAwesomeIcon icon={faSearch} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-400" />
+                        </motion.div>
+                        <motion.button 
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => setModalState({ isOpen: true, type: 'add', user: null })}
+                            className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out flex items-center justify-center shadow-md"
+                        >
+                            <FontAwesomeIcon icon={faPlus} className="mr-2" /> Add Personnel
+                        </motion.button>
                     </div>
-                </main>
-            </div>
+                    {loading ? (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="flex justify-center items-center h-64"
+                        >
+                            <div className="loader"></div>
+                        </motion.div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full table-auto">
+                                <thead>
+                                    <tr className="bg-green-600 text-white">
+                                        <th className="py-3 px-4 text-left rounded-tl-lg">Full Name</th>
+                                        <th className="py-3 px-4 text-left">Contact</th>
+                                        <th className="py-3 px-4 text-left">Username</th>
+                                        <th className="py-3 px-4 text-left">Position</th>
+                                        <th className="py-3 px-4 text-center rounded-tr-lg">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="text-gray-600 text-sm font-light">
+                                    <AnimatePresence>
+                                        {sortedPersonnel.map((person, index) => (
+                                            <motion.tr 
+                                                key={index}
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                exit={{ opacity: 0 }}
+                                                className="border-b border-green-200 hover:bg-green-50 transition-colors duration-200"
+                                            >
+                                                <td className="py-3 px-4">{person.jo_personel_fname} {person.jo_personel_lname}</td>
+                                                <td className="py-3 px-4">{person.jo_personel_contact}</td>
+                                                <td className="py-3 px-4">{person.username}</td>
+                                                <td className="py-3 px-4">{person.position_name}</td>
+                                                <td className="py-3 px-4 text-center">
+                                                    <motion.button 
+                                                        whileHover={{ scale: 1.1 }}
+                                                        whileTap={{ scale: 0.9 }}
+                                                        onClick={() => setModalState({ isOpen: true, type: 'edit', user: person })}
+                                                        className="bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-3 rounded-full transition duration-300 ease-in-out mr-2"
+                                                    >
+                                                        <FontAwesomeIcon icon={faEdit} />
+                                                    </motion.button>
+                                                    <motion.button 
+                                                        whileHover={{ scale: 1.1 }}
+                                                        whileTap={{ scale: 0.9 }}
+                                                        onClick={() => setModalState({ isOpen: true, type: 'delete', user: person })}
+                                                        className="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded-full transition duration-300 ease-in-out"
+                                                    >
+                                                        <FontAwesomeIcon icon={faTrashAlt} />
+                                                    </motion.button>
+                                                </td>
+                                            </motion.tr>
+                                        ))}
+                                    </AnimatePresence>
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            </motion.div>
 
             <PersonnelModal 
                 show={modalState.isOpen} 
@@ -216,12 +252,6 @@ const UserManagement = () => {
 
 const PersonnelModal = ({ show, onHide, type, user, positions, onSubmit, onDelete }) => {
     const [formData, setFormData] = useState({
-=======
-    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [selectedUser, setSelectedUser] = useState({
->>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271
         id: '',
         firstName: '',
         lastName: '',
@@ -230,7 +260,14 @@ const PersonnelModal = ({ show, onHide, type, user, positions, onSubmit, onDelet
         password: '',
         positionId: '',
     });
-<<<<<<< HEAD
+
+    const [passwordCriteria, setPasswordCriteria] = useState({
+        hasUpperCase: false,
+        hasLowerCase: false,
+        hasNumber: false,
+        hasSpecialChar: false,
+        hasMinLength: false,
+    });
 
     useEffect(() => {
         if (user) {
@@ -257,482 +294,126 @@ const PersonnelModal = ({ show, onHide, type, user, positions, onSubmit, onDelet
     }, [user, positions]);
 
     const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        const { name, value } = e.target;
+        setFormData({ ...formData, [name]: value });
+
+        if (name === 'password') {
+            setPasswordCriteria({
+                hasUpperCase: /[A-Z]/.test(value),
+                hasLowerCase: /[a-z]/.test(value),
+                hasNumber: /[0-9]/.test(value),
+                hasSpecialChar: /[!@#$%^&*(),.?":{}|<>]/.test(value),
+                hasMinLength: value.length >= 8,
+            });
+        }
     };
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        onSubmit(formData);
+        if (validateForm()) {
+            onSubmit(formData);
+        }
     };
 
-    if (type === 'delete') {
-        return (
-            <Modal show={show} onHide={onHide}>
-                <Modal.Header closeButton>
-                    <Modal.Title>Confirm Deletion</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    Are you sure you want to delete this personnel?
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button variant="secondary" onClick={onHide}>Cancel</Button>
-                    <Button variant="danger" onClick={() => onDelete(user.jo_personel_id)}>Delete</Button>
-                </Modal.Footer>
-            </Modal>
-        );
-    }
+    const validateForm = () => {
+        if (type !== 'delete' && formData.password) {
+            const isPasswordValid = Object.values(passwordCriteria).every(Boolean);
+            if (!isPasswordValid) {
+                toast.error("Password does not meet all criteria.");
+                return false;
+            }
+        }
+        return true;
+    };
+
+    const renderPasswordCriteria = () => (
+        <div className="mt-2">
+            <p className="text-sm font-semibold mb-1">Password must contain:</p>
+            {Object.entries(passwordCriteria).map(([key, met]) => (
+                <div key={key} className="flex items-center text-sm">
+                    <FontAwesomeIcon 
+                        icon={met ? faCheck : faTimes} 
+                        className={met ? "text-green-500 mr-2" : "text-red-500 mr-2"} 
+                    />
+                    {key === 'hasUpperCase' && 'Uppercase letter'}
+                    {key === 'hasLowerCase' && 'Lowercase letter'}
+                    {key === 'hasNumber' && 'Number'}
+                    {key === 'hasSpecialChar' && 'Special character'}
+                    {key === 'hasMinLength' && 'At least 8 characters'}
+                </div>
+            ))}
+        </div>
+    );
 
     return (
-        <Modal show={show} onHide={onHide}>
-            <Form onSubmit={handleSubmit}>
-                <Modal.Header closeButton>
-                    <Modal.Title>{type === 'add' ? 'Add Personnel' : 'Update Personnel'}</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    <Form.Group className="mb-3">
-                        <Form.Label>First Name</Form.Label>
-                        <Form.Control type="text" name="firstName" value={formData.firstName} onChange={handleChange} required />
-                    </Form.Group>
-                    <Form.Group className="mb-3">
-                        <Form.Label>Last Name</Form.Label>
-                        <Form.Control type="text" name="lastName" value={formData.lastName} onChange={handleChange} required />
-                    </Form.Group>
-                    <Form.Group className="mb-3">
-                        <Form.Label>Contact</Form.Label>
-                        <Form.Control type="text" name="contact" value={formData.contact} onChange={handleChange} required />
-                    </Form.Group>
-                    <Form.Group className="mb-3">
-                        <Form.Label>Username</Form.Label>
-                        <Form.Control type="text" name="username" value={formData.username} onChange={handleChange} required />
-                    </Form.Group>
-                    <Form.Group className="mb-3">
-                        <Form.Label>Password</Form.Label>
-                        <Form.Control type="password" name="password" value={formData.password} onChange={handleChange} />
-                    </Form.Group>
-                    <Form.Group className="mb-3">
-                        <Form.Label>Position</Form.Label>
-                        <Form.Select name="positionId" value={formData.positionId} onChange={handleChange} required>
-                            <option value="">Select Position</option>
-                            {positions.map((position) => (
-                                <option key={position.position_id} value={position.position_id}>
-                                    {position.position_name}
-                                </option>
-                            ))}
-                        </Form.Select>
-                    </Form.Group>
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button variant="secondary" onClick={onHide}>Close</Button>
-                    <Button variant="primary" type="submit">
-                        {type === 'add' ? 'Add Personnel' : 'Update Personnel'}
+        <Modal show={show} onHide={onHide} centered>
+            <Modal.Header closeButton className="bg-green-600 text-white">
+                <Modal.Title><FontAwesomeIcon icon={faUser} className="mr-2" /> {type === 'add' ? 'Add Personnel' : type === 'edit' ? 'Edit Personnel' : 'Confirm Deletion'}</Modal.Title>
+            </Modal.Header>
+            <Modal.Body className="bg-green-50">
+                {type === 'delete' ? (
+                    <p>Are you sure you want to delete this personnel?</p>
+                ) : (
+                    <Form onSubmit={handleSubmit}>
+                        <div className="flex flex-col gap-4">
+                            <div>
+                                <Form.Label className="font-semibold">First Name</Form.Label>
+                                <Form.Control type="text" name="firstName" value={formData.firstName} onChange={handleChange} required className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
+                            </div>
+                            <div>
+                                <Form.Label className="font-semibold">Last Name</Form.Label>
+                                <Form.Control type="text" name="lastName" value={formData.lastName} onChange={handleChange} required className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
+                            </div>
+                            <div>
+                                <Form.Label className="font-semibold">Contact</Form.Label>
+                                <Form.Control type="text" name="contact" value={formData.contact} onChange={handleChange} required className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
+                            </div>
+                            <div>
+                                <Form.Label className="font-semibold">Username</Form.Label>
+                                <Form.Control type="text" name="username" value={formData.username} onChange={handleChange} required className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
+                            </div>
+                            <div>
+                                <Form.Label className="font-semibold">Password</Form.Label>
+                                <Form.Control 
+                                    type="password" 
+                                    name="password" 
+                                    value={formData.password} 
+                                    onChange={handleChange} 
+                                    className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" 
+                                />
+                                {renderPasswordCriteria()}
+                            </div>
+                            <div>
+                                <Form.Label className="font-semibold">Position</Form.Label>
+                                <Form.Select name="positionId" value={formData.positionId} onChange={handleChange} required className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                                    <option value="">Select Position</option>
+                                    {positions.map((position) => (
+                                        <option key={position.position_id} value={position.position_id}>
+                                            {position.position_name}
+                                        </option>
+                                    ))}
+                                </Form.Select>
+                            </div>
+                        </div>
+                    </Form>
+                )}
+            </Modal.Body>
+            <Modal.Footer className="bg-green-50">
+                <Button variant="secondary" onClick={onHide}>
+                    Close
+                </Button>
+                {type === 'delete' ? (
+                    <Button variant="danger" onClick={() => onDelete(user.jo_personel_id)}>
+                        Delete
                     </Button>
-                </Modal.Footer>
-            </Form>
+                ) : (
+                    <Button variant="primary" onClick={handleSubmit} className="bg-green-600 hover:bg-green-700">
+                        {type === 'add' ? 'Add Personnel' : 'Save Changes'}
+                    </Button>
+                )}
+            </Modal.Footer>
         </Modal>
     );
 };
 
 export default Personnel;
-=======
-    const [userToDelete, setUserToDelete] = useState(null);
-    const navigate = useNavigate();
-    const adminLevel = localStorage.getItem('adminLevel');
-
-    useEffect(() => {
-        if (adminLevel !== '100') {
-            localStorage.clear();
-            navigate('/');
-        }
-    }, [adminLevel, navigate]);
-
-    useEffect(() => {
-        fetchPersonnel();
-        fetchPositions();
-    }, []);
-
-    const fetchPersonnel = async () => {
-        setLoading(true);
-        const url = "http://localhost/coc/gsd/user.php";
-
-        try {
-            const response = await axios.post(url, new URLSearchParams({ operation: "fetchPersonnel" }), {
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            });
-            if (response.data.status === 'success') {
-                setPersonnel(response.data.data);
-            } else {
-                toast.error("Error fetching personnel: " + response.data.message);
-            }
-        } catch {
-            toast.error("An error occurred while fetching personnel.");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const fetchPositions = async () => {
-        const url = "http://localhost/coc/gsd/user.php";
-
-        try {
-            const response = await axios.post(url, new URLSearchParams({ operation: "fetchPositions" }), {
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            });
-            if (response.data.status === 'success') {
-                setPositions(response.data.data);
-            } else {
-                toast.error("Error fetching positions: " + response.data.message);
-            }
-        } catch {
-            toast.error("An error occurred while fetching positions.");
-        }
-    };
-
-    const getPersonnelDetails = async (personId) => {
-        const url = "http://localhost/coc/gsd/update_master1.php";
-
-        try {
-            const response = await axios.post(url, new URLSearchParams({
-                operation: "getPersonnelDetails",
-                json: JSON.stringify({ personId })
-            }), {
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            });
-
-            if (response.data.status === 'success') {
-                const userDetails = response.data.data;
-                setSelectedUser({
-                    id: userDetails.jo_personel_id,
-                    firstName: userDetails.jo_personel_fname,
-                    lastName: userDetails.jo_personel_lname,
-                    contact: userDetails.jo_personel_contact,
-                    username: userDetails.username,
-                    password: '', // Don't show password for edit
-                    positionId: positions.find(position => position.position_name === userDetails.position_name)?.position_id || '',
-                });
-                setIsUpdateModalOpen(true);
-            } else {
-                toast.error("Error fetching personnel details: " + response.data.message);
-            }
-        } catch {
-            toast.error("An error occurred while fetching personnel details.");
-        }
-    };
-
-    const handleSubmit = async () => {
-        const { firstName, lastName, contact, username, password, positionId } = selectedUser;
-
-        if (!firstName || !lastName || !contact || !username || !positionId) {
-            toast.error("All fields except password are required!");
-            return;
-        }
-
-        const userData = { id: selectedUser.id, firstName, lastName, contact, username, positionId };
-        if (password) userData.password = password; // Only include if provided
-
-        const operation = selectedUser.id ? "updatePersonnel" : "savePersonnel";
-
-        const formData = new URLSearchParams();
-        formData.append("operation", operation);
-        formData.append("json", JSON.stringify(userData));
-
-        setLoading(true);
-        const url = "http://localhost/coc/gsd/insert_master.php";
-        try {
-            const response = await axios.post(url, formData, {
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            });
-
-            if (response.data.status === 'success') {
-                toast.success(`Personnel successfully ${selectedUser.id ? 'updated' : 'added'}!`);
-                fetchPersonnel();
-                resetForm();
-            } else {
-                toast.error("Failed to add/update personnel: " + (response.data.message || "Unknown error"));
-            }
-        } catch {
-            toast.error("An error occurred while adding/updating personnel.");
-        } finally {
-            setLoading(false);
-            setIsAddModalOpen(false);
-            setIsUpdateModalOpen(false);
-        }
-    };
-
-    const resetForm = () => {
-        setSelectedUser({
-            id: '',
-            firstName: '',
-            lastName: '',
-            contact: '',
-            username: '',
-            password: '',
-            positionId: '',
-        });
-    };
-
-    const openAddModal = () => {
-        resetForm();
-        setIsAddModalOpen(true);
-    };
-
-    const openEditModal = (person) => {
-        getPersonnelDetails(person.jo_personel_id);
-    };
-
-    const confirmDeleteUser = (personId) => {
-        setUserToDelete(personId);
-        setIsDeleteModalOpen(true);
-    };
-
-    const deleteUser = async (personnelId) => {
-        const url = "http://localhost/coc/gsd/delete_master.php";
-
-        try {
-            const response = await axios.post(url, new URLSearchParams({ 
-                operation: "deletePersonnel",
-                personnel_id: personnelId
-            }), {
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            });
-
-            if (response.data.status === 'success') {
-                toast.success("Personnel deleted successfully!");
-                fetchPersonnel(); // Refresh the personnel list
-            } else {
-                toast.error("Error deleting personnel: " + response.data.message);
-            }
-        } catch {
-            toast.error("An error occurred while deleting the personnel.");
-        } finally {
-            setIsDeleteModalOpen(false); // Close the delete modal
-        }
-    };
-
-    const filteredPersonnel = personnel.filter(person =>
-        person.jo_personel_fname && person.jo_personel_fname.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-    return (
-        <div className="flex flex-col lg:flex-row">
-            <Sidebar />
-            <div className="flex-grow ml-0 lg:ml-10 p-6">
-                <h2 className="text-2xl font-bold">Personnel Management</h2>
-                <div className="flex flex-col lg:flex-row items-center mb-4">
-                    <input
-                        type="text"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="Search by Full Name..."
-                        className="border border-gray-300 p-2 rounded w-full max-w-xs"
-                    />
-                    <Button variant="primary" onClick={openAddModal} className="ml-4">
-                        <FaPlus /> Add Personnel
-                    </Button>
-                </div>
-
-                {loading ? (
-                    <div className="flex justify-center py-10">
-                        <div className="loader"></div>
-                    </div>
-                ) : (
-                    <table className="min-w-full bg-white shadow-md rounded-lg overflow-hidden">
-                        <thead>
-                            <tr className="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
-                                <th className="py-3 px-6 text-left">Full Name</th>
-                                <th className="py-3 px-6 text-left">Contact</th>
-                                <th className="py-3 px-6 text-left">Username</th>
-                                <th className="py-3 px-6 text-left">Position</th>
-                                <th className="py-3 px-6 text-left">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="text-gray-600 text-sm font-light">
-                            {filteredPersonnel.length > 0 ? (
-                                filteredPersonnel.map((person, index) => (
-                                    <tr key={index} className="border-b border-gray-200 hover:bg-gray-100">
-                                        <td className="py-3 px-6">{person.jo_personel_fname} {person.jo_personel_lname}</td>
-                                        <td className="py-3 px-6">{person.jo_personel_contact}</td>
-                                        <td className="py-3 px-6">{person.username}</td>
-                                        <td className="py-3 px-6">{person.position_name}</td>
-                                        <td className="py-3 px-6">
-                                            <Button variant="warning" onClick={() => openEditModal(person)}>
-                                                <FaEdit /> Edit
-                                            </Button>
-                                            <Button variant="danger" onClick={() => confirmDeleteUser(person.jo_personel_id)}>
-                                                <FaTrash /> Delete
-                                            </Button>
-                                        </td>
-                                    </tr>
-                                ))
-                            ) : (
-                                <tr>
-                                    <td colSpan="5" className="text-center py-3">No personnel found.</td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                )}
-
-<Modal show={isAddModalOpen} onHide={() => setIsAddModalOpen(false)}>
-                    <Modal.Header closeButton>
-                        <Modal.Title>Add Personnel</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
-                        <div className="mb-3">
-                            <label>First Name</label>
-                            <input
-                                type="text"
-                                value={selectedUser.firstName}
-                                onChange={(e) => setSelectedUser({ ...selectedUser, firstName: e.target.value })}
-                                className="form-control"
-                            />
-                        </div>
-                        <div className="mb-3">
-                            <label>Last Name</label>
-                            <input
-                                type="text"
-                                value={selectedUser.lastName}
-                                onChange={(e) => setSelectedUser({ ...selectedUser, lastName: e.target.value })}
-                                className="form-control"
-                            />
-                        </div>
-                        <div className="mb-3">
-                            <label>Contact</label>
-                            <input
-                                type="text"
-                                value={selectedUser.contact}
-                                onChange={(e) => setSelectedUser({ ...selectedUser, contact: e.target.value })}
-                                className="form-control"
-                            />
-                        </div>
-                        <div className="mb-3">
-                            <label>Username</label>
-                            <input
-                                type="text"
-                                value={selectedUser.username}
-                                onChange={(e) => setSelectedUser({ ...selectedUser, username: e.target.value })}
-                                className="form-control"
-                            />
-                        </div>
-                        <div className="mb-3">
-                            <label>Password</label>
-                            <input
-                                type="password"
-                                value={selectedUser.password}
-                                onChange={(e) => setSelectedUser({ ...selectedUser, password: e.target.value })}
-                                className="form-control"
-                            />
-                        </div>
-                        <div className="mb-3">
-                            <label>Position</label>
-                            <select
-                                value={selectedUser.positionId}
-                                onChange={(e) => setSelectedUser({ ...selectedUser, positionId: e.target.value })}
-                                className="form-control"
-                            >
-                                <option value="">Select Position</option>
-                                {positions.map((position) => (
-                                    <option key={position.position_id} value={position.position_id}>
-                                        {position.position_name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={() => setIsAddModalOpen(false)}>Close</Button>
-                        <Button variant="primary" onClick={handleSubmit}>Save Personnel</Button>
-                    </Modal.Footer>
-                </Modal>
-
-                {/* Update Personnel Modal */}
-                <Modal show={isUpdateModalOpen} onHide={() => setIsUpdateModalOpen(false)}>
-                    <Modal.Header closeButton>
-                        <Modal.Title>Update Personnel</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
-                        <div className="mb-3">
-                            <label>First Name</label>
-                            <input
-                                type="text"
-                                value={selectedUser.firstName}
-                                onChange={(e) => setSelectedUser({ ...selectedUser, firstName: e.target.value })}
-                                className="form-control"
-                            />
-                        </div>
-                        <div className="mb-3">
-                            <label>Last Name</label>
-                            <input
-                                type="text"
-                                value={selectedUser.lastName}
-                                onChange={(e) => setSelectedUser({ ...selectedUser, lastName: e.target.value })}
-                                className="form-control"
-                            />
-                        </div>
-                        <div className="mb-3">
-                            <label>Contact</label>
-                            <input
-                                type="text"
-                                value={selectedUser.contact}
-                                onChange={(e) => setSelectedUser({ ...selectedUser, contact: e.target.value })}
-                                className="form-control"
-                            />
-                        </div>
-                        <div className="mb-3">
-                            <label>Username</label>
-                            <input
-                                type="text"
-                                value={selectedUser.username}
-                                onChange={(e) => setSelectedUser({ ...selectedUser, username: e.target.value })}
-                                className="form-control"
-                            />
-                        </div>
-                        <div className="mb-3">
-                            <label>Password</label>
-                            <input
-                                type="password"
-                                value={selectedUser.password}
-                                onChange={(e) => setSelectedUser({ ...selectedUser, password: e.target.value })}
-                                className="form-control"
-                            />
-                        </div>
-                        <div className="mb-3">
-                            <label>Position</label>
-                            <select
-                                value={selectedUser.positionId}
-                                onChange={(e) => setSelectedUser({ ...selectedUser, positionId: e.target.value })}
-                                className="form-control"
-                            >
-                                {positions.map((position) => (
-                                    <option key={position.position_id} value={position.position_id}>
-                                        {position.position_name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={() => setIsUpdateModalOpen(false)}>Close</Button>
-                        <Button variant="primary" onClick={handleSubmit}>Update Personnel</Button>
-                    </Modal.Footer>
-                </Modal>
-
-                {/* Delete Confirmation Modal */}
-                <Modal show={isDeleteModalOpen} onHide={() => setIsDeleteModalOpen(false)}>
-                    <Modal.Header closeButton>
-                        <Modal.Title>Confirm Deletion</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
-                        Are you sure you want to delete this personnel?
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={() => setIsDeleteModalOpen(false)}>Cancel</Button>
-                        <Button variant="danger" onClick={() => deleteUser(userToDelete)}>Delete</Button>
-                    </Modal.Footer>
-                </Modal>
-            </div>
-        </div>
-    );
-};
-
-export default UserManagement;
->>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271

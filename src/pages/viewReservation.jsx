@@ -3,46 +3,162 @@ import Sidebar from './Sidebar';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import axios from 'axios';
 import { toast } from 'sonner';
-import { FaFilter, FaEye, FaCalendar, FaSearch, FaTimes, FaPrint } from 'react-icons/fa';
+import { FaFilter, FaEye, FaCalendar, FaSearch, FaPrint, FaSort, FaChartBar } from 'react-icons/fa';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// Add this function at the top of your file, outside of the component:
+// Add this function at the top of the file, along with getStatusClass
 const formatDate = (date) => {
-  if (!(date instanceof Date)) {
-    date = new Date(date);
-  }
-  const options = { year: 'numeric', month: 'long', day: 'numeric' };
-  return date.toLocaleDateString(undefined, options);
+    if (!(date instanceof Date)) {
+        date = new Date(date);
+    }
+    return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
 };
 
-const ReservationReport = ({ reservations, month, year }) => {
+const getStatusClass = (status) => {
+    switch (status) {
+        case 'pending':
+            return 'bg-yellow-100 text-yellow-800';
+        case 'reserve':
+            return 'bg-green-100 text-green-800';
+        case 'declined':
+            return 'bg-red-100 text-red-800';
+        default:
+            return 'bg-gray-100 text-gray-800';
+    }
+};
+
+// Update the ReservationReport component to accept formatDate as a prop
+const ReservationReport = ({ reservations, reportType, reportDate, getStatusClass, formatDate }) => {
+    const formatReportDate = () => {
+        if (reportType === 'monthly') {
+            return formatDate(reportDate).split(' ').slice(0, 2).join(' ');
+        } else {
+            return formatDate(reportDate).split(' ').slice(0, 1).join(' ');
+        }
+    };
+
     return (
-        <div className="p-8 bg-white">
-            <h1 className="text-3xl font-bold mb-6">Reservation Report: {formatDate(new Date(year, month))}</h1>
-            <table className="w-full border-collapse border border-gray-300">
+        <div className="p-8 bg-white font-sans max-w-4xl mx-auto">
+            <div className="flex items-center justify-between mb-6 border-b-2 border-green-500 pb-4">
+                <img
+                    src="/images/assets/phinma.png"
+                    alt="PHINMA Logo"
+                    className="w-24 h-auto"
+                />
+                <div className="text-right">
+                    <h1 className="text-3xl font-bold text-green-800">General Service Department</h1>
+                    <h2 className="text-xl text-green-600">Reservation And Monitoring System</h2>
+                    <h3 className="text-lg font-semibold">PHINMA Cagayan de Oro College</h3>
+                </div>
+            </div>
+            
+            <h2 className="text-2xl font-bold mb-6 text-center text-green-700 bg-green-100 py-2 rounded-lg">
+                Reservation Report: {formatReportDate()}
+            </h2>
+
+            <table className="w-full border-collapse mb-6">
                 <thead>
-                    <tr className="bg-gray-100">
-                        <th className="border border-gray-300 p-2">ID</th>
-                        <th className="border border-gray-300 p-2">Name</th>
-                        <th className="border border-gray-300 p-2">Event Title</th>
-                        <th className="border border-gray-300 p-2">Status</th>
-                        <th className="border border-gray-300 p-2">Created</th>
+                    <tr className="bg-green-600 text-white">
+                        <th className="p-2 text-left">#</th>
+                        <th className="p-2 text-left">Requested By</th>
+                        <th className="p-2 text-left">Event Title</th>
+                        <th className="p-2 text-left">Date Range</th>
+                        <th className="p-2 text-left">Date Created</th>
+                        <th className="p-2 text-left">Status</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {reservations.map((reservation) => (
-                        <tr key={reservation.reservation_id}>
-                            <td className="border border-gray-300 p-2">{reservation.reservation_id}</td>
-                            <td className="border border-gray-300 p-2">{reservation.reservation_name}</td>
-                            <td className="border border-gray-300 p-2">{reservation.reservation_event_title}</td>
-                            <td className="border border-gray-300 p-2">{reservation.reservation_status_name}</td>
-                            <td className="border border-gray-300 p-2">{formatDate(new Date(reservation.date_created))}</td>
+                    {reservations.map((reservation, index) => (
+                        <tr key={reservation.reservation_id} className={index % 2 === 0 ? 'bg-green-50' : 'bg-white'}>
+                            <td className="p-2 border-b border-green-200">{index + 1}</td>
+                            <td className="p-2 border-b border-green-200">{reservation.reservation_name}</td>
+                            <td className="p-2 border-b border-green-200">{reservation.reservation_event_title}</td>
+                            <td className="p-2 border-b border-green-200">
+                                {formatDate(new Date(reservation.reservation_start_date)).split(',')[0]} - 
+                                {formatDate(new Date(reservation.reservation_end_date)).split(',')[0]}
+                            </td>
+                            <td className="p-2 border-b border-green-200">
+                                {formatDate(new Date(reservation.date_created))}
+                            </td>
+                            <td className="p-2 border-b border-green-200">
+                                <span className={`px-2 py-1 rounded-full text-xs ${getStatusClass(reservation.reservation_status_name)}`}>
+                                    {reservation.reservation_status_name}
+                                </span>
+                            </td>
                         </tr>
                     ))}
                 </tbody>
             </table>
+
+            <div className="mt-8 flex justify-between items-center text-sm text-gray-600">
+                <p>Total Reservations: {reservations.length}</p>
+                <p>Generated on: {new Date().toLocaleString()}</p>
+            </div>
+
+            <div className="mt-8 text-center">
+                <button onClick={() => window.print()} className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors print:hidden">
+                    <FaPrint className="inline-block mr-2" />
+                    Print Report
+                </button>
+            </div>
+
+            <style jsx global>{`
+                @media print {
+                    @page {
+                        size: auto;
+                        margin: 20mm;
+                    }
+                    body {
+                        font-family: Arial, sans-serif;
+                        color: #333;
+                    }
+                    h1, h2, h3 {
+                        margin: 0;
+                    }
+                    table {
+                        border-collapse: collapse;
+                        width: 100%;
+                    }
+                    th, td {
+                        border: 1px solid #ddd;
+                        padding: 8px;
+                        text-align: left;
+                    }
+                    th {
+                        background-color: #f2f2f2;
+                    }
+                    tr:nth-child(even) {
+                        background-color: #f9f9f9;
+                    }
+                    .print:hidden {
+                        display: none !important;
+                    }
+                    /* Hide URL and timestamp */
+                    @page {
+                        margin: 0.5cm;
+                    }
+                    @page :first {
+                        margin-top: 0;
+                    }
+                    @page :left {
+                        margin-left: 0;
+                    }
+                    @page :right {
+                        margin-right: 0;
+                    }
+                    body::after {
+                        content: none !important;
+                    }
+                }
+            `}</style>
         </div>
     );
 };
@@ -60,7 +176,8 @@ const ViewReservations = () => {
     const [sortOrder, setSortOrder] = useState('desc');
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10);
-    const [reportMonth, setReportMonth] = useState(new Date());
+    const [reportType, setReportType] = useState('monthly');
+    const [reportDate, setReportDate] = useState(new Date());
     const [showReport, setShowReport] = useState(false);
 
     const fetchReservations = async () => {
@@ -104,19 +221,6 @@ const ViewReservations = () => {
         fetchReservations();
     }, []);
 
-    const getStatusClass = (status) => {
-        switch (status) {
-            case 'pending':
-                return 'bg-yellow-100 text-yellow-800';
-            case 'reserve':
-                return 'bg-green-100 text-green-800';
-            case 'declined':
-                return 'bg-red-100 text-red-800';
-            default:
-                return 'bg-gray-100 text-gray-800';
-        }
-    };
-
     const filteredAndSortedReservations = reservations
         .filter((reservation) => {
             const matchesFilter = filter === 'All' ||
@@ -156,24 +260,23 @@ const ViewReservations = () => {
 
     const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
-    const clearFilters = () => {
-        setFilter('All');
-        setStartDate(null);
-        setEndDate(null);
-        setSearchTerm('');
-        setSortBy('date_created');
-        setSortOrder('desc');
-    };
-
     const generateReport = () => {
-        const filteredReservations = reservations.filter(reservation => {
-            const reservationDate = new Date(reservation.date_created);
-            return reservationDate.getMonth() === reportMonth.getMonth() &&
-                   reservationDate.getFullYear() === reportMonth.getFullYear();
-        });
+        let filteredReservations;
+        if (reportType === 'monthly') {
+            filteredReservations = reservations.filter(reservation => {
+                const reservationDate = new Date(reservation.date_created);
+                return reservationDate.getMonth() === reportDate.getMonth() &&
+                       reservationDate.getFullYear() === reportDate.getFullYear();
+            });
+        } else {
+            filteredReservations = reservations.filter(reservation => {
+                const reservationDate = new Date(reservation.date_created);
+                return reservationDate.getFullYear() === reportDate.getFullYear();
+            });
+        }
 
         if (filteredReservations.length === 0) {
-            toast.error('No reservations found for the selected month.');
+            toast.error(`No reservations found for the selected ${reportType === 'monthly' ? 'month' : 'year'}.`);
             return;
         }
 
@@ -184,15 +287,15 @@ const ViewReservations = () => {
     };
 
     return (
-        <div className="flex flex-col lg:flex-row bg-gray-100 min-h-screen">
+        <div className="flex flex-col lg:flex-row min-h-screen bg-gradient-to-br from-green-50 to-white">
             {!showReport ? (
                 <>
                     <Sidebar />
-                    <div className="flex-grow p-6 lg:p-10">
+                    <div className="flex-grow p-4 lg:p-6">
                         <motion.h2 
                             initial={{ opacity: 0, y: -20 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="text-3xl font-bold mb-6 text-gray-800"
+                            className="text-3xl font-bold mb-4 text-green-800"
                         >
                             Reservations
                         </motion.h2>
@@ -200,25 +303,40 @@ const ViewReservations = () => {
                         <motion.div 
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="mb-6 bg-white rounded-lg shadow p-4"
+                            className="mb-4 bg-white rounded-lg shadow-md p-4"
                         >
-                            <div className="flex flex-wrap items-center gap-4">
-                                <div className="flex items-center">
-                                    <FaFilter className="text-gray-500 mr-3" />
+                            {/* Separate search input with full width */}
+                            <div className="mb-3">
+                                <div className="flex items-center bg-green-100 rounded-lg p-2">
+                                    <FaSearch className="text-green-600 mr-2" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search reservations..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="form-input w-full bg-transparent border-0 focus:ring-0 text-sm"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Other filters in a grid */}
+                            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+                                <div className="flex items-center bg-green-100 rounded-lg p-2">
+                                    <FaFilter className="text-green-600 mr-2" />
                                     <select
                                         id="filter"
                                         value={filter}
                                         onChange={(e) => setFilter(e.target.value)}
-                                        className="form-select border-0 focus:ring-0 text-gray-700"
+                                        className="form-select w-full bg-transparent border-0 focus:ring-0 text-green-700 text-sm"
                                     >
-                                        <option value="All">All Reservations</option>
+                                        <option value="All">All</option>
                                         <option value="Vehicle">Vehicles</option>
                                         <option value="Venue">Venues</option>
                                         <option value="Equipment">Equipment</option>
                                     </select>
                                 </div>
-                                <div className="flex items-center">
-                                    <FaCalendar className="text-gray-500 mr-3" />
+                                <div className="flex items-center bg-green-100 rounded-lg p-2">
+                                    <FaCalendar className="text-green-600 mr-2" />
                                     <DatePicker
                                         selected={startDate}
                                         onChange={(date) => setStartDate(date)}
@@ -226,9 +344,11 @@ const ViewReservations = () => {
                                         startDate={startDate}
                                         endDate={endDate}
                                         placeholderText="Start Date"
-                                        className="form-input border-0 focus:ring-0"
+                                        className="form-input w-full bg-transparent border-0 focus:ring-0 text-sm"
                                     />
-                                    <span className="mx-2">to</span>
+                                </div>
+                                <div className="flex items-center bg-green-100 rounded-lg p-2">
+                                    <FaCalendar className="text-green-600 mr-2" />
                                     <DatePicker
                                         selected={endDate}
                                         onChange={(date) => setEndDate(date)}
@@ -237,42 +357,40 @@ const ViewReservations = () => {
                                         endDate={endDate}
                                         minDate={startDate}
                                         placeholderText="End Date"
-                                        className="form-input border-0 focus:ring-0"
+                                        className="form-input w-full bg-transparent border-0 focus:ring-0 text-sm"
+                                    />
+                                </div>
+                                <div className="flex items-center bg-green-100 rounded-lg p-2">
+                                    <FaChartBar className="text-green-600 mr-2" />
+                                    <select
+                                        value={reportType}
+                                        onChange={(e) => setReportType(e.target.value)}
+                                        className="form-select w-full bg-transparent border-0 focus:ring-0 text-green-700 text-sm"
+                                    >
+                                        <option value="monthly">Monthly</option>
+                                        <option value="yearly">Yearly</option>
+                                    </select>
+                                </div>
+                                <div className="flex items-center bg-green-100 rounded-lg p-2">
+                                    <FaCalendar className="text-green-600 mr-2" />
+                                    <DatePicker
+                                        selected={reportDate}
+                                        onChange={(date) => setReportDate(date)}
+                                        dateFormat={reportType === 'monthly' ? "MMM yyyy" : "yyyy"}
+                                        showMonthYearPicker={reportType === 'monthly'}
+                                        showYearPicker={reportType === 'yearly'}
+                                        className="form-input w-full bg-transparent border-0 focus:ring-0 text-sm"
                                     />
                                 </div>
                                 <div className="flex items-center">
-                                    <FaSearch className="text-gray-500 mr-3" />
-                                    <input
-                                        type="text"
-                                        placeholder="Search reservations..."
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        className="form-input border-0 focus:ring-0"
-                                    />
+                                    <button
+                                        onClick={generateReport}
+                                        className="bg-green-500 text-white px-3 py-2 rounded-lg hover:bg-green-600 transition-colors w-full flex items-center justify-center text-sm"
+                                    >
+                                        <FaPrint className="mr-2" />
+                                        Generate Report
+                                    </button>
                                 </div>
-                                <button
-                                    onClick={clearFilters}
-                                    className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-colors"
-                                >
-                                    <FaTimes className="mr-2" />
-                                    Clear Filters
-                                </button>
-                            </div>
-                            <div className="flex items-center mt-4">
-                                <FaPrint className="text-gray-500 mr-3" />
-                                <DatePicker
-                                    selected={reportMonth}
-                                    onChange={(date) => setReportMonth(date)}
-                                    dateFormat="MMMM yyyy"
-                                    showMonthYearPicker
-                                    className="form-input border-0 focus:ring-0"
-                                />
-                                <button
-                                    onClick={generateReport}
-                                    className="ml-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
-                                >
-                                    Generate Report
-                                </button>
                             </div>
                         </motion.div>
 
@@ -282,19 +400,21 @@ const ViewReservations = () => {
                             </div>
                         ) : (
                             <>
-                                <div className="overflow-x-auto">
-                                    <table className="min-w-full bg-white shadow-md rounded-lg overflow-hidden">
-                                        <thead className="bg-gray-200">
+                                <div className="overflow-x-auto bg-white rounded-lg shadow-lg">
+                                    <table className="min-w-full">
+                                        <thead className="bg-green-600 text-white">
                                             <tr>
-                                                <th className="px-4 py-2 cursor-pointer" onClick={() => handleSort('reservation_id')}>ID</th>
-                                                <th className="px-4 py-2 cursor-pointer" onClick={() => handleSort('reservation_name')}>Name</th>
-                                                <th className="px-4 py-2 cursor-pointer" onClick={() => handleSort('reservation_event_title')}>Event Title</th>
-                                                <th className="px-4 py-2 cursor-pointer" onClick={() => handleSort('date_created')}>Created</th>
-                                                <th className="px-4 py-2 cursor-pointer" onClick={() => handleSort('reservation_status_name')}>Status</th>
-                                                <th className="px-4 py-2">Actions</th>
+                                                {['Name', 'Event Title', 'Created', 'Status', 'Actions'].map((header) => (
+                                                    <th key={header} className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider cursor-pointer" onClick={() => handleSort(header.toLowerCase())}>
+                                                        <div className="flex items-center">
+                                                            {header}
+                                                            <FaSort className="ml-1" />
+                                                        </div>
+                                                    </th>
+                                                ))}
                                             </tr>
                                         </thead>
-                                        <tbody>
+                                        <tbody className="bg-white divide-y divide-green-200">
                                             <AnimatePresence>
                                                 {currentItems.map((reservation) => (
                                                     <motion.tr 
@@ -302,23 +422,23 @@ const ViewReservations = () => {
                                                         initial={{ opacity: 0 }}
                                                         animate={{ opacity: 1 }}
                                                         exit={{ opacity: 0 }}
-                                                        className="hover:bg-gray-100"
+                                                        className="hover:bg-green-50"
                                                     >
-                                                        <td className="px-4 py-2">{reservation.reservation_id}</td>
-                                                        <td className="px-4 py-2">{reservation.reservation_name}</td>
-                                                        <td className="px-4 py-2">{reservation.reservation_event_title}</td>
-                                                        <td className="px-4 py-2">{formatDate(new Date(reservation.date_created))}</td>
-                                                        <td className="px-4 py-2">
+                                                    
+                                                        <td className="px-6 py-4 whitespace-nowrap">{reservation.reservation_name}</td>
+                                                        <td className="px-6 py-4 whitespace-nowrap">{reservation.reservation_event_title}</td>
+                                                        <td className="px-6 py-4 whitespace-nowrap">{formatDate(new Date(reservation.date_created))}</td>
+                                                        <td className="px-6 py-4 whitespace-nowrap">
                                                             <span className={`px-2 py-1 rounded-full text-xs ${getStatusClass(reservation.reservation_status_name)}`}>
                                                                 {reservation.reservation_status_name}
                                                             </span>
                                                         </td>
-                                                        <td className="px-4 py-2">
+                                                        <td className="px-6 py-4 whitespace-nowrap">
                                                             <button 
-                                                                className="text-blue-500 hover:text-blue-700 transition-colors"
+                                                                className="text-green-600 hover:text-green-900 transition-colors"
                                                                 onClick={() => fetchReservationDetails(reservation.reservation_id)}
                                                             >
-                                                                <FaEye />
+                                                                <FaEye size={18} />
                                                             </button>
                                                         </td>
                                                     </motion.tr>
@@ -330,12 +450,12 @@ const ViewReservations = () => {
                                 {filteredAndSortedReservations.length === 0 && (
                                     <p className="text-center text-gray-500 mt-4">No reservations found.</p>
                                 )}
-                                <div className="mt-4 flex justify-center">
+                                <div className="mt-6 flex justify-center">
                                     {Array.from({ length: Math.ceil(filteredAndSortedReservations.length / itemsPerPage) }, (_, i) => (
                                         <button
                                             key={i}
                                             onClick={() => paginate(i + 1)}
-                                            className={`mx-1 px-3 py-1 rounded ${currentPage === i + 1 ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+                                            className={`mx-1 px-4 py-2 rounded-lg ${currentPage === i + 1 ? 'bg-green-600 text-white' : 'bg-green-100 text-green-600'} hover:bg-green-500 hover:text-white transition-colors`}
                                         >
                                             {i + 1}
                                         </button>
@@ -349,11 +469,17 @@ const ViewReservations = () => {
                 <ReservationReport 
                     reservations={reservations.filter(reservation => {
                         const reservationDate = new Date(reservation.date_created);
-                        return reservationDate.getMonth() === reportMonth.getMonth() &&
-                               reservationDate.getFullYear() === reportMonth.getFullYear();
+                        if (reportType === 'monthly') {
+                            return reservationDate.getMonth() === reportDate.getMonth() &&
+                                   reservationDate.getFullYear() === reportDate.getFullYear();
+                        } else {
+                            return reservationDate.getFullYear() === reportDate.getFullYear();
+                        }
                     })}
-                    month={reportMonth.getMonth()}
-                    year={reportMonth.getFullYear()}
+                    reportType={reportType}
+                    reportDate={reportDate}
+                    getStatusClass={getStatusClass}
+                    formatDate={formatDate}  // Pass the function as a prop
                 />
             )}
 
@@ -364,16 +490,16 @@ const ViewReservations = () => {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50"
+                        className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
                     >
                         <motion.div 
                             initial={{ scale: 0.9, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.9, opacity: 0 }}
-                            className="bg-white rounded-lg p-6 max-w-lg w-full"
+                            className="bg-white rounded-lg p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
                         >
-                            <h3 className="text-2xl font-bold mb-4 text-gray-800">Reservation Details</h3>
-                            <div className="grid grid-cols-2 gap-4">
+                            <h3 className="text-3xl font-bold mb-6 text-green-800">Reservation Details</h3>
+                            <div className="grid grid-cols-2 gap-6">
                                 <div>
                                     <p className="font-medium text-gray-600">Name:</p>
                                     <p>{selectedReservation.reservation.reservation_name}</p>
@@ -437,7 +563,7 @@ const ViewReservations = () => {
                                     </ul>
                                 </div>
                             )}
-                            <button className="mt-6 bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition-colors" onClick={() => setModalOpen(false)}>Close</button>
+                            <button className="mt-8 bg-green-600 text-white py-2 px-6 rounded-lg hover:bg-green-700 transition-colors" onClick={() => setModalOpen(false)}>Close</button>
                         </motion.div>
                     </motion.div>
                 )}

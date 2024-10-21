@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
-import { FaPlus, FaSearch, FaPencilAlt, FaTrashAlt } from 'react-icons/fa';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faEdit, faTrashAlt, faSearch, faPlus } from '@fortawesome/free-solid-svg-icons';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { Modal, Button } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const EquipmentEntry = () => {
     const adminId = localStorage.getItem('adminId') || '';
@@ -203,75 +205,100 @@ const EquipmentEntry = () => {
     const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
     return (
-        <div className="flex flex-col lg:flex-row min-h-screen bg-[#F4CE14] bg-opacity-10">
+        <div className="flex flex-col lg:flex-row min-h-screen bg-gradient-to-br from-white to-green-500">
             <Sidebar />
-            <div className="flex-grow p-8">
-                <h2 className="text-3xl font-bold text-[#495E57] mb-6">Equipment Management</h2>
-                <div className="bg-white rounded-lg shadow-md p-6">
-                    <div className="flex flex-col md:flex-row justify-between items-center mb-6">
-                        <div className="relative w-full md:w-96 mb-4 md:mb-0">
+            <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="flex-grow p-6 lg:p-10"
+            >
+                <h2 className="text-4xl font-bold mb-6 text-green-800 drop-shadow-lg">Equipment Management</h2>
+                <div className="bg-white bg-opacity-90 rounded-lg shadow-xl p-6 mb-6 backdrop-filter backdrop-blur-lg">
+                    <div className="flex flex-col md:flex-row items-center justify-between mb-4">
+                        <motion.div 
+                            whileHover={{ scale: 1.05 }}
+                            className="relative w-full md:w-64 mb-4 md:mb-0"
+                        >
                             <input
                                 type="text"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 placeholder="Search equipment..."
-                                className="w-full pl-10 pr-4 py-2 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full pl-10 pr-4 py-2 rounded-full border border-green-300 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-300"
                             />
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <FaSearch className="text-gray-400" />
-                            </div>
-                        </div>
-                        <button onClick={() => setIsAddModalOpen(true)} className="bg-[#495E57] text-white px-4 py-2 rounded-lg hover:bg-[#3a4a45] transition duration-300 flex items-center">
-                            <FaPlus className="mr-2" />
-                            Add Equipment
-                        </button>
+                            <FontAwesomeIcon icon={faSearch} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-400" />
+                        </motion.div>
+                        <motion.button 
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => setIsAddModalOpen(true)}
+                            className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out flex items-center justify-center shadow-md"
+                        >
+                            <FontAwesomeIcon icon={faPlus} className="mr-2" /> Add Equipment
+                        </motion.button>
                     </div>
 
                     {loading ? (
-                        <div className="flex justify-center py-10">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="flex justify-center items-center h-64"
+                        >
                             <div className="loader"></div>
-                        </div>
+                        </motion.div>
                     ) : (
                         <div className="overflow-x-auto">
-                            <table className="w-full">
+                            <table className="w-full table-auto">
                                 <thead>
-                                    <tr className="bg-[#495E57] text-left text-xs font-semibold text-white uppercase tracking-wider">
-                                        <th className="px-6 py-3">No.</th>
-                                        <th className="px-6 py-3">Equipment Name</th>
-                                        <th className="px-6 py-3">Quantity</th>
-                                        <th className="px-6 py-3">Status</th>
-                                        <th className="px-6 py-3">Created At</th>
-                                        <th className="px-6 py-3">Updated At</th>
-                                        <th className="px-6 py-3">Actions</th>
+                                    <tr className="bg-green-600 text-white">
+                                        <th className="py-3 px-4 text-left rounded-tl-lg">No.</th>
+                                        <th className="py-3 px-4 text-left">Equipment Name</th>
+                                        <th className="py-3 px-4 text-left">Quantity</th>
+                                        <th className="py-3 px-4 text-left">Status</th>
+                                        <th className="py-3 px-4 text-left">Created At</th>
+                                        <th className="py-3 px-4 text-left">Updated At</th>
+                                        <th className="py-3 px-4 text-center rounded-tr-lg">Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody className="bg-white divide-y divide-[#495E57] divide-opacity-20">
-                                    {currentEquipments.length > 0 ? (
-                                        currentEquipments.map((equipment, index) => (
-                                            <tr key={equipment.equip_id} className="hover:bg-[#F4CE14] hover:bg-opacity-10 transition-all">
-                                                <td className="px-6 py-4 whitespace-nowrap">{indexOfFirstEquipment + index + 1}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap">{equipment.equip_name}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap">{equipment.equip_quantity}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap">{equipment.equip_status}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap">{equipment.equip_created_at}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap">{equipment.equip_updated_at}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <button className="text-[#495E57] hover:text-[#3a4a45] mr-3" onClick={() => handleEditClick(equipment)}>
-                                                        <FaPencilAlt />
-                                                    </button>
-                                                    <button className="text-red-600 hover:text-red-800" onClick={() => handleDeleteClick(equipment.equip_id)}>
-                                                        <FaTrashAlt />
-                                                    </button>
+                                <tbody className="text-gray-600 text-sm font-light">
+                                    <AnimatePresence>
+                                        {currentEquipments.map((equipment, index) => (
+                                            <motion.tr 
+                                                key={equipment.equip_id}
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                exit={{ opacity: 0 }}
+                                                className="border-b border-green-200 hover:bg-green-50 transition-colors duration-200"
+                                            >
+                                                <td className="py-3 px-4">{indexOfFirstEquipment + index + 1}</td>
+                                                <td className="py-3 px-4">{equipment.equip_name}</td>
+                                                <td className="py-3 px-4">{equipment.equip_quantity}</td>
+                                                <td className="py-3 px-4">{equipment.equip_status}</td>
+                                                <td className="py-3 px-4">{equipment.equip_created_at}</td>
+                                                <td className="py-3 px-4">{equipment.equip_updated_at}</td>
+                                                <td className="py-3 px-4 text-center">
+                                                    <motion.button 
+                                                        whileHover={{ scale: 1.1 }}
+                                                        whileTap={{ scale: 0.9 }}
+                                                        onClick={() => handleEditClick(equipment)}
+                                                        className="bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-3 rounded-full transition duration-300 ease-in-out mr-2"
+                                                    >
+                                                        <FontAwesomeIcon icon={faEdit} />
+                                                    </motion.button>
+                                                    <motion.button 
+                                                        whileHover={{ scale: 1.1 }}
+                                                        whileTap={{ scale: 0.9 }}
+                                                        onClick={() => handleDeleteClick(equipment.equip_id)}
+                                                        className="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded-full transition duration-300 ease-in-out"
+                                                    >
+                                                        <FontAwesomeIcon icon={faTrashAlt} />
+                                                    </motion.button>
                                                 </td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan="7" className="px-6 py-4 text-center text-[#495E57]">
-                                                No equipment found.
-                                            </td>
-                                        </tr>
-                                    )}
+                                            </motion.tr>
+                                        ))}
+                                    </AnimatePresence>
                                 </tbody>
                             </table>
                         </div>
@@ -283,7 +310,7 @@ const EquipmentEntry = () => {
                                 <button
                                     key={i}
                                     onClick={() => paginate(i + 1)}
-                                    className={`mx-1 px-4 py-2 rounded-md ${currentPage === i + 1 ? 'bg-[#495E57] text-white' : 'bg-[#F4CE14] text-[#495E57] hover:bg-[#f3d44a]'}`}
+                                    className={`mx-1 px-4 py-2 rounded-md ${currentPage === i + 1 ? 'bg-green-600 text-white' : 'bg-green-200 text-green-800 hover:bg-green-300'}`}
                                 >
                                     {i + 1}
                                 </button>
@@ -291,37 +318,42 @@ const EquipmentEntry = () => {
                         </div>
                     )}
                 </div>
+            </motion.div>
 
-                {/* Add Equipment Modal */}
-                <Modal show={isAddModalOpen} onHide={() => setIsAddModalOpen(false)}>
-                    <Modal.Header closeButton>
-                        <Modal.Title className="text-[#495E57]">Add Equipment</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-[#495E57] mb-2">Equipment Name</label>
+            {/* Equipment Modal */}
+            <Modal show={isAddModalOpen || isEditModalOpen} onHide={() => {setIsAddModalOpen(false); setIsEditModalOpen(false);}} centered>
+                <Modal.Header closeButton className="bg-green-600 text-white">
+                    <Modal.Title>{isEditModalOpen ? 'Edit Equipment' : 'Add Equipment'}</Modal.Title>
+                </Modal.Header>
+                <Modal.Body className="bg-green-50">
+                    <div className="flex flex-col gap-4">
+                        <div>
+                            <label htmlFor="equipmentName" className="block mb-2 font-semibold">Equipment Name</label>
                             <input
                                 type="text"
+                                id="equipmentName"
                                 value={newEquipmentName}
                                 onChange={(e) => setNewEquipmentName(e.target.value)}
-                                className="w-full px-3 py-2 border border-[#495E57] rounded-md focus:outline-none focus:ring-2 focus:ring-[#F4CE14]"
+                                className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                             />
                         </div>
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-[#495E57] mb-2">Equipment Quantity</label>
+                        <div>
+                            <label htmlFor="equipmentQuantity" className="block mb-2 font-semibold">Equipment Quantity</label>
                             <input
                                 type="number"
+                                id="equipmentQuantity"
                                 value={newEquipmentQuantity}
                                 onChange={(e) => setNewEquipmentQuantity(e.target.value)}
-                                className="w-full px-3 py-2 border border-[#495E57] rounded-md focus:outline-none focus:ring-2 focus:ring-[#F4CE14]"
+                                className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                             />
                         </div>
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-[#495E57] mb-2">Select Category</label>
+                        <div>
+                            <label htmlFor="category" className="block mb-2 font-semibold">Category</label>
                             <select
+                                id="category"
                                 value={selectedCategory}
                                 onChange={(e) => setSelectedCategory(e.target.value)}
-                                className="w-full px-3 py-2 border border-[#495E57] rounded-md focus:outline-none focus:ring-2 focus:ring-[#F4CE14]"
+                                className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                             >
                                 <option value="">Select a category</option>
                                 {categories.map(category => (
@@ -331,67 +363,17 @@ const EquipmentEntry = () => {
                                 ))}
                             </select>
                         </div>
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={() => setIsAddModalOpen(false)}>
-                            Close
-                        </Button>
-                        <Button variant="primary" onClick={handleSubmit}>
-                            Add Equipment
-                        </Button>
-                    </Modal.Footer>
-                </Modal>
-
-                {/* Update Equipment Modal */}
-                <Modal show={isEditModalOpen} onHide={() => setIsEditModalOpen(false)}>
-                    <Modal.Header closeButton>
-                        <Modal.Title className="text-[#495E57]">Edit Equipment</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-[#495E57] mb-2">Equipment Name</label>
-                            <input
-                                type="text"
-                                value={newEquipmentName}
-                                onChange={(e) => setNewEquipmentName(e.target.value)}
-                                className="w-full px-3 py-2 border border-[#495E57] rounded-md focus:outline-none focus:ring-2 focus:ring-[#F4CE14]"
-                            />
-                        </div>
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-[#495E57] mb-2">Equipment Quantity</label>
-                            <input
-                                type="number"
-                                value={newEquipmentQuantity}
-                                onChange={(e) => setNewEquipmentQuantity(e.target.value)}
-                                className="w-full px-3 py-2 border border-[#495E57] rounded-md focus:outline-none focus:ring-2 focus:ring-[#F4CE14]"
-                            />
-                        </div>
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-[#495E57] mb-2">Select Category</label>
-                            <select
-                                value={selectedCategory}
-                                onChange={(e) => setSelectedCategory(e.target.value)}
-                                className="w-full px-3 py-2 border border-[#495E57] rounded-md focus:outline-none focus:ring-2 focus:ring-[#F4CE14]"
-                            >
-                                <option value="">Select a category</option>
-                                {categories.map(category => (
-                                    <option key={category.equipments_category_id} value={category.equipments_category_id}>
-                                        {category.equipments_category_name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={() => setIsEditModalOpen(false)}>
-                            Close
-                        </Button>
-                        <Button variant="primary" onClick={handleSubmit}>
-                            Update Equipment
-                        </Button>
-                    </Modal.Footer>
-                </Modal>
-            </div>
+                    </div>
+                </Modal.Body>
+                <Modal.Footer className="bg-green-50">
+                    <Button variant="secondary" onClick={() => {setIsAddModalOpen(false); setIsEditModalOpen(false);}}>
+                        Close
+                    </Button>
+                    <Button variant="primary" onClick={handleSubmit} className="bg-green-600 hover:bg-green-700">
+                        {isEditModalOpen ? 'Update' : 'Add'}
+                    </Button>
+                </Modal.Footer>
+            </Modal>
         </div>
     );
 };

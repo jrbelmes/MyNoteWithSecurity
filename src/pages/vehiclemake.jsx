@@ -211,8 +211,5 @@ const VehicleMakes = () => {
   );
 };
 
-<<<<<<< HEAD
 export default VehicleMakes;
-=======
-export default VehicleMakes;
->>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271
+

@@ -5,7 +5,10 @@ import { toast } from 'sonner';
 import axios from 'axios';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEdit, faTrashAlt, faSearch, faPlus } from '@fortawesome/free-solid-svg-icons';
-import '../vehicle.css'; // Assuming custom styles are included here
+import '../vehicle.css';
+import { Modal, Button } from 'react-bootstrap';
+import 'bootstrap/dist/css/bootstrap.min.css';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const VenueEntry = () => {
     const adminId = localStorage.getItem('adminId') || '';
@@ -170,71 +173,98 @@ const VenueEntry = () => {
     const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
     return (
-        <div className="flex flex-col lg:flex-row min-h-screen bg-[#F4CE14] bg-opacity-10">
+        <div className="flex flex-col lg:flex-row min-h-screen bg-gradient-to-br from-white to-green-500">
             <Sidebar />
-            <div className="flex-grow p-8">
-                <h2 className="text-3xl font-bold text-[#495E57] mb-6">Venue Management</h2>
-                <div className="bg-white rounded-lg shadow-md p-6">
-                    <div className="flex flex-col md:flex-row justify-between items-center mb-6">
-                        <div className="relative w-full md:w-64 mb-4 md:mb-0">
+            <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="flex-grow p-6 lg:p-10"
+            >
+                <h2 className="text-4xl font-bold mb-6 text-green-800 drop-shadow-lg">Venue Management</h2>
+                <div className="bg-white bg-opacity-90 rounded-lg shadow-xl p-6 mb-6 backdrop-filter backdrop-blur-lg">
+                    <div className="flex flex-col md:flex-row items-center justify-between mb-4">
+                        <motion.div 
+                            whileHover={{ scale: 1.05 }}
+                            className="relative w-full md:w-64 mb-4 md:mb-0"
+                        >
                             <input
                                 type="text"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 placeholder="Search venues..."
-                                className="w-full pl-10 pr-4 py-2 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full pl-10 pr-4 py-2 rounded-full border border-green-300 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-300"
                             />
-                            <FontAwesomeIcon icon={faSearch} className="absolute left-3 top-3 text-[#495E57]" />
-                        </div>
-                        <button onClick={handleAddVenue} className="bg-[#495E57] text-white px-4 py-2 rounded-lg hover:bg-[#3a4a45] transition duration-300 flex items-center">
-                            <FontAwesomeIcon icon={faPlus} className="mr-2" />
-                            Add Venue
-                        </button>
+                            <FontAwesomeIcon icon={faSearch} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-400" />
+                        </motion.div>
+                        <motion.button 
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={handleAddVenue}
+                            className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out flex items-center justify-center shadow-md"
+                        >
+                            <FontAwesomeIcon icon={faPlus} className="mr-2" /> Add Venue
+                        </motion.button>
                     </div>
 
                     {loading ? (
-                        <div className="flex justify-center py-10">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="flex justify-center items-center h-64"
+                        >
                             <div className="loader"></div>
-                        </div>
+                        </motion.div>
                     ) : (
                         <div className="overflow-x-auto">
-                            <table className="w-full">
+                            <table className="w-full table-auto">
                                 <thead>
-                                    <tr className="bg-[#495E57] text-left text-xs font-semibold text-white uppercase tracking-wider">
-                                        <th className="px-6 py-3">No.</th>
-                                        <th className="px-6 py-3">Venue Name</th>
-                                        <th className="px-6 py-3">Occupancy</th>
-                                        <th className="px-6 py-3">Created At</th>
-                                        <th className="px-6 py-3">Updated At</th>
-                                        <th className="px-6 py-3">Actions</th>
+                                    <tr className="bg-green-600 text-white">
+                                        <th className="py-3 px-4 text-left rounded-tl-lg">No.</th>
+                                        <th className="py-3 px-4 text-left">Venue Name</th>
+                                        <th className="py-3 px-4 text-left">Occupancy</th>
+                                        <th className="py-3 px-4 text-left">Created At</th>
+                                        <th className="py-3 px-4 text-left">Updated At</th>
+                                        <th className="py-3 px-4 text-center rounded-tr-lg">Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody className="bg-white divide-y divide-[#495E57] divide-opacity-20">
-                                    {currentVenues.length > 0 ? (
-                                        currentVenues.map((venue, index) => (
-                                            <tr key={venue.ven_id} className="hover:bg-[#F4CE14] hover:bg-opacity-10 transition-all">
-                                                <td className="px-6 py-4 whitespace-nowrap">{indexOfFirstVenue + index + 1}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap">{venue.ven_name}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap">{venue.ven_occupancy}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap">{venue.ven_created_at}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap">{venue.ven_updated_at}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <button className="text-[#495E57] hover:text-[#3a4a45] mr-3" onClick={() => handleEditVenue(venue)}>
+                                <tbody className="text-gray-600 text-sm font-light">
+                                    <AnimatePresence>
+                                        {currentVenues.map((venue, index) => (
+                                            <motion.tr 
+                                                key={venue.ven_id}
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                exit={{ opacity: 0 }}
+                                                className="border-b border-green-200 hover:bg-green-50 transition-colors duration-200"
+                                            >
+                                                <td className="py-3 px-4">{indexOfFirstVenue + index + 1}</td>
+                                                <td className="py-3 px-4">{venue.ven_name}</td>
+                                                <td className="py-3 px-4">{venue.ven_occupancy}</td>
+                                                <td className="py-3 px-4">{venue.ven_created_at}</td>
+                                                <td className="py-3 px-4">{venue.ven_updated_at}</td>
+                                                <td className="py-3 px-4 text-center">
+                                                    <motion.button 
+                                                        whileHover={{ scale: 1.1 }}
+                                                        whileTap={{ scale: 0.9 }}
+                                                        onClick={() => handleEditVenue(venue)}
+                                                        className="bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-3 rounded-full transition duration-300 ease-in-out mr-2"
+                                                    >
                                                         <FontAwesomeIcon icon={faEdit} />
-                                                    </button>
-                                                    <button className="text-red-600 hover:text-red-800" onClick={() => handleDeleteVenue(venue.ven_id)}>
+                                                    </motion.button>
+                                                    <motion.button 
+                                                        whileHover={{ scale: 1.1 }}
+                                                        whileTap={{ scale: 0.9 }}
+                                                        onClick={() => handleDeleteVenue(venue.ven_id)}
+                                                        className="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded-full transition duration-300 ease-in-out"
+                                                    >
                                                         <FontAwesomeIcon icon={faTrashAlt} />
-                                                    </button>
+                                                    </motion.button>
                                                 </td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan="6" className="px-6 py-4 text-center text-[#495E57]">
-                                                No venues found.
-                                            </td>
-                                        </tr>
-                                    )}
+                                            </motion.tr>
+                                        ))}
+                                    </AnimatePresence>
                                 </tbody>
                             </table>
                         </div>
@@ -246,7 +276,7 @@ const VenueEntry = () => {
                                 <button
                                     key={i}
                                     onClick={() => paginate(i + 1)}
-                                    className={`mx-1 px-4 py-2 rounded-md ${currentPage === i + 1 ? 'bg-[#495E57] text-white' : 'bg-[#F4CE14] text-[#495E57] hover:bg-[#f3d44a]'}`}
+                                    className={`mx-1 px-4 py-2 rounded-md ${currentPage === i + 1 ? 'bg-green-600 text-white' : 'bg-green-200 text-green-800 hover:bg-green-300'}`}
                                 >
                                     {i + 1}
                                 </button>
@@ -254,53 +284,49 @@ const VenueEntry = () => {
                         </div>
                     )}
                 </div>
+            </motion.div>
 
-                {/* Modal */}
-                {showModal && (
-                    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
-                        <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
-                            <h3 className="text-2xl font-semibold mb-6 text-[#495E57]">
-                                {editMode ? 'Edit Venue' : 'Add Venue'}
-                            </h3>
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-[#495E57] mb-2">Venue Name</label>
-                                <input
-                                    type="text"
-                                    value={venueName}
-                                    onChange={handleVenueNameChange}
-                                    className="w-full px-3 py-2 border border-[#495E57] rounded-md focus:outline-none focus:ring-2 focus:ring-[#F4CE14]"
-                                />
-                                {venueExists && (
-                                    <p className="text-red-600 text-sm mt-2">Venue already exists!</p>
-                                )}
-                            </div>
-                            <div className="mb-6">
-                                <label className="block text-sm font-medium text-[#495E57] mb-2">Max Occupancy</label>
-                                <input
-                                    type="number"
-                                    value={maxOccupancy}
-                                    onChange={(e) => setMaxOccupancy(e.target.value)}
-                                    className="w-full px-3 py-2 border border-[#495E57] rounded-md focus:outline-none focus:ring-2 focus:ring-[#F4CE14]"
-                                />
-                            </div>
-                            <div className="flex justify-end">
-                                <button
-                                    onClick={() => setShowModal(false)}
-                                    className="bg-gray-300 text-[#495E57] px-4 py-2 rounded-md hover:bg-gray-400 transition duration-300 mr-2"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleSubmit}
-                                    className="bg-[#495E57] text-white px-4 py-2 rounded-md hover:bg-[#3a4a45] transition duration-300"
-                                >
-                                    {editMode ? 'Update' : 'Add'}
-                                </button>
-                            </div>
+            {/* Venue Modal */}
+            <Modal show={showModal} onHide={() => setShowModal(false)} centered>
+                <Modal.Header closeButton className="bg-green-600 text-white">
+                    <Modal.Title>{editMode ? 'Edit Venue' : 'Add Venue'}</Modal.Title>
+                </Modal.Header>
+                <Modal.Body className="bg-green-50">
+                    <div className="flex flex-col gap-4">
+                        <div>
+                            <label htmlFor="venueName" className="block mb-2 font-semibold">Venue Name</label>
+                            <input
+                                type="text"
+                                id="venueName"
+                                value={venueName}
+                                onChange={handleVenueNameChange}
+                                className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                            />
+                            {venueExists && (
+                                <p className="text-red-600 text-sm mt-2">Venue already exists!</p>
+                            )}
+                        </div>
+                        <div>
+                            <label htmlFor="maxOccupancy" className="block mb-2 font-semibold">Max Occupancy</label>
+                            <input
+                                type="number"
+                                id="maxOccupancy"
+                                value={maxOccupancy}
+                                onChange={(e) => setMaxOccupancy(e.target.value)}
+                                className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                            />
                         </div>
                     </div>
-                )}
-            </div>
+                </Modal.Body>
+                <Modal.Footer className="bg-green-50">
+                    <Button variant="secondary" onClick={() => setShowModal(false)}>
+                        Close
+                    </Button>
+                    <Button variant="primary" onClick={handleSubmit} className="bg-green-600 hover:bg-green-700">
+                        {editMode ? 'Update' : 'Add'}
+                    </Button>
+                </Modal.Footer>
+            </Modal>
         </div>
     );
 };

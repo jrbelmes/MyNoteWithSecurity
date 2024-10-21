@@ -223,8 +223,4 @@ const UserLevels = () => {
   );
 };
 
-<<<<<<< HEAD
 export default UserLevels;
-=======
-export default UserLevels;
->>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271

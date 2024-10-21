@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
 import axios from 'axios';
-import { motion } from 'framer-motion';
-import { FaEye, FaEyeSlash, FaLock, FaUser } from 'react-icons/fa';
+import { motion, AnimatePresence } from 'framer-motion';
+import { FaEye, FaEyeSlash, FaLock, FaUser, FaCalculator } from 'react-icons/fa';
+import toast, { Toaster } from 'react-hot-toast';
 
 function Logins() {
     const [username, setUsername] = useState("");
@@ -22,6 +22,12 @@ function Logins() {
         if (localStorage.getItem('loggedIn') === 'true') {
             navigateTo("/adminDashboard");
         }
+        generateCaptcha();
+        const rememberedUsername = localStorage.getItem('rememberedUsername');
+        if (rememberedUsername) {
+            setUsername(rememberedUsername);
+            setRememberMe(true);
+        }
     }, [navigateTo]);
 
     const generateCaptcha = () => {
@@ -37,14 +43,28 @@ function Logins() {
         setIsCaptchaCorrect(userAnswer == (captchaNum1 + captchaNum2));
     };
 
+    const notify = (message, type = 'success') => {
+        toast[type](message, {
+            style: {
+                borderRadius: '10px',
+                background: type === 'error' ? '#FEE2E2' : '#ECFDF5',
+                color: type === 'error' ? '#DC2626' : '#059669',
+            },
+            iconTheme: {
+                primary: type === 'error' ? '#DC2626' : '#059669',
+                secondary: 'white',
+            },
+        });
+    };
+
     const handleLogin = async (e) => {
         e.preventDefault();
         if (!username || !password || isCaptchaCorrect === null) {
-            toast.error("Please fill in all fields and solve the CAPTCHA.");
+            notify("Please fill in all fields and solve the CAPTCHA.", 'error');
             return;
         }
         if (!isCaptchaCorrect) {
-            toast.error("Incorrect CAPTCHA. Please try again.");
+            notify("Incorrect CAPTCHA. Please try again.", 'error');
             generateCaptcha();
             return;
         }
@@ -53,7 +73,7 @@ function Logins() {
 
         const url = `${localStorage.getItem("url")}login.php`;
         if (!url || !username || !password) {
-            toast.error("Invalid URL or missing credentials.");
+            notify("Invalid URL or missing credentials.", 'error');
             setLoading(false);
             return;
         }
@@ -70,15 +90,18 @@ function Logins() {
             if (Array.isArray(data) && data.length > 0) {
                 const { admin_id, admin_name, user_level_desc } = data[0];
 
+                // Clear localStorage and sessionStorage
                 localStorage.clear();
                 sessionStorage.clear();
 
+                // Set new values in localStorage
                 localStorage.setItem('loggedIn', 'true');
                 localStorage.setItem('adminId', admin_id);
                 localStorage.setItem('adminName', admin_name);
                 localStorage.setItem('adminLevel', user_level_desc);
-               
+                localStorage.setItem('url', url);  // Make sure to preserve the URL
 
+                // Set values in sessionStorage
                 sessionStorage.setItem('adminId', admin_id);
 
                 if (rememberMe) {
@@ -93,130 +116,155 @@ function Logins() {
                     navigateTo("/adminDashboard");
                 }, 2000);
 
-                toast.success("Login Successful");
+                notify("Login Successful");
             } else {
                 const newAttempts = loginAttempts + 1;
                 setLoginAttempts(newAttempts);
                 if (newAttempts >= 3) {
-                    toast.error("Too many failed attempts. Please try again later.");
+                    notify("Too many failed attempts. Please try again later.", 'error');
                     setTimeout(() => setLoginAttempts(0), 300000); // Reset after 5 minutes
                 } else {
-                    toast.error("Invalid Credentials");
+                    notify("Invalid Credentials", 'error');
                 }
             }
         } catch (error) {
             console.error("Login error:", error.response ? error.response.data : error.message);
-            toast.error("Something went wrong. Please try again.");
+            notify("Something went wrong. Please try again.", 'error');
         } finally {
             setLoading(false);
         }
     };
-
-    useEffect(() => {
-        generateCaptcha();
-        const rememberedUsername = localStorage.getItem('rememberedUsername');
-        if (rememberedUsername) {
-            setUsername(rememberedUsername);
-            setRememberMe(true);
-        }
-    }, []);
 
     return (
         <motion.div 
             initial={{ opacity: 0 }} 
             animate={{ opacity: 1 }} 
             transition={{ duration: 0.5 }}
-            className='flex flex-col justify-center items-center h-screen bg-gradient-to-br from-green-100 to-green-200'
+            className='flex flex-col justify-center items-center min-h-screen bg-gradient-to-br from-green-50 to-green-100 p-4'
         >
+            <Toaster position="top-right" reverseOrder={false} />
             <motion.div 
                 initial={{ y: -50 }} 
                 animate={{ y: 0 }} 
                 transition={{ type: 'spring', stiffness: 300 }}
-                className='w-full max-w-md bg-white rounded-xl shadow-lg overflow-hidden p-8'
+                className='w-full max-w-md bg-white rounded-xl shadow-2xl overflow-hidden'
             >
-                <h2 className='text-center text-3xl font-bold text-gray-800 mb-6'>User Login</h2>
-                <form onSubmit={handleLogin}>
-                    <div className='mb-4 relative'>
-                        <label className='block text-gray-700 font-semibold mb-2' htmlFor='username'>
-                            Username
-                        </label>
-                        <div className='relative'>
-                            <FaUser className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400' />
-                            <input 
-                                value={username} 
-                                onChange={(e) => setUsername(e.target.value)} 
-                                className='w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-300' 
-                                id='username' 
-                                type='text' 
-                                placeholder='Enter your username' 
-                                required 
-                            />
+                <div className='bg-gradient-to-r from-green-600 to-green-700 p-6 text-white'>
+                    <h2 className='text-center text-3xl font-bold'>Welcome Back</h2>
+                    <p className='text-center text-green-100 mt-2'>Please login to your account</p>
+                </div>
+                <div className='p-8'>
+                    <form onSubmit={handleLogin} className='space-y-6'>
+                        <div className='space-y-2'>
+                            <label className='text-sm font-medium text-gray-700' htmlFor='username'>
+                                Username
+                            </label>
+                            <div className='relative rounded-md shadow-sm'>
+                                <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
+                                    <FaUser className='text-green-500' />
+                                </div>
+                                <input 
+                                    value={username} 
+                                    onChange={(e) => setUsername(e.target.value)} 
+                                    className='block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm transition duration-150 ease-in-out' 
+                                    id='username' 
+                                    type='text' 
+                                    placeholder='Enter your username' 
+                                    required 
+                                />
+                            </div>
                         </div>
-                    </div>
 
-                    <div className='mb-4 relative'>
-                        <label className='block text-gray-700 font-semibold mb-2' htmlFor='password'>
-                            Password
-                        </label>
-                        <div className='relative'>
-                            <FaLock className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400' />
-                            <input 
-                                value={password} 
-                                onChange={(e) => setPassword(e.target.value)} 
-                                className='w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-300' 
-                                id='password' 
-                                type={showPassword ? 'text' : 'password'} 
-                                placeholder='Enter your password' 
-                                required 
-                            />
-                            <button 
-                                type="button" 
-                                onClick={() => setShowPassword(!showPassword)} 
-                                className='absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600'
-                            >
-                                {showPassword ? <FaEyeSlash /> : <FaEye />}
-                            </button>
+                        <div className='space-y-2'>
+                            <label className='text-sm font-medium text-gray-700' htmlFor='password'>
+                                Password
+                            </label>
+                            <div className='relative rounded-md shadow-sm'>
+                                <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
+                                    <FaLock className='text-green-500' />
+                                </div>
+                                <input 
+                                    value={password} 
+                                    onChange={(e) => setPassword(e.target.value)} 
+                                    className='block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm transition duration-150 ease-in-out' 
+                                    id='password' 
+                                    type={showPassword ? 'text' : 'password'} 
+                                    placeholder='Enter your password' 
+                                    required 
+                                />
+                                <button 
+                                    type="button" 
+                                    onClick={() => setShowPassword(!showPassword)} 
+                                    className='absolute inset-y-0 right-0 pr-3 flex items-center'
+                                >
+                                    {showPassword ? <FaEyeSlash className='text-green-500' /> : <FaEye className='text-green-500' />}
+                                </button>
+                            </div>
                         </div>
+
+                        <div className='space-y-2'>
+                            <label className='text-sm font-medium text-gray-700'>
+                                Math CAPTCHA
+                            </label>
+                            <div className='flex items-center space-x-2 bg-green-50 p-3 rounded-md'>
+                                <FaCalculator className='text-green-500' />
+                                <span>{captchaNum1} + {captchaNum2} = ?</span>
+                                <input 
+                                    value={captchaAnswer}
+                                    onChange={handleCaptchaChange}
+                                    className={`w-20 px-2 py-1 border ${isCaptchaCorrect === false ? 'border-red-500' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm transition duration-150 ease-in-out`}
+                                    placeholder='Answer'
+                                />
+                            </div>
+                            <AnimatePresence>
+                                {isCaptchaCorrect === false && (
+                                    <motion.p 
+                                        initial={{ opacity: 0, y: -10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -10 }}
+                                        className='text-red-500 text-xs'
+                                    >
+                                        Incorrect answer.
+                                    </motion.p>
+                                )}
+                                {isCaptchaCorrect === true && (
+                                    <motion.p 
+                                        initial={{ opacity: 0, y: -10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -10 }}
+                                        className='text-green-500 text-xs'
+                                    >
+                                        Correct!
+                                    </motion.p>
+                                )}
+                            </AnimatePresence>
+                        </div>
+
+                        <div className='flex items-center'>
+                            <input
+                                type="checkbox"
+                                id="rememberMe"
+                                checked={rememberMe}
+                                onChange={(e) => setRememberMe(e.target.checked)}
+                                className='h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded transition duration-150 ease-in-out'
+                            />
+                            <label htmlFor="rememberMe" className='ml-2 block text-sm text-gray-700'>Remember me</label>
+                        </div>
+
+                        <motion.button 
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-150 ease-in-out ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            type='submit'
+                            disabled={loading || loginAttempts >= 3}
+                        >
+                            {loading ? 'Logging in...' : 'Sign In'}
+                        </motion.button>
+                    </form>
+
+                    <div className='mt-6 text-center'>
+                        <a href="#" className='text-sm text-green-600 hover:text-green-700 transition duration-150 ease-in-out'>Forgot your password?</a>
                     </div>
-
-                    <div className='mb-4'>
-                        <label className='block text-gray-700 font-semibold mb-2'>
-                            Solve this: {captchaNum1} + {captchaNum2} = ?
-                        </label>
-                        <input 
-                            value={captchaAnswer}
-                            onChange={handleCaptchaChange}
-                            className={`w-full px-4 py-2 border ${isCaptchaCorrect === false ? 'border-red-500' : 'border-gray-300'} rounded-md focus:outline-none focus:border-pink-500`}
-                            placeholder='Your answer'
-                        />
-                        {isCaptchaCorrect === false && <p className='text-red-500 text-sm mt-1'>Incorrect answer.</p>}
-                        {isCaptchaCorrect === true && <p className='text-green-500 text-sm mt-1'>Correct!</p>}
-                    </div>
-
-                    <div className='mb-4 flex items-center'>
-                        <input
-                            type="checkbox"
-                            id="rememberMe"
-                            checked={rememberMe}
-                            onChange={(e) => setRememberMe(e.target.checked)}
-                            className='mr-2'
-                        />
-                        <label htmlFor="rememberMe" className='text-sm text-gray-600'>Remember me</label>
-                    </div>
-
-                    <motion.button 
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className={`w-full py-2 px-4 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-300 ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-green-400 to-green-600 hover:from-green-500 hover:to-green-700'}`}
-                        type='submit'
-                        disabled={loading || loginAttempts >= 3}
-                    >
-                        {loading ? 'Logging in...' : 'Login'}
-                    </motion.button>
-                </form>
-
-                <div className='mt-4 text-center'>
-                    <a href="#" className='text-sm text-green-600 hover:text-green-800 transition duration-300'>Forgot password?</a>
                 </div>
             </motion.div>
         </motion.div>

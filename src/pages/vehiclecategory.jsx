@@ -213,8 +213,6 @@ const VehicleCategories = () => {
   );
 };
 
-<<<<<<< HEAD
+
 export default VehicleCategories;
-=======
-export default VehicleCategories;
->>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271
+

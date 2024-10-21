@@ -214,8 +214,4 @@ const VehiclePositions = () => {
   );
 };
 
-<<<<<<< HEAD
 export default VehiclePositions;
-=======
-export default VehiclePositions;
->>>>>>> 054698c93fec072ffdfe11e06169d2313e26e271
