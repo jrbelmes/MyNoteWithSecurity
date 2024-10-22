@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, createContext, useCallback } from 'react';
 import { Route, Routes, Navigate } from 'react-router-dom';
 // import Sidebar from './pages/Sidebar';
 // import Login from './pages/Login';
@@ -25,43 +25,64 @@ import Equipmentc from './pages/equipmentCategory';
 import Userlevel from './pages/userLevel';
 import VehicleModel from './pages/vehiclemodel';
 import PersonnelDashboard from './pages/PersonelDashboard';
+
+// Create a new context for the theme
+export const ThemeContext = createContext();
+
 const App = () => {
     const defaultUrl = "http://localhost/coc/gsd/";
     if (localStorage.getItem("url") !== defaultUrl) {
         localStorage.setItem("url", defaultUrl);
     }
 
+    // Add state for the current theme
+    const [theme, setTheme] = useState(() => {
+        const savedTheme = localStorage.getItem('theme');
+        return savedTheme || 'light';
+    });
+
+    // Function to toggle the theme
+    const toggleTheme = useCallback(() => {
+        setTheme(prevTheme => {
+            const newTheme = prevTheme === 'light' ? 'dark' : 'light';
+            localStorage.setItem('theme', newTheme);
+            return newTheme;
+        });
+    }, []);
+
     return (
-        <div className="app-container">
-            <Toaster richColors position='top-center' duration={1500} />
-            <main className="main-content">
-                <Routes>
-                    <Route path="/" element={<Navigate to="/gsd" replace />} />
-                    <Route path="/gsd" element={<Logins />} />
-                    <Route path="/departments" element={<Departments />} />
-                    <Route path="/vehiclemodel" element={<VehicleModel />} />
-                    <Route path="/personeldashboard" element={<PersonnelDashboard />} />
-                    <Route path="/userlevel" element={<Userlevel /> } /> 
-                    <Route path="/position" element={<Position />} />
-                    <Route path="/equipmentCat" element={<Equipmentc />} />
-                    <Route path="/vehiclemake" element={<Vehiclem />} /> 
-                    <Route path="/vehicleCategory" element={<Vehiclec />} /> 
-                    <Route path="/VehicleEntry" element={<VehicleEntry />} /> 
-                    <Route path="/viewReservation" element={<ViewReservation />} /> 
-                    <Route path="/addReservation" element={<AddReservation />} /> {/* Add new route for AddReservation */}
-                    <Route path="/Venue" element={<Venue />} /> 
-                    <Route path="/adminDashboard" element={<AdminDashboard />} />
-                    <Route path="/Equipment" element={<Equipment />} />
-                    <Route path="/Faculty" element={<Faculty />} />
-                    <Route path="/Register" element={<Register />} />
-                    <Route path="/viewRequest" element={<ViewRequest />} />
-                    <Route path="/personel" element={<Personnel />} />
-                    <Route path="/Master" element={<Master />} />
-                    
-                    <Route path="*" element={<div>404 Not Found</div>} /> 
-                </Routes>
-            </main>
-        </div>
+        <ThemeContext.Provider value={{ theme, toggleTheme }}>
+            <div className={`app-container ${theme}`}>
+                <Toaster richColors position='top-center' duration={1500} />
+                <main className="main-content">
+                    <Routes>
+                        <Route path="/" element={<Navigate to="/gsd" replace />} />
+                        <Route path="/gsd" element={<Logins />} />
+                        <Route path="/departments" element={<Departments />} />
+                        <Route path="/vehiclemodel" element={<VehicleModel />} />
+                        <Route path="/personeldashboard" element={<PersonnelDashboard />} />
+                        <Route path="/userlevel" element={<Userlevel /> } /> 
+                        <Route path="/position" element={<Position />} />
+                        <Route path="/equipmentCat" element={<Equipmentc />} />
+                        <Route path="/vehiclemake" element={<Vehiclem />} /> 
+                        <Route path="/vehicleCategory" element={<Vehiclec />} /> 
+                        <Route path="/VehicleEntry" element={<VehicleEntry />} /> 
+                        <Route path="/viewReservation" element={<ViewReservation />} /> 
+                        <Route path="/addReservation" element={<AddReservation />} /> {/* Add new route for AddReservation */}
+                        <Route path="/Venue" element={<Venue />} /> 
+                        <Route path="/adminDashboard" element={<AdminDashboard />} />
+                        <Route path="/Equipment" element={<Equipment />} />
+                        <Route path="/Faculty" element={<Faculty />} />
+                        <Route path="/Register" element={<Register />} />
+                        <Route path="/viewRequest" element={<ViewRequest />} />
+                        <Route path="/personel" element={<Personnel />} />
+                        <Route path="/Master" element={<Master />} />
+                        
+                        <Route path="*" element={<div>404 Not Found</div>} /> 
+                    </Routes>
+                </main>
+            </div>
+        </ThemeContext.Provider>
     );
 };
 

@@ -1,40 +1,50 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import axios from 'axios';
+import { FaEye, FaEyeSlash } from 'react-icons/fa'; // Import eye icons
 
-function Login() {
-    const [username, setUsername] = useState("");
-    const [password, setPassword] = useState("");
-    const [loading, setLoading] = useState(false);
-    const [captchaNum1, setCaptchaNum1] = useState(Math.floor(Math.random() * 10));
-    const [captchaNum2, setCaptchaNum2] = useState(Math.floor(Math.random() * 10));
-    const [captchaAnswer, setCaptchaAnswer] = useState("");
-    const [isCaptchaCorrect, setIsCaptchaCorrect] = useState(null);
+function Logins() {
+    const defaultUrl = "http://localhost/coc/gsd/";
     const navigateTo = useNavigate();
+
+    const [formData, setFormData] = useState({
+        username: "",
+        password: "",
+        captchaAnswer: "",
+    });
+    const [loading, setLoading] = useState(false);
+    const [captcha, setCaptcha] = useState({ num1: 0, num2: 0 });
+    const [isCaptchaCorrect, setIsCaptchaCorrect] = useState(null);
+    const [showPassword, setShowPassword] = useState(false);
 
     useEffect(() => {
         if (localStorage.getItem('loggedIn') === 'true') {
-            navigateTo("/dashboard");
+            navigateTo("/adminDashboard");
         }
+        if (localStorage.getItem("url") !== defaultUrl) {
+            localStorage.setItem("url", defaultUrl);
+        }
+        generateCaptcha();
     }, [navigateTo]);
 
     const generateCaptcha = () => {
-        setCaptchaNum1(Math.floor(Math.random() * 10));
-        setCaptchaNum2(Math.floor(Math.random() * 10));
-        setCaptchaAnswer("");
+        setCaptcha({ num1: Math.floor(Math.random() * 10), num2: Math.floor(Math.random() * 10) });
         setIsCaptchaCorrect(null);
     };
 
-    const handleCaptchaChange = (e) => {
-        const userAnswer = e.target.value;
-        setCaptchaAnswer(userAnswer);
-        setIsCaptchaCorrect(userAnswer == (captchaNum1 + captchaNum2));
+    const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+        if (name === 'captchaAnswer') {
+            setIsCaptchaCorrect(parseInt(value) === (captcha.num1 + captcha.num2));
+        }
     };
 
     const handleLogin = async (e) => {
         e.preventDefault();
-        if (!username || !password || isCaptchaCorrect === null) {
+        if (!formData.username || !formData.password || isCaptchaCorrect === null) {
             toast.error("Please fill in all fields and solve the CAPTCHA.");
             return;
         }
@@ -47,43 +57,35 @@ function Login() {
         setLoading(true);
 
         const url = `${localStorage.getItem("url")}login.php`;
-        if (!url || !username || !password) {
-            toast.error("Invalid URL or missing credentials.");
+        if (!url) {
+            toast.error("Invalid URL.");
             setLoading(false);
             return;
         }
 
         try {
-            const jsonData = { username, password };
-            const formData = new FormData();
-            formData.append("json", JSON.stringify(jsonData));
-            formData.append("operation", "admin");
+            const jsonData = { username: formData.username, password: formData.password };
+            const formDataToSend = new FormData();
+            formDataToSend.append("json", JSON.stringify(jsonData));
+            formDataToSend.append("operation", "login");
 
-            const res = await axios.post(url, formData);
-            const data = res.data;
+            const response = await axios.post(url, formDataToSend);
 
-            if (Array.isArray(data) && data.length > 0) {
-                const { admin_id, admin_name, admin_school_id, admin_contact_number, admin_level, admin_username } = data[0];
+            if (response.data) {
+                const user = response.data;
+                toast.success("Login successful! Redirecting...");
 
-                localStorage.clear();
-                sessionStorage.clear();
-
-                localStorage.setItem('loggedIn', 'true');
-                localStorage.setItem('adminId', admin_id);
-                localStorage.setItem('adminName', admin_name);
-                localStorage.setItem('adminSchoolId', admin_school_id);
-                localStorage.setItem('adminContact', admin_contact_number);
-                localStorage.setItem('adminLevel', admin_level);
-                localStorage.setItem('adminUsername', admin_username);
-
-                sessionStorage.setItem('adminId', admin_id);
-
-                // Add a delay before redirecting
-                setTimeout(() => {
-                    navigateTo("/dashboard");
-                }, 2000);
-
-                toast.success("Login Successful");
+                if (user.adm_userLevel === "100") {
+                    localStorage.setItem("user_id", user.admin_id);
+                    localStorage.setItem("user_level", user.adm_userLevel);
+                    localStorage.setItem("name", user.admin_name || "");
+                    navigateTo("/adminDashboard");
+                } else if (user.personnel_userLevel  === "1") {
+                    localStorage.setItem("user_id", user.jo_personel_id);
+                    localStorage.setItem("user_level", user.personnel_userLevel );
+                    localStorage.setItem("first_name", user.jo_personel_fname || "");
+                    navigateTo("/personnelDashboard");
+                }
             } else {
                 toast.error("Invalid Credentials");
             }
@@ -95,9 +97,9 @@ function Login() {
         }
     };
 
-    useEffect(() => {
-        generateCaptcha(); // Generate CAPTCHA on component mount
-    }, []);
+    const togglePasswordVisibility = () => {
+        setShowPassword(!showPassword);
+    };
 
     return (
         <div className='flex flex-col justify-center items-center h-screen bg-gray-100'>
@@ -112,8 +114,9 @@ function Login() {
                             Username
                         </label>
                         <input 
-                            value={username} 
-                            onChange={(e) => setUsername(e.target.value)} 
+                            name="username"
+                            value={formData.username} 
+                            onChange={handleInputChange} 
                             className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring focus:ring-blue-500" 
                             id="username" 
                             type="text" 
@@ -126,25 +129,35 @@ function Login() {
                         <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="password">
                             Password
                         </label>
-                        <input 
-                            value={password} 
-                            onChange={(e) => setPassword(e.target.value)} 
-                            className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 mb-3 leading-tight focus:outline-none focus:ring focus:ring-blue-500" 
-                            id="password" 
-                            type="password" 
-                            placeholder="Enter your password" 
-                            required 
-                        />
+                        <div className="relative">
+                            <input 
+                                name="password"
+                                value={formData.password} 
+                                onChange={handleInputChange} 
+                                className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 mb-3 leading-tight focus:outline-none focus:ring focus:ring-blue-500 pr-10" 
+                                id="password" 
+                                type={showPassword ? "text" : "password"}
+                                placeholder="Enter your password" 
+                                required 
+                            />
+                            <button
+                                type="button"
+                                className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5"
+                                onClick={togglePasswordVisibility}
+                            >
+                                {showPassword ? <FaEyeSlash className="text-gray-500" /> : <FaEye className="text-gray-500" />}
+                            </button>
+                        </div>
                     </div>
 
                     <div className="mb-4">
                         <label className="block text-gray-700 text-sm font-semibold mb-2">
-                            Solve this: {captchaNum1} + {captchaNum2} = ?
+                            Solve this: {captcha.num1} + {captcha.num2} = ?
                         </label>
                         <input
-                            type="text"
-                            value={captchaAnswer}
-                            onChange={handleCaptchaChange}
+                            name="captchaAnswer"
+                            value={formData.captchaAnswer}
+                            onChange={handleInputChange}
                             className={`shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring focus:ring-blue-500 ${isCaptchaCorrect === false ? 'border-red-500' : isCaptchaCorrect === true ? 'border-green-500' : ''}`}
                             placeholder="Your answer"
                         />
@@ -180,12 +193,10 @@ function Login() {
                     </div>
                 </form>
 
-                <p className="text-center text-gray-500 text-xs">
-                    &copy;{new Date().getFullYear()} Acme Corp. All rights reserved.
-                </p>
+           
             </div>
         </div>
     );
 }
 
-export default Login;
+export default Logins;

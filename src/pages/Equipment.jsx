@@ -10,7 +10,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const EquipmentEntry = () => {
-    const adminId = localStorage.getItem('adminId') || '';
+    const user_level = localStorage.getItem('user_level') || '';
     const [equipments, setEquipments] = useState([]);
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -28,11 +28,11 @@ const EquipmentEntry = () => {
     const [filteredEquipments, setFilteredEquipments] = useState([]);
 
     useEffect(() => {
-        if (adminLevel !== '100') {
+        if (user_level !== '100') {
             localStorage.clear();
             navigate('/');
         }
-    }, [adminLevel, navigate]);
+    }, [user_level, navigate]);
 
     useEffect(() => {
         fetchEquipments();

@@ -11,7 +11,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const VenueEntry = () => {
-    const adminId = localStorage.getItem('adminId') || '';
+    const user_level = localStorage.getItem('user_level') || '';
     const [venues, setVenues] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -27,11 +27,11 @@ const VenueEntry = () => {
     const adminLevel = localStorage.getItem('adminLevel');
 
     useEffect(() => {
-        if (adminLevel !== '100') {
+        if (user_level !== '100') {
             localStorage.clear();
             navigate('/gsd');
         }
-    }, [adminLevel, navigate]);
+    }, [user_level, navigate]);
 
     useEffect(() => {
         fetchVenues();

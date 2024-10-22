@@ -1,210 +1,263 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, createContext, useContext, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   FaSignOutAlt, FaTachometerAlt, FaCar, FaCog, FaFileAlt, FaHeadset,
   FaChevronDown, FaBars, FaHome, FaTools, FaUserCircle, FaFolder,
-  FaBell, FaMoon, FaSun, FaBuilding
+  FaBell, FaMoon, FaSun, FaBuilding, FaSearch, FaQuestionCircle, FaCalendarAlt, FaChartBar
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const sidebarVariants = {
-  open: { x: 0, width: 256 },
-  closed: { x: -220, width: 256 },
-};
+const SidebarContext = createContext();
 
-const menuItemVariants = {
-  open: { opacity: 1, x: 0 },
-  closed: { opacity: 0, x: -20 },
+const sidebarVariants = {
+  open: { width: '16rem' },
+  closed: { width: '4rem' },
 };
 
 const Sidebar = () => {
   const navigate = useNavigate();
-  const location = useLocation(); // Get the current location
-  const [isMasterFileOpen, setMasterFileOpen] = useState(false);
-  const [isUsersOpen, setUsersOpen] = useState(false);
-  const [isReservationOpen, setReservationOpen] = useState(false);
+  const location = useLocation();
+  const [activeItem, setActiveItem] = useState('');
   const [isSidebarOpen, setSidebarOpen] = useState(true);
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const [notifications, setNotifications] = useState(3); // Example notification count
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const savedMode = localStorage.getItem('darkMode');
+    return savedMode ? JSON.parse(savedMode) : false;
+  });
 
-  const adminName = localStorage.getItem('adminName') || '';
+  const name = localStorage.getItem('name') || 'Admin User';
 
-  const toggleMasterFile = () => {
-    setMasterFileOpen(!isMasterFileOpen);
-  };
+  useEffect(() => {
+    setActiveItem(location.pathname);
+    const handleResize = () => {
+      setSidebarOpen(window.innerWidth >= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    handleResize();
+    return () => window.removeEventListener('resize', handleResize);
+  }, [location]);
 
-  const toggleUsers = () => {
-    setUsersOpen(!isUsersOpen);
-  };
+  useEffect(() => {
+    document.body.classList.toggle('dark', isDarkMode);
+    localStorage.setItem('darkMode', JSON.stringify(isDarkMode));
+  }, [isDarkMode]);
 
-  const toggleReservations = () => {
-    setReservationOpen(!isReservationOpen);
-  };
-
-  const toggleSidebar = () => {
-    setSidebarOpen(!isSidebarOpen);
-  };
+  const toggleSidebar = () => setSidebarOpen(!isSidebarOpen);
+  const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
 
   const handleLogout = () => {
     sessionStorage.clear();
     localStorage.clear();
-    window.location.reload();
     navigate('/gsd');
-     // Add this line to refresh the window
+    window.location.reload();
   };
 
-  const toggleDarkMode = () => {
-    setIsDarkMode(!isDarkMode);
-    // Implement dark mode logic here
-  };
-
-  // Detect route changes and keep the correct toggle open
-  useEffect(() => {
-    if (location.pathname.includes('/Venue') || location.pathname.includes('/VehicleEntry') || location.pathname.includes('/Equipment')) {
-      setMasterFileOpen(true);
-    } else {
-      setMasterFileOpen(false);
-    }
-
-    if (location.pathname.includes('/personnel') || location.pathname.includes('/Faculty')) {
-      setUsersOpen(true);
-    } else {
-      setUsersOpen(false);
-    }
-
-    if (location.pathname.includes('/viewReservation') || location.pathname.includes('/ViewRequest') || location.pathname.includes('/AddReservation')) {
-      setReservationOpen(true);
-    } else {
-      setReservationOpen(false);
-    }
-  }, [location]); // Update the toggles whenever the location changes
+  const contextValue = useMemo(() => ({ isSidebarOpen }), [isSidebarOpen]);
 
   return (
-    <div className={`flex ${isDarkMode ? 'dark' : ''}`}>
-      <button 
-        className={`fixed top-1 z-50 text-emerald-700 bg-white rounded-full shadow-lg hover:bg-emerald-50 transition-all duration-300 p-3 ${isSidebarOpen ? 'left-64' : 'left-10'}`}
-        onClick={toggleSidebar}
-      >
-        <FaBars />
-      </button>
-      <motion.aside
-        initial="open"
-        animate={isSidebarOpen ? "open" : "closed"}
-        variants={sidebarVariants}
-        transition={{ duration: 0.3, type: 'tween' }}
-        className={`fixed h-full bg-gradient-to-br from-emerald-800 via-emerald-700 to-emerald-600 text-white shadow-xl flex flex-col z-40 overflow-hidden ${isSidebarOpen ? 'w-64' : 'w-16'}`}
-      >
-        <div className="sidebar-header p-6 text-center bg-emerald-900 rounded-br-[40px] shadow-md">
-          <motion.div 
-            className="flex items-center justify-center mb-4"
-            variants={menuItemVariants}
-          >
-            <img src="/images/assets/phinma.png" alt="GSD Logo" className="w-12 h-12 mr-3" />
-            <h2 className="text-xl font-bold">General Service Department</h2>
-          </motion.div>
-          <motion.div 
-            className="flex items-center justify-center mt-4"
-            variants={menuItemVariants}
-          >
-            <FaUserCircle className="text-3xl mr-2" />
-            <h1 className="text-lg font-semibold">{adminName}</h1>
-          </motion.div>
-        </div>
-        <nav className="sidebar-nav p-5 flex-grow overflow-y-auto custom-scrollbar">
-          <ul className="space-y-2">
-            <SidebarItem icon={FaTachometerAlt} text="Dashboard" link="/adminDashboard" />
-            <SidebarDropdown
-              icon={FaFileAlt}
-              text="Master File"
-              isOpen={isMasterFileOpen}
-              toggleOpen={toggleMasterFile}
-            >
-              <SidebarSubItem icon={FaHome} text="Venue" link="/Venue" />
-              <SidebarSubItem icon={FaCar} text="Vehicle" link="/VehicleEntry" />
-              <SidebarSubItem icon={FaTools} text="Equipments" link="/Equipment" />
-              <SidebarSubItem icon={FaFolder} text="Master" link="/Master" />
-            </SidebarDropdown>
-            <SidebarDropdown
-              icon={FaUserCircle}
-              text="Users"
-              isOpen={isUsersOpen}
-              toggleOpen={toggleUsers}
-            >
-              <SidebarSubItem icon={FaUserCircle} text="Personnel" link="/personel" />
-              <SidebarSubItem icon={FaUserCircle} text="Faculty" link="/Faculty" />
-            </SidebarDropdown>
-            <SidebarDropdown
-              icon={FaCar}
-              text="Reservations"
-              isOpen={isReservationOpen}
-              toggleOpen={toggleReservations}
-            >
-              <SidebarSubItem icon={FaFileAlt} text="View All Reservations" link="/viewReservation" />
-              <SidebarSubItem icon={FaHeadset} text="View Requests" link="/ViewRequest" />
-              <SidebarSubItem icon={FaCar} text="Add Reservation" link="/AddReservation" />
-            </SidebarDropdown>
-            <SidebarItem icon={FaCog} text="Settings" link="/settings" />
-            <SidebarItem icon={FaHeadset} text="Support" link="/support" />
-          </ul>
-        </nav>
-        <div className="sidebar-footer p-4 bg-emerald-900  shadow-inner">
-          <div className="flex flex-col items-center">
-           
-            <button 
-              onClick={handleLogout} 
-              className="flex items-center justify-center w-full py-2 px-4 text-red-400 hover:bg-red-400 hover:text-white rounded-full transition-all duration-300"
-            >
-              <FaSignOutAlt className="mr-2" />
-              <span>Logout</span>
+    <SidebarContext.Provider value={contextValue}>
+      <div className={`flex h-screen ${isDarkMode ? 'dark' : ''}`}>
+        <motion.aside
+          initial="open"
+          animate={isSidebarOpen ? "open" : "closed"}
+          variants={sidebarVariants}
+          transition={{ duration: 0.3, type: 'tween' }}
+          className={`fixed md:relative h-full bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 shadow-xl flex flex-col z-40 ${
+            isSidebarOpen ? 'w-64' : 'w-16'
+          } transition-all duration-300 ease-in-out`}
+        >
+          <div className="flex items-center justify-between p-4 border-b border-green-200">
+            <AnimatePresence>
+              {isSidebarOpen && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex items-center space-x-3"
+                >
+                  <img src="/images/assets/phinma.png" alt="GSD Logo" className="w-8 h-8" />
+                  <span className="font-semibold text-lg text-green-600">GSD Portal</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <button onClick={toggleSidebar} className="text-green-600 hover:text-green-700">
+              <FaBars />
             </button>
           </div>
-        </div>
-      </motion.aside>
-      <div className={`flex-grow transition-all duration-300 ${isSidebarOpen ? 'ml-64' : 'ml-16'}`}>
-        {/* Content goes here */}
+
+          <div className="flex-grow overflow-y-auto">
+            <nav className="mt-5 px-2">
+              <SidebarItem icon={FaTachometerAlt} text="Dashboard" link="/adminDashboard" active={activeItem === '/adminDashboard'} />
+              
+              
+              <SidebarDropdown icon={FaFileAlt} text="Master File" active={['/Venue', '/VehicleEntry', '/Equipment', '/Master'].includes(activeItem)}>
+                <SidebarSubItem icon={FaHome} text="Venue" link="/Venue" active={activeItem === '/Venue'} />
+                <SidebarSubItem icon={FaCar} text="Vehicle" link="/VehicleEntry" active={activeItem === '/VehicleEntry'} />
+                <SidebarSubItem icon={FaTools} text="Equipments" link="/Equipment" active={activeItem === '/Equipment'} />
+                <SidebarSubItem icon={FaFolder} text="Master" link="/Master" active={activeItem === '/Master'} />
+              </SidebarDropdown>
+
+              <SidebarDropdown icon={FaUserCircle} text="Users" active={['/personel', '/Faculty'].includes(activeItem)}>
+                <SidebarSubItem icon={FaUserCircle} text="Personnel" link="/personel" active={activeItem === '/personel'} />
+                <SidebarSubItem icon={FaUserCircle} text="Faculty" link="/Faculty" active={activeItem === '/Faculty'} />
+              </SidebarDropdown>
+
+              <SidebarDropdown icon={FaCar} text="Reservations" active={['/viewReservation', '/ViewRequest', '/AddReservation'].includes(activeItem)}>
+                <SidebarSubItem icon={FaHeadset} text="View Requests" link="/ViewRequest" active={activeItem === '/ViewRequest'} />
+                <SidebarSubItem icon={FaCar} text="Add Reservation" link="/AddReservation" active={activeItem === '/AddReservation'} />
+              </SidebarDropdown>
+
+              <SidebarSubItem icon={FaFileAlt} text="Reports" link="/viewReservation" active={activeItem === '/viewReservation'} />
+            </nav>
+          </div>
+
+          <div className="border-t border-green-200 p-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-3">
+                <FaUserCircle className="text-2xl text-green-600" />
+                <AnimatePresence>
+                  {isSidebarOpen && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                    >
+                      <p className="font-medium text-gray-700">{name}</p>
+                      
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+              <button onClick={toggleDarkMode} className="text-green-600 hover:text-green-700">
+                {isDarkMode ? <FaSun /> : <FaMoon />}
+              </button>
+            </div>
+            <button 
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center space-x-2 py-2 px-4 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+            >
+              <FaSignOutAlt />
+              <AnimatePresence>
+                {isSidebarOpen && (
+                  <motion.span
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    Logout
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </button>
+          </div>
+        </motion.aside>
+
+        {/* Main content area */}
+        
       </div>
-    </div>
+    </SidebarContext.Provider>
   );
 };
 
-// Updated components to accept variants prop
-const SidebarItem = ({ icon: Icon, text, link, variants }) => (
-  <motion.li variants={variants}>
-    <Link to={link} className="flex items-center p-3 hover:bg-emerald-600 rounded-xl transition-all duration-200 group">
-      <Icon className="mr-3 text-emerald-300 group-hover:text-white transition-colors" />
-      <span className="group-hover:translate-x-1 transition-transform">{text}</span>
-    </Link>
-  </motion.li>
-);
-
-const SidebarDropdown = ({ icon: Icon, text, isOpen, toggleOpen, children, variants }) => (
-  <motion.li variants={variants}>
-    <div 
-      onClick={toggleOpen} 
-      className="flex items-center cursor-pointer p-3 hover:bg-emerald-600 rounded-xl transition-all duration-200 group"
-    >
-      <Icon className="mr-3 text-emerald-300 group-hover:text-white transition-colors" />
-      <span className="flex-grow group-hover:translate-x-1 transition-transform">{text}</span>
-      <FaChevronDown className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-    </div>
-    {isOpen && (
-      <ul className="ml-4 mt-2 space-y-1 pr-2">
-        {children}
-      </ul>
-    )}
-  </motion.li>
-);
-
-const SidebarSubItem = ({ icon: Icon, text, link, variants }) => (
-  <motion.li variants={variants}>
+// Memoize the SidebarItem component
+const SidebarItem = React.memo(({ icon: Icon, text, link, active }) => {
+  const { isSidebarOpen } = useContext(SidebarContext);
+  
+  return (
     <Link 
       to={link} 
-      className="flex items-center p-2 my-1 hover:bg-emerald-100 hover:text-emerald-800 text-emerald-100 bg-emerald-800 bg-opacity-30 rounded-lg transition-all duration-200 group border border-emerald-300"
+      className={`flex items-center space-x-3 p-2 rounded-lg transition-colors ${
+        active ? 'bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-200' : 
+        'text-gray-600 dark:text-gray-300 hover:bg-green-50 dark:hover:bg-green-900 hover:text-green-600 dark:hover:text-green-300'
+      }`}
+      aria-current={active ? 'page' : undefined}
     >
-      <Icon className="mr-2 text-emerald-300 group-hover:text-emerald-600 transition-colors" />
-      <span className="group-hover:translate-x-1 transition-transform text-sm">{text}</span>
+      <Icon className={`text-xl ${active ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500'}`} />
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <motion.span
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="font-medium"
+          >
+            {text}
+          </motion.span>
+        )}
+      </AnimatePresence>
     </Link>
-  </motion.li>
-);
+  );
+});
+
+// Memoize the SidebarDropdown component
+const SidebarDropdown = React.memo(({ icon: Icon, text, active, children }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const { isSidebarOpen } = useContext(SidebarContext);
+
+  return (
+    <div>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full flex items-center justify-between p-2 rounded-lg transition-colors ${
+          active ? 'bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-200' : 
+          'text-gray-600 dark:text-gray-300 hover:bg-green-50 dark:hover:bg-green-900 hover:text-green-600 dark:hover:text-green-300'
+        }`}
+        aria-expanded={isOpen}
+      >
+        <div className="flex items-center space-x-3">
+          <Icon className={`text-xl ${active ? 'text-green-600' : 'text-gray-400'}`} />
+          <AnimatePresence>
+            {isSidebarOpen && (
+              <motion.span
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="font-medium"
+              >
+                {text}
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </div>
+        <FaChevronDown className={`transition-transform ${isOpen ? 'rotate-180' : ''} text-gray-400`} />
+      </button>
+      {isOpen && (
+        <div className="ml-4 mt-2 space-y-2" role="menu">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+});
+
+// Memoize the SidebarSubItem component
+const SidebarSubItem = React.memo(({ icon: Icon, text, link, active }) => {
+  const { isSidebarOpen } = useContext(SidebarContext);
+  
+  return (
+    <Link 
+      to={link} 
+      className={`flex items-center space-x-3 p-2 rounded-lg transition-colors ${
+        active ? 'bg-green-50 dark:bg-green-900 text-green-600 dark:text-green-300' : 
+        'text-gray-500 dark:text-gray-400 hover:bg-green-50 dark:hover:bg-green-900 hover:text-green-600 dark:hover:text-green-300'
+      }`}
+      role="menuitem"
+      aria-current={active ? 'page' : undefined}
+    >
+      <Icon className={`text-sm ${active ? 'text-green-500' : 'text-gray-400'}`} />
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <motion.span
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="text-sm"
+          >
+            {text}
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </Link>
+  );
+});
 
 export default Sidebar;

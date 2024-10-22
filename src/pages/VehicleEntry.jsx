@@ -7,8 +7,10 @@ import { Modal, Button } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '../vehicle.css';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 
 const VehicleEntry = () => {
+    const user_level = localStorage.getItem('user_level') || '';
     const [vehicles, setVehicles] = useState([]);
     const [filteredVehicles, setFilteredVehicles] = useState([]);
     const [categories, setCategories] = useState([]);
@@ -24,6 +26,7 @@ const VehicleEntry = () => {
     const [loading, setLoading] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [editingVehicle, setEditingVehicle] = useState(null);
+    const navigate = useNavigate();
     const BASE_URL = "http://localhost/coc/gsd/user.php";
 
     useEffect(() => {
@@ -31,6 +34,12 @@ const VehicleEntry = () => {
         fetchMakes();
         fetchCategoriesAndModels();
     }, []);
+    useEffect(() => {
+        if (user_level !== '100') {
+            localStorage.clear();
+            navigate('/');
+        }
+    }, [user_level, navigate]);
 
     const fetchVehicles = async () => {
         setLoading(true);

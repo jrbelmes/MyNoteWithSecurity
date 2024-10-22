@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { motion, AnimatePresence } from 'framer-motion';
-import { FaEye, FaEyeSlash, FaLock, FaUser, FaCalculator } from 'react-icons/fa';
+import { motion, AnimatePresence, useAnimation } from 'framer-motion';
+import { FaEye, FaEyeSlash, FaLock, FaUser, FaCalculator, FaCalendarCheck, FaChartLine, FaClock } from 'react-icons/fa';
 import toast, { Toaster } from 'react-hot-toast';
 
 function Logins() {
@@ -17,6 +17,9 @@ function Logins() {
     const [rememberMe, setRememberMe] = useState(false);
     const [loginAttempts, setLoginAttempts] = useState(0);
     const navigateTo = useNavigate();
+    const [isHovering, setIsHovering] = useState(false);
+    const controls = useAnimation();
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
 
     useEffect(() => {
         if (localStorage.getItem('loggedIn') === 'true') {
@@ -28,7 +31,17 @@ function Logins() {
             setUsername(rememberedUsername);
             setRememberMe(true);
         }
-    }, [navigateTo]);
+
+        // Looping animation for the feature icons
+        controls.start({
+            scale: [1, 1.1, 1],
+            transition: { 
+                duration: 2, 
+                repeat: Infinity, 
+                repeatType: "reverse" 
+            }
+        });
+    }, [controls, navigateTo]);
 
     const generateCaptcha = () => {
         setCaptchaNum1(Math.floor(Math.random() * 10));
@@ -45,6 +58,8 @@ function Logins() {
 
     const notify = (message, type = 'success') => {
         toast[type](message, {
+            duration: 3000,
+            position: 'top-right',
             style: {
                 borderRadius: '10px',
                 background: type === 'error' ? '#FEE2E2' : '#ECFDF5',
@@ -60,11 +75,11 @@ function Logins() {
     const handleLogin = async (e) => {
         e.preventDefault();
         if (!username || !password || isCaptchaCorrect === null) {
-            notify("Please fill in all fields and solve the CAPTCHA.", 'error');
+            toast.error("Please fill in all fields and solve the CAPTCHA.");
             return;
         }
         if (!isCaptchaCorrect) {
-            notify("Incorrect CAPTCHA. Please try again.", 'error');
+            toast.error("Incorrect CAPTCHA. Please try again.");
             generateCaptcha();
             return;
         }
@@ -72,51 +87,42 @@ function Logins() {
         setLoading(true);
 
         const url = `${localStorage.getItem("url")}login.php`;
-        if (!url || !username || !password) {
-            notify("Invalid URL or missing credentials.", 'error');
+        if (!url) {
+            toast.error("Invalid URL.");
             setLoading(false);
             return;
         }
 
         try {
             const jsonData = { username, password };
-            const formData = new FormData();
-            formData.append("json", JSON.stringify(jsonData));
-            formData.append("operation", "admin");
+            const formDataToSend = new FormData();
+            formDataToSend.append("json", JSON.stringify(jsonData));
+            formDataToSend.append("operation", "login");
 
-            const res = await axios.post(url, formData);
-            const data = res.data;
+            const response = await axios.post(url, formDataToSend);
 
-            if (Array.isArray(data) && data.length > 0) {
-                const { admin_id, admin_name, user_level_desc } = data[0];
-
-                // Clear localStorage and sessionStorage
-                localStorage.clear();
-                sessionStorage.clear();
-
-                // Set new values in localStorage
-                localStorage.setItem('loggedIn', 'true');
-                localStorage.setItem('adminId', admin_id);
-                localStorage.setItem('adminName', admin_name);
-                localStorage.setItem('adminLevel', user_level_desc);
-                localStorage.setItem('url', url);  // Make sure to preserve the URL
-
-                // Set values in sessionStorage
-                sessionStorage.setItem('adminId', admin_id);
-
-                if (rememberMe) {
-                    localStorage.setItem('rememberedUsername', username);
-                } else {
-                    localStorage.removeItem('rememberedUsername');
-                }
-                setLoginAttempts(0);
-
-                // Add a delay before redirecting
-                setTimeout(() => {
+            if (response.data) {
+                const user = response.data;
+                
+                if (user.adm_userLevel) {
+                    // Admin login
+                    notify("Login Successful");
+                    localStorage.setItem("user_id", user.admin_id);
+                    localStorage.setItem("user_level", user.adm_userLevel);
+                    localStorage.setItem("name", user.admin_name || "");
+                    localStorage.setItem("loggedIn", "true");
                     navigateTo("/adminDashboard");
-                }, 2000);
-
-                notify("Login Successful");
+                } else if (user.personnel_userLevel) {
+                    // Personnel login
+                    notify("Login Successful");
+                    localStorage.setItem("user_id", user.jo_personel_id);
+                    localStorage.setItem("user_level", user.personnel_userLevel);
+                    localStorage.setItem("name", user.jo_personel_fname || "");
+                    localStorage.setItem("loggedIn", "true");
+                    navigateTo("/personeldashboard");
+                } else {
+                    toast.error("Invalid user type");
+                }
             } else {
                 const newAttempts = loginAttempts + 1;
                 setLoginAttempts(newAttempts);
@@ -129,145 +135,356 @@ function Logins() {
             }
         } catch (error) {
             console.error("Login error:", error.response ? error.response.data : error.message);
-            notify("Something went wrong. Please try again.", 'error');
+            toast.error("Something went wrong. Please try again.");
         } finally {
             setLoading(false);
         }
     };
 
+    const featureVariants = {
+        hidden: { opacity: 0, y: 20 },
+        visible: { opacity: 1, y: 0 }
+    };
+
+    const pageVariants = {
+        initial: { opacity: 0, scale: 0.8 },
+        in: { opacity: 1, scale: 1 },
+        out: { opacity: 0, scale: 1.2 }
+    };
+
+    const pageTransition = {
+        type: "tween",
+        ease: "anticipate",
+        duration: 0.5
+    };
+
     return (
-        <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            transition={{ duration: 0.5 }}
-            className='flex flex-col justify-center items-center min-h-screen bg-gradient-to-br from-green-50 to-green-100 p-4'
-        >
-            <Toaster position="top-right" reverseOrder={false} />
-            <motion.div 
-                initial={{ y: -50 }} 
-                animate={{ y: 0 }} 
-                transition={{ type: 'spring', stiffness: 300 }}
-                className='w-full max-w-md bg-white rounded-xl shadow-2xl overflow-hidden'
-            >
-                <div className='bg-gradient-to-r from-green-600 to-green-700 p-6 text-white'>
-                    <h2 className='text-center text-3xl font-bold'>Welcome Back</h2>
-                    <p className='text-center text-green-100 mt-2'>Please login to your account</p>
-                </div>
-                <div className='p-8'>
-                    <form onSubmit={handleLogin} className='space-y-6'>
-                        <div className='space-y-2'>
-                            <label className='text-sm font-medium text-gray-700' htmlFor='username'>
-                                Username
-                            </label>
-                            <div className='relative rounded-md shadow-sm'>
-                                <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
-                                    <FaUser className='text-green-500' />
-                                </div>
-                                <input 
-                                    value={username} 
-                                    onChange={(e) => setUsername(e.target.value)} 
-                                    className='block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm transition duration-150 ease-in-out' 
-                                    id='username' 
-                                    type='text' 
-                                    placeholder='Enter your username' 
-                                    required 
-                                />
-                            </div>
-                        </div>
-
-                        <div className='space-y-2'>
-                            <label className='text-sm font-medium text-gray-700' htmlFor='password'>
-                                Password
-                            </label>
-                            <div className='relative rounded-md shadow-sm'>
-                                <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
-                                    <FaLock className='text-green-500' />
-                                </div>
-                                <input 
-                                    value={password} 
-                                    onChange={(e) => setPassword(e.target.value)} 
-                                    className='block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm transition duration-150 ease-in-out' 
-                                    id='password' 
-                                    type={showPassword ? 'text' : 'password'} 
-                                    placeholder='Enter your password' 
-                                    required 
-                                />
-                                <button 
-                                    type="button" 
-                                    onClick={() => setShowPassword(!showPassword)} 
-                                    className='absolute inset-y-0 right-0 pr-3 flex items-center'
-                                >
-                                    {showPassword ? <FaEyeSlash className='text-green-500' /> : <FaEye className='text-green-500' />}
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className='space-y-2'>
-                            <label className='text-sm font-medium text-gray-700'>
-                                Math CAPTCHA
-                            </label>
-                            <div className='flex items-center space-x-2 bg-green-50 p-3 rounded-md'>
-                                <FaCalculator className='text-green-500' />
-                                <span>{captchaNum1} + {captchaNum2} = ?</span>
-                                <input 
-                                    value={captchaAnswer}
-                                    onChange={handleCaptchaChange}
-                                    className={`w-20 px-2 py-1 border ${isCaptchaCorrect === false ? 'border-red-500' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm transition duration-150 ease-in-out`}
-                                    placeholder='Answer'
-                                />
-                            </div>
-                            <AnimatePresence>
-                                {isCaptchaCorrect === false && (
-                                    <motion.p 
-                                        initial={{ opacity: 0, y: -10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, y: -10 }}
-                                        className='text-red-500 text-xs'
-                                    >
-                                        Incorrect answer.
-                                    </motion.p>
-                                )}
-                                {isCaptchaCorrect === true && (
-                                    <motion.p 
-                                        initial={{ opacity: 0, y: -10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, y: -10 }}
-                                        className='text-green-500 text-xs'
-                                    >
-                                        Correct!
-                                    </motion.p>
-                                )}
-                            </AnimatePresence>
-                        </div>
-
-                        <div className='flex items-center'>
-                            <input
-                                type="checkbox"
-                                id="rememberMe"
-                                checked={rememberMe}
-                                onChange={(e) => setRememberMe(e.target.checked)}
-                                className='h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded transition duration-150 ease-in-out'
-                            />
-                            <label htmlFor="rememberMe" className='ml-2 block text-sm text-gray-700'>Remember me</label>
-                        </div>
-
-                        <motion.button 
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-150 ease-in-out ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            type='submit'
-                            disabled={loading || loginAttempts >= 3}
+        <AnimatePresence mode="wait">
+            {!isLoggedIn ? (
+                <motion.div
+                    key="login"
+                    initial="initial"
+                    animate="in"
+                    exit="out"
+                    variants={pageVariants}
+                    transition={pageTransition}
+                    className='flex min-h-screen bg-gradient-to-br from-green-50 to-green-100 overflow-hidden'
+                >
+                    {/* Left side: Introduction with picture */}
+                    <motion.div 
+                        initial={{ opacity: 0, x: -50 }} 
+                        animate={{ opacity: 1, x: 0 }} 
+                        transition={{ duration: 0.5 }}
+                        className='w-1/2 p-8 flex flex-col items-center justify-center bg-gradient-to-br from-white to-green-100 text-green-800 relative'
+                    >
+                        <motion.img 
+                            src="/images/assets/phinma.png" 
+                            alt="PHINMA CDO Logo" 
+                            className='w-64 h-64 object-cover rounded-full mb-8 shadow-lg'
+                            whileHover={{ scale: 1.1, rotate: 360 }}
+                            transition={{ duration: 0.5 }}
+                        />
+                        <motion.h2 
+                            className='text-4xl font-bold mb-4 text-green-700 font-sans'
+                            initial={{ opacity: 0, y: -20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.2 }}
                         >
-                            {loading ? 'Logging in...' : 'Sign In'}
-                        </motion.button>
-                    </form>
+                            General Service Department
+                        </motion.h2>
+                        <motion.h3 
+                            className='text-2xl font-semibold mb-2 text-green-600 font-sans'
+                            initial={{ opacity: 0, y: -20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.4 }}
+                        >
+                            Reservation and Monitoring System
+                        </motion.h3>
+                      
+                        <motion.ul 
+                            className='space-y-4 mt-8'
+                            variants={{
+                                hidden: { opacity: 0 },
+                                visible: { 
+                                    opacity: 1,
+                                    transition: { staggerChildren: 0.2 }
+                                }
+                            }}
+                            initial="hidden"
+                            animate="visible"
+                        >
+                            <motion.li 
+                                className='flex items-center'
+                                variants={featureVariants}
+                                whileHover={{ scale: 1.05 }}
+                            >
+                                <motion.div animate={controls}>
+                                    <FaCalendarCheck className='w-6 h-6 mr-2 text-green-500' />
+                                </motion.div>
+                                <span className='text-green-700'>Efficient Facilities reservations</span>
+                            </motion.li>
+                            <motion.li 
+                                className='flex items-center'
+                                variants={featureVariants}
+                                whileHover={{ scale: 1.05 }}
+                            >
+                                <motion.div animate={controls}>
+                                    <FaChartLine className='w-6 h-6 mr-2 text-green-500' />
+                                </motion.div>
+                                <span className='text-green-700'>Real-time facility monitoring</span>
+                            </motion.li>
+                            <motion.li 
+                                className='flex items-center'
+                                variants={featureVariants}
+                                whileHover={{ scale: 1.05 }}
+                            >
+                                <motion.div animate={controls}>
+                                    <FaClock className='w-6 h-6 mr-2 text-green-500' />
+                                </motion.div>
+                                <span className='text-green-700'>Optimized resource allocation</span>
+                            </motion.li>
+                        </motion.ul>
 
-                    <div className='mt-6 text-center'>
-                        <a href="#" className='text-sm text-green-600 hover:text-green-700 transition duration-150 ease-in-out'>Forgot your password?</a>
+                        {/* Floating particles */}
+                        <motion.div 
+                            className="absolute top-10 right-10 w-4 h-4 bg-green-400 rounded-full"
+                            animate={{
+                                y: [0, -20, 0],
+                                opacity: [1, 0.5, 1],
+                            }}
+                            transition={{
+                                duration: 3,
+                                repeat: Infinity,
+                                repeatType: "reverse"
+                            }}
+                        />
+                        <motion.div 
+                            className="absolute bottom-20 left-20 w-6 h-6 bg-yellow-400 rounded-full"
+                            animate={{
+                                x: [0, 20, 0],
+                                opacity: [1, 0.5, 1],
+                            }}
+                            transition={{
+                                duration: 4,
+                                repeat: Infinity,
+                                repeatType: "reverse"
+                            }}
+                        />
+
+                        {/* New cool animations */}
+                        <motion.div 
+                            className="absolute top-1/4 left-1/4 w-8 h-8 border-4 border-green-500 rounded-full"
+                            animate={{
+                                scale: [1, 1.5, 1],
+                                opacity: [0.7, 0.3, 0.7],
+                            }}
+                            transition={{
+                                duration: 5,
+                                repeat: Infinity,
+                                ease: "easeInOut"
+                            }}
+                        />
+                        <motion.div 
+                            className="absolute bottom-1/4 right-1/4 w-12 h-12 border-2 border-yellow-500"
+                            animate={{
+                                rotate: [0, 180, 360],
+                                borderRadius: ["0%", "50%", "0%"],
+                            }}
+                            transition={{
+                                duration: 8,
+                                repeat: Infinity,
+                                ease: "linear"
+                            }}
+                        />
+                       
+                    </motion.div>
+
+                    {/* Right side: Login form */}
+                    <motion.div 
+                        initial={{ opacity: 0, x: 50 }} 
+                        animate={{ opacity: 1, x: 0 }} 
+                        transition={{ duration: 0.5 }}
+                        className='w-1/2 p-8 flex items-center justify-center relative'
+                    >
+                        {/* Decorative background elements */}
+                        <motion.div 
+                            className="absolute top-0 left-0 w-64 h-64 bg-green-200 rounded-full mix-blend-multiply filter blur-xl opacity-70"
+                            animate={{
+                                scale: [1, 1.2, 1],
+                                rotate: [0, 90, 0],
+                            }}
+                            transition={{
+                                duration: 20,
+                                repeat: Infinity,
+                                repeatType: "reverse"
+                            }}
+                        />
+                        <motion.div 
+                            className="absolute bottom-0 right-0 w-80 h-80 bg-yellow-200 rounded-full mix-blend-multiply filter blur-xl opacity-70"
+                            animate={{
+                                scale: [1, 1.3, 1],
+                                rotate: [0, -90, 0],
+                            }}
+                            transition={{
+                                duration: 25,
+                                repeat: Infinity,
+                                repeatType: "reverse"
+                            }}
+                        />
+
+                        <div className='w-full max-w-md bg-white rounded-xl shadow-2xl overflow-hidden z-10'>
+                            <div className='bg-gradient-to-r from-green-600 to-green-700 p-6 text-white'>
+                                <h2 className='text-center text-3xl font-bold'>General Service Department</h2>
+                                <p className='text-center text-green-100 mt-2'>Please login to your account</p>
+                            </div>
+                            <div className='p-8'>
+                                <form onSubmit={handleLogin} className='space-y-6'>
+                                    <div className='space-y-2'>
+                                        <label className='text-sm font-medium text-gray-700' htmlFor='username'>
+                                            Username
+                                        </label>
+                                        <div className='relative rounded-md shadow-sm'>
+                                            <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
+                                                <FaUser className='text-green-500' />
+                                            </div>
+                                            <input 
+                                                value={username} 
+                                                onChange={(e) => setUsername(e.target.value)} 
+                                                className='block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm transition duration-150 ease-in-out' 
+                                                id='username' 
+                                                type='text'
+                                                placeholder='Enter your username' 
+                                                required 
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className='space-y-2'>
+                                        <label className='text-sm font-medium text-gray-700' htmlFor='password'>
+                                            Password
+                                        </label>
+                                        <div className='relative rounded-md shadow-sm'>
+                                            <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
+                                                <FaLock className='text-green-500' />
+                                            </div>
+                                            <input 
+                                                value={password} 
+                                                onChange={(e) => setPassword(e.target.value)} 
+                                                className='block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm transition duration-150 ease-in-out' 
+                                                id='password' 
+                                                type={showPassword ? 'text' : 'password'} 
+                                                placeholder='Enter your password' 
+                                                required 
+                                            />
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setShowPassword(!showPassword)} 
+                                                className='absolute inset-y-0 right-0 pr-3 flex items-center'
+                                            >
+                                                {showPassword ? <FaEyeSlash className='text-green-500' /> : <FaEye className='text-green-500' />}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className='space-y-2'>
+                                        <label className='text-sm font-medium text-gray-700'>
+                                            Math CAPTCHA
+                                        </label>
+                                        <div className='flex items-center space-x-2 bg-green-50 p-3 rounded-md'>
+                                            <FaCalculator className='text-green-500' />
+                                            <span>{captchaNum1} + {captchaNum2} = ?</span>
+                                            <input 
+                                                value={captchaAnswer}
+                                                onChange={handleCaptchaChange}
+                                                className={`w-20 px-2 py-1 border ${isCaptchaCorrect === false ? 'border-red-500' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm transition duration-150 ease-in-out`}
+                                                placeholder='Answer'
+                                            />
+                                        </div>
+                                        <AnimatePresence>
+                                            {isCaptchaCorrect === false && (
+                                                <motion.p 
+                                                    initial={{ opacity: 0, y: -10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    exit={{ opacity: 0, y: -10 }}
+                                                    className='text-red-500 text-xs'
+                                                >
+                                                    Incorrect answer.
+                                                </motion.p>
+                                            )}
+                                            {isCaptchaCorrect === true && (
+                                                <motion.p 
+                                                    initial={{ opacity: 0, y: -10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    exit={{ opacity: 0, y: -10 }}
+                                                    className='text-green-500 text-xs'
+                                                >
+                                                    Correct!
+                                                </motion.p>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
+
+                                    <div className='flex items-center'>
+                                        <input
+                                            type="checkbox"
+                                            id="rememberMe"
+                                            checked={rememberMe}
+                                            onChange={(e) => setRememberMe(e.target.checked)}
+                                            className='h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded transition duration-150 ease-in-out'
+                                        />
+                                        <label htmlFor="rememberMe" className='ml-2 block text-sm text-gray-700'>Remember me</label>
+                                    </div>
+
+                                    <motion.button 
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                        className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-150 ease-in-out ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                        type='submit'
+                                        disabled={loading || loginAttempts >= 3}
+                                    >
+                                        {loading ? 'Logging in...' : 'Sign In'}
+                                    </motion.button>
+                                </form>
+
+                                <div className='mt-6 text-center'>
+                                    <a href="#" className='text-sm text-green-600 hover:text-green-700 transition duration-150 ease-in-out'>Forgot your password?</a>
+                                </div>
+                            </div>
+                        </div>
+                    </motion.div>
+                </motion.div>
+            ) : (
+                <motion.div
+                    key="success"
+                    initial="initial"
+                    animate="in"
+                    exit="out"
+                    variants={pageVariants}
+                    transition={pageTransition}
+                    className="flex items-center justify-center min-h-screen bg-green-100"
+                >
+                    <div className="text-center">
+                        <motion.h2 
+                            initial={{ opacity: 0, y: 50 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.2 }}
+                            className="text-4xl font-bold text-green-700 mb-4"
+                        >
+                            Login Successful!
+                        </motion.h2>
+                        <motion.p
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.4 }}
+                            className="text-xl text-green-600"
+                        >
+                            Redirecting to dashboard...
+                        </motion.p>
                     </div>
-                </div>
-            </motion.div>
-        </motion.div>
+                </motion.div>
+            )}
+            <Toaster position="top-right" reverseOrder={false} />
+        </AnimatePresence>
     );
 }
 

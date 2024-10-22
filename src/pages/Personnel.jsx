@@ -16,18 +16,18 @@ const Personnel = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [modalState, setModalState] = useState({ isOpen: false, type: '', user: null });
     const navigate = useNavigate();
-    const adminLevel = localStorage.getItem('adminLevel');
+    const user_level = localStorage.getItem('user_level');
     const [sortConfig, setSortConfig] = useState({ key: null, direction: 'ascending' });
 
     useEffect(() => {
-        if (adminLevel !== '100') {
+        if (user_level !== '100') {
             localStorage.clear();
             navigate('/');
         } else {
             fetchPersonnel();
             fetchPositions();
         }
-    }, [adminLevel, navigate]);
+    }, [user_level, navigate]);
 
     const fetchPersonnel = async () => {
         setLoading(true);

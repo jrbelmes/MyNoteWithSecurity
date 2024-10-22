@@ -1,12 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import Sidebar from './Sidebar';
+import Sidebar1 from './sidebarpersonel';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import axios from 'axios';
 import { toast } from 'sonner';
-import { FaFilter, FaEye, FaCalendar, FaSearch, FaPrint, FaSort, FaChartBar } from 'react-icons/fa';
+import { FiFilter, FiEye, FiCalendar, FiSearch, FiPrinter, FiArrowUp, FiArrowDown, FiBarChart2, FiDownload } from 'react-icons/fi';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
+import { Pie } from 'react-chartjs-2';
+
+ChartJS.register(ArcElement, Tooltip, Legend);
+
+const user_level = localStorage.getItem('user_level');
 
 // Add this function at the top of the file, along with getStatusClass
 const formatDate = (date) => {
@@ -36,14 +43,23 @@ const getStatusClass = (status) => {
 };
 
 // Update the ReservationReport component to accept formatDate as a prop
-const ReservationReport = ({ reservations, reportType, reportDate, getStatusClass, formatDate }) => {
+const ReservationReport = ({ reservations, reportType, reportDate, getStatusClass, formatDate, startDate, endDate }) => {
     const formatReportDate = () => {
         if (reportType === 'monthly') {
-            return formatDate(reportDate).split(' ').slice(0, 2).join(' ');
-        } else {
-            return formatDate(reportDate).split(' ').slice(0, 1).join(' ');
+            return `Report As of: ${formatDate(reportDate).split(' ').slice(0, 2).join(' ')}`;
+        } else if (reportType === 'yearly') {
+            return `Report As of: ${reportDate.getFullYear()}`;
+        } else if (reportType === 'range') {
+            return `Report As of: ${formatDate(startDate)} - ${formatDate(endDate)}`;
         }
     };
+
+    const statusCounts = reservations.reduce((acc, reservation) => {
+        acc[reservation.reservation_status_name] = (acc[reservation.reservation_status_name] || 0) + 1;
+        return acc;
+    }, {});
+
+    
 
     return (
         <div className="p-8 bg-white font-sans max-w-4xl mx-auto">
@@ -61,8 +77,9 @@ const ReservationReport = ({ reservations, reportType, reportDate, getStatusClas
             </div>
             
             <h2 className="text-2xl font-bold mb-6 text-center text-green-700 bg-green-100 py-2 rounded-lg">
-                Reservation Report: {formatReportDate()}
+                {formatReportDate()}
             </h2>
+
 
             <table className="w-full border-collapse mb-6">
                 <thead>
@@ -99,15 +116,15 @@ const ReservationReport = ({ reservations, reportType, reportDate, getStatusClas
             </table>
 
             <div className="mt-8 flex justify-between items-center text-sm text-gray-600">
-                <p>Total Reservations: {reservations.length}</p>
                 <p>Generated on: {new Date().toLocaleString()}</p>
             </div>
 
-            <div className="mt-8 text-center">
-                <button onClick={() => window.print()} className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors print:hidden">
-                    <FaPrint className="inline-block mr-2" />
+            <div className="mt-8 flex justify-center space-x-4">
+                <button onClick={() => window.print()} className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors print:hidden flex items-center">
+                    <FiPrinter className="mr-2" />
                     Print Report
                 </button>
+                
             </div>
 
             <style jsx global>{`
@@ -164,6 +181,7 @@ const ReservationReport = ({ reservations, reportType, reportDate, getStatusClas
 };
 
 const ViewReservations = () => {
+    const [userLevel, setUserLevel] = useState(null);
     const [reservations, setReservations] = useState([]);
     const [loading, setLoading] = useState(false);
     const [filter, setFilter] = useState('All');
@@ -179,6 +197,10 @@ const ViewReservations = () => {
     const [reportType, setReportType] = useState('monthly');
     const [reportDate, setReportDate] = useState(new Date());
     const [showReport, setShowReport] = useState(false);
+    const [showReportModal, setShowReportModal] = useState(false);
+    const [rangeStartDate, setRangeStartDate] = useState(null);
+    const [rangeEndDate, setRangeEndDate] = useState(null);
+    const [filteredReservations, setFilteredReservations] = useState([]);
 
     const fetchReservations = async () => {
         setLoading(true);
@@ -218,6 +240,8 @@ const ViewReservations = () => {
     };
 
     useEffect(() => {
+        const level = localStorage.getItem('user_level');
+        setUserLevel(level);
         fetchReservations();
     }, []);
 
@@ -261,26 +285,33 @@ const ViewReservations = () => {
     const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
     const generateReport = () => {
-        let filteredReservations;
+        let filtered;
         if (reportType === 'monthly') {
-            filteredReservations = reservations.filter(reservation => {
+            filtered = reservations.filter(reservation => {
                 const reservationDate = new Date(reservation.date_created);
                 return reservationDate.getMonth() === reportDate.getMonth() &&
                        reservationDate.getFullYear() === reportDate.getFullYear();
             });
-        } else {
-            filteredReservations = reservations.filter(reservation => {
+        } else if (reportType === 'yearly') {
+            filtered = reservations.filter(reservation => {
                 const reservationDate = new Date(reservation.date_created);
                 return reservationDate.getFullYear() === reportDate.getFullYear();
             });
+        } else if (reportType === 'range') {
+            filtered = reservations.filter(reservation => {
+                const reservationDate = new Date(reservation.date_created);
+                return reservationDate >= rangeStartDate && reservationDate <= rangeEndDate;
+            });
         }
 
-        if (filteredReservations.length === 0) {
-            toast.error(`No reservations found for the selected ${reportType === 'monthly' ? 'month' : 'year'}.`);
+        if (filtered.length === 0) {
+            toast.error(`No reservations found for the selected ${reportType}.`);
             return;
         }
 
+        setFilteredReservations(filtered);
         setShowReport(true);
+        setShowReportModal(false);
         setTimeout(() => {
             window.print();
         }, 500);
@@ -290,44 +321,42 @@ const ViewReservations = () => {
         <div className="flex flex-col lg:flex-row min-h-screen bg-gradient-to-br from-green-50 to-white">
             {!showReport ? (
                 <>
-                    <Sidebar />
+                    {userLevel === '100' && <Sidebar />}
+                    {userLevel === '1' && <Sidebar1 />}
                     <div className="flex-grow p-4 lg:p-6">
                         <motion.h2 
-                            initial={{ opacity: 0, y: -20 }}
+                            initial={{ opacity: 0, y: -20 }}    
                             animate={{ opacity: 1, y: 0 }}
-                            className="text-3xl font-bold mb-4 text-green-800"
+                            className="text-4xl font-bold mb-6 text-green-800 border-b-2 border-green-500 pb-2"
                         >
-                            Reservations
+                            Reservations Dashboard
                         </motion.h2>
 
                         <motion.div 
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="mb-4 bg-white rounded-lg shadow-md p-4"
+                            className="mb-6 bg-white rounded-xl shadow-lg p-6"
                         >
-                            {/* Separate search input with full width */}
-                            <div className="mb-3">
-                                <div className="flex items-center bg-green-100 rounded-lg p-2">
-                                    <FaSearch className="text-green-600 mr-2" />
-                                    <input
-                                        type="text"
-                                        placeholder="Search reservations..."
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        className="form-input w-full bg-transparent border-0 focus:ring-0 text-sm"
-                                    />
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                <div className="col-span-1 md:col-span-2 lg:col-span-3">
+                                    <div className="relative">
+                                        <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-600" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search reservations..."
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            className="form-input pl-10 w-full bg-green-50 border-green-200 focus:border-green-500 focus:ring focus:ring-green-200 focus:ring-opacity-50 rounded-lg"
+                                        />
+                                    </div>
                                 </div>
-                            </div>
-
-                            {/* Other filters in a grid */}
-                            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-                                <div className="flex items-center bg-green-100 rounded-lg p-2">
-                                    <FaFilter className="text-green-600 mr-2" />
+                                <div className="relative">
+                                    <FiFilter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-600" />
                                     <select
                                         id="filter"
                                         value={filter}
                                         onChange={(e) => setFilter(e.target.value)}
-                                        className="form-select w-full bg-transparent border-0 focus:ring-0 text-green-700 text-sm"
+                                        className="form-select pl-10 w-full bg-green-50 border-green-200 focus:border-green-500 focus:ring focus:ring-green-200 focus:ring-opacity-50 rounded-lg"
                                     >
                                         <option value="All">All</option>
                                         <option value="Vehicle">Vehicles</option>
@@ -335,8 +364,8 @@ const ViewReservations = () => {
                                         <option value="Equipment">Equipment</option>
                                     </select>
                                 </div>
-                                <div className="flex items-center bg-green-100 rounded-lg p-2">
-                                    <FaCalendar className="text-green-600 mr-2" />
+                                <div className="relative">
+                                    <FiCalendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-600" />
                                     <DatePicker
                                         selected={startDate}
                                         onChange={(date) => setStartDate(date)}
@@ -344,11 +373,11 @@ const ViewReservations = () => {
                                         startDate={startDate}
                                         endDate={endDate}
                                         placeholderText="Start Date"
-                                        className="form-input w-full bg-transparent border-0 focus:ring-0 text-sm"
+                                        className="form-input pl-10 w-full bg-green-50 border-green-200 focus:border-green-500 focus:ring focus:ring-green-200 focus:ring-opacity-50 rounded-lg"
                                     />
                                 </div>
-                                <div className="flex items-center bg-green-100 rounded-lg p-2">
-                                    <FaCalendar className="text-green-600 mr-2" />
+                                <div className="relative">
+                                    <FiCalendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-600" />
                                     <DatePicker
                                         selected={endDate}
                                         onChange={(date) => setEndDate(date)}
@@ -357,40 +386,16 @@ const ViewReservations = () => {
                                         endDate={endDate}
                                         minDate={startDate}
                                         placeholderText="End Date"
-                                        className="form-input w-full bg-transparent border-0 focus:ring-0 text-sm"
+                                        className="form-input pl-10 w-full bg-green-50 border-green-200 focus:border-green-500 focus:ring focus:ring-green-200 focus:ring-opacity-50 rounded-lg"
                                     />
                                 </div>
-                                <div className="flex items-center bg-green-100 rounded-lg p-2">
-                                    <FaChartBar className="text-green-600 mr-2" />
-                                    <select
-                                        value={reportType}
-                                        onChange={(e) => setReportType(e.target.value)}
-                                        className="form-select w-full bg-transparent border-0 focus:ring-0 text-green-700 text-sm"
-                                    >
-                                        <option value="monthly">Monthly</option>
-                                        <option value="yearly">Yearly</option>
-                                    </select>
-                                </div>
-                                <div className="flex items-center bg-green-100 rounded-lg p-2">
-                                    <FaCalendar className="text-green-600 mr-2" />
-                                    <DatePicker
-                                        selected={reportDate}
-                                        onChange={(date) => setReportDate(date)}
-                                        dateFormat={reportType === 'monthly' ? "MMM yyyy" : "yyyy"}
-                                        showMonthYearPicker={reportType === 'monthly'}
-                                        showYearPicker={reportType === 'yearly'}
-                                        className="form-input w-full bg-transparent border-0 focus:ring-0 text-sm"
-                                    />
-                                </div>
-                                <div className="flex items-center">
-                                    <button
-                                        onClick={generateReport}
-                                        className="bg-green-500 text-white px-3 py-2 rounded-lg hover:bg-green-600 transition-colors w-full flex items-center justify-center text-sm"
-                                    >
-                                        <FaPrint className="mr-2" />
-                                        Generate Report
-                                    </button>
-                                </div>
+                                <button
+                                    onClick={() => setShowReportModal(true)}
+                                    className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center"
+                                >
+                                    <FiPrinter className="mr-2" />
+                                    Generate Report
+                                </button>
                             </div>
                         </motion.div>
 
@@ -400,7 +405,7 @@ const ViewReservations = () => {
                             </div>
                         ) : (
                             <>
-                                <div className="overflow-x-auto bg-white rounded-lg shadow-lg">
+                                <div className="overflow-x-auto bg-white rounded-xl shadow-lg">
                                     <table className="min-w-full">
                                         <thead className="bg-green-600 text-white">
                                             <tr>
@@ -408,7 +413,9 @@ const ViewReservations = () => {
                                                     <th key={header} className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider cursor-pointer" onClick={() => handleSort(header.toLowerCase())}>
                                                         <div className="flex items-center">
                                                             {header}
-                                                            <FaSort className="ml-1" />
+                                                            {sortBy === header.toLowerCase() && (
+                                                                sortOrder === 'asc' ? <FiArrowUp className="ml-1" /> : <FiArrowDown className="ml-1" />
+                                                            )}
                                                         </div>
                                                     </th>
                                                 ))}
@@ -422,9 +429,8 @@ const ViewReservations = () => {
                                                         initial={{ opacity: 0 }}
                                                         animate={{ opacity: 1 }}
                                                         exit={{ opacity: 0 }}
-                                                        className="hover:bg-green-50"
+                                                        className="hover:bg-green-50 transition-colors"
                                                     >
-                                                    
                                                         <td className="px-6 py-4 whitespace-nowrap">{reservation.reservation_name}</td>
                                                         <td className="px-6 py-4 whitespace-nowrap">{reservation.reservation_event_title}</td>
                                                         <td className="px-6 py-4 whitespace-nowrap">{formatDate(new Date(reservation.date_created))}</td>
@@ -438,7 +444,7 @@ const ViewReservations = () => {
                                                                 className="text-green-600 hover:text-green-900 transition-colors"
                                                                 onClick={() => fetchReservationDetails(reservation.reservation_id)}
                                                             >
-                                                                <FaEye size={18} />
+                                                                <FiEye size={18} />
                                                             </button>
                                                         </td>
                                                     </motion.tr>
@@ -467,21 +473,115 @@ const ViewReservations = () => {
                 </>
             ) : (
                 <ReservationReport 
-                    reservations={reservations.filter(reservation => {
-                        const reservationDate = new Date(reservation.date_created);
-                        if (reportType === 'monthly') {
-                            return reservationDate.getMonth() === reportDate.getMonth() &&
-                                   reservationDate.getFullYear() === reportDate.getFullYear();
-                        } else {
-                            return reservationDate.getFullYear() === reportDate.getFullYear();
-                        }
-                    })}
+                    reservations={filteredReservations}
                     reportType={reportType}
                     reportDate={reportDate}
                     getStatusClass={getStatusClass}
-                    formatDate={formatDate}  // Pass the function as a prop
+                    formatDate={formatDate}
+                    startDate={rangeStartDate}
+                    endDate={rangeEndDate}
                 />
             )}
+
+            {/* Report Generation Modal */}
+            <AnimatePresence>
+                {showReportModal && (
+                    <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+                    >
+                        <motion.div 
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            className="bg-white rounded-xl p-8 max-w-md w-full"
+                        >
+                            <h3 className="text-2xl font-bold mb-6 text-green-800 border-b-2 border-green-500 pb-2">Generate Report</h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Report Type</label>
+                                    <select
+                                        value={reportType}
+                                        onChange={(e) => setReportType(e.target.value)}
+                                        className="form-select w-full bg-green-50 border-green-300 rounded-lg focus:border-green-500 focus:ring focus:ring-green-200 focus:ring-opacity-50"
+                                    >
+                                        <option value="monthly">Monthly</option>
+                                        <option value="yearly">Yearly</option>
+                                        <option value="range">Date Range</option>
+                                    </select>
+                                </div>
+                                {reportType === 'monthly' && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Select Month</label>
+                                        <DatePicker
+                                            selected={reportDate}
+                                            onChange={(date) => setReportDate(date)}
+                                            dateFormat="MMMM yyyy"
+                                            showMonthYearPicker
+                                            className="form-input w-full bg-green-50 border-green-300 rounded-lg focus:border-green-500 focus:ring focus:ring-green-200 focus:ring-opacity-50"
+                                        />
+                                    </div>
+                                )}
+                                {reportType === 'yearly' && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Select Year</label>
+                                        <DatePicker
+                                            selected={reportDate}
+                                            onChange={(date) => setReportDate(date)}
+                                            showYearPicker
+                                            dateFormat="yyyy"
+                                            className="form-input w-full bg-green-50 border-green-300 rounded-lg focus:border-green-500 focus:ring focus:ring-green-200 focus:ring-opacity-50"
+                                        />
+                                    </div>
+                                )}
+                                {reportType === 'range' && (
+                                    <>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+                                            <DatePicker
+                                                selected={rangeStartDate}
+                                                onChange={(date) => setRangeStartDate(date)}
+                                                selectsStart
+                                                startDate={rangeStartDate}
+                                                endDate={rangeEndDate}
+                                                className="form-input w-full bg-green-50 border-green-300 rounded-lg focus:border-green-500 focus:ring focus:ring-green-200 focus:ring-opacity-50"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+                                            <DatePicker
+                                                selected={rangeEndDate}
+                                                onChange={(date) => setRangeEndDate(date)}
+                                                selectsEnd
+                                                startDate={rangeStartDate}
+                                                endDate={rangeEndDate}
+                                                minDate={rangeStartDate}
+                                                className="form-input w-full bg-green-50 border-green-300 rounded-lg focus:border-green-500 focus:ring focus:ring-green-200 focus:ring-opacity-50"
+                                            />
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                            <div className="flex justify-end mt-8">
+                                <button
+                                    onClick={() => setShowReportModal(false)}
+                                    className="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={generateReport}
+                                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                                >
+                                    Generate
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Modal for Reservation Details */}
             <AnimatePresence>
@@ -496,27 +596,27 @@ const ViewReservations = () => {
                             initial={{ scale: 0.9, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.9, opacity: 0 }}
-                            className="bg-white rounded-lg p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+                            className="bg-white rounded-xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
                         >
-                            <h3 className="text-3xl font-bold mb-6 text-green-800">Reservation Details</h3>
+                            <h3 className="text-3xl font-bold mb-6 text-green-800 border-b-2 border-green-500 pb-2">Reservation Details</h3>
                             <div className="grid grid-cols-2 gap-6">
                                 <div>
                                     <p className="font-medium text-gray-600">Name:</p>
-                                    <p>{selectedReservation.reservation.reservation_name}</p>
+                                    <p className="text-lg">{selectedReservation.reservation.reservation_name}</p>
                                 </div>
                                 <div>
                                     <p className="font-medium text-gray-600">Status:</p>
-                                    <p className={`px-2 py-1 rounded-full text-xs inline-block ${getStatusClass(selectedReservation.reservation.reservation_status_name)}`}>
+                                    <p className={`px-3 py-1 rounded-full text-sm inline-block ${getStatusClass(selectedReservation.reservation.reservation_status_name)}`}>
                                         {selectedReservation.reservation.reservation_status_name}
                                     </p>
                                 </div>
                                 <div className="col-span-2">
                                     <p className="font-medium text-gray-600">Event Title:</p>
-                                    <p>{selectedReservation.reservation.reservation_event_title}</p>
+                                    <p className="text-lg">{selectedReservation.reservation.reservation_event_title}</p>
                                 </div>
                                 <div className="col-span-2">
                                     <p className="font-medium text-gray-600">Description:</p>
-                                    <p>{selectedReservation.reservation.reservation_description}</p>
+                                    <p className="text-sm">{selectedReservation.reservation.reservation_description}</p>
                                 </div>
                                 <div>
                                     <p className="font-medium text-gray-600">Start:</p>
@@ -534,31 +634,31 @@ const ViewReservations = () => {
 
                             {/* Display vehicle, equipment, and venue information */}
                             {selectedReservation.equipment && selectedReservation.equipment.length > 0 && (
-                                <div className="mt-4">
-                                    <h4 className="font-semibold text-gray-700">Equipment Used:</h4>
-                                    <ul className="list-disc list-inside">
+                                <div className="mt-6">
+                                    <h4 className="font-semibold text-green-700 mb-2">Equipment Used:</h4>
+                                    <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
                                         {selectedReservation.equipment.map((equip) => (
-                                            <li key={equip.equip_name} className="text-sm">{equip.equip_name} (Quantity: {equip.quantity})</li>
+                                            <li key={equip.equip_name} className="text-sm mb-1">{equip.equip_name} (Quantity: {equip.quantity})</li>
                                         ))}
                                     </ul>
                                 </div>
                             )}
                             {selectedReservation.vehicles && selectedReservation.vehicles.length > 0 && (
-                                <div className="mt-4">
-                                    <h4 className="font-semibold text-gray-700">Vehicles Used:</h4>
-                                    <ul className="list-disc list-inside">
+                                <div className="mt-6">
+                                    <h4 className="font-semibold text-green-700 mb-2">Vehicles Used:</h4>
+                                    <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
                                         {selectedReservation.vehicles.map((vehicle) => (
-                                            <li key={vehicle.vehicle_license} className="text-sm">{vehicle.vehicle_license} (ID: {vehicle.vehicle_reservation_vehicle_id})</li>
+                                            <li key={vehicle.vehicle_license} className="text-sm mb-1">{vehicle.vehicle_license} (ID: {vehicle.vehicle_reservation_vehicle_id})</li>
                                         ))}
                                     </ul>
                                 </div>
                             )}
                             {selectedReservation.venues && selectedReservation.venues.length > 0 && (
-                                <div className="mt-4">
-                                    <h4 className="font-semibold text-gray-700">Venues Used:</h4>
-                                    <ul className="list-disc list-inside">
+                                <div className="mt-6">
+                                    <h4 className="font-semibold text-green-700 mb-2">Venues Used:</h4>
+                                    <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
                                         {selectedReservation.venues.map((venue) => (
-                                            <li key={venue.ven_name} className="text-sm">{venue.ven_name}</li>
+                                            <li key={venue.ven_name} className="text-sm mb-1">{venue.ven_name}</li>
                                         ))}
                                     </ul>
                                 </div>

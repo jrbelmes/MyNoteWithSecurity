@@ -2,6 +2,7 @@ import React, { useState, useEffect, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Form, Button, Card, Row, Col } from 'react-bootstrap';
 import Sidebar from './Sidebar';
+import Sidebar1 from './sidebarpersonel';
 import axios from 'axios';
 import { Toaster, toast } from 'react-hot-toast';
 import { FaCalendarAlt, FaMapMarkerAlt, FaUser, FaCar, FaTools, FaTimes, FaSearch } from 'react-icons/fa';
@@ -11,6 +12,12 @@ import { Dialog, Transition } from '@headlessui/react'
 
 const AddReservation = () => {
   const navigate = useNavigate();
+  const [userLevel, setUserLevel] = useState(null);
+
+  useEffect(() => {
+    const level = localStorage.getItem('user_level');
+    setUserLevel(level);
+}, []);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -22,6 +29,7 @@ const AddReservation = () => {
     endDate: '',
     selectedUserId: '',
     selectedUserName: '',
+    participants: '', // Add this line
   });
   
   // Loading and selection states
@@ -114,9 +122,8 @@ const AddReservation = () => {
 
   const handleAddReservation = async (e) => {
     e.preventDefault();
-  
+
     // Validate required fields
-    const missingFields = [];
     const requiredFields = [
       'reservationName',
       'eventTitle',
@@ -125,13 +132,9 @@ const AddReservation = () => {
       'startDate',
       'endDate'
     ];
-  
-    requiredFields.forEach(field => {
-      if (!formData[field]) {
-        missingFields.push(field);
-      }
-    });
-  
+
+    const missingFields = requiredFields.filter(field => !formData[field]);
+
     if (missingFields.length > 0) {
       toast.error(`Missing required fields: ${missingFields.join(', ')}`, {
         icon: '❌',
@@ -143,33 +146,36 @@ const AddReservation = () => {
       });
       return;
     }
-  
+
     setLoading(true);
-  
+
     // Construct the payload
     const payload = {
       operation: 'completeReservation',
       reservation: {
         reservation_name: formData.reservationName,
         reservation_event_title: formData.eventTitle,
-        reservation_description: formData.description,
-        reservation_start_date: `${formData.startDate} ${new Date().toLocaleTimeString()}`,
-        reservation_end_date: `${formData.endDate} ${new Date().toLocaleTimeString()}`,
-        reservations_users_id: formData.selectedUserId,
+        reservation_description: formData.description || "",
+        reservation_start_date: formData.startDate.toISOString().split('T')[0],
+        reservation_end_date: formData.endDate.toISOString().split('T')[0],
+        reservations_users_id: parseInt(formData.selectedUserId),
+        reservation_participants: parseInt(formData.participants) || 0, // Add this line
       },
-      vehicles: selectedModels.map(vehicleId => ({ vehicle_id: vehicleId })),
-      venues: [{ venue_id: formData.venue }],
-      equipments: Object.entries(selectedEquipment).map(([equipId, quantity]) => ({
-        equip_id: parseInt(equipId),
-        quantity: quantity,
-      })),
+      equipments: Object.entries(selectedEquipment)
+        .filter(([_, quantity]) => quantity > 0)
+        .map(([equipId, quantity]) => ({
+          equip_id: parseInt(equipId),
+          quantity: parseInt(quantity),
+        })),
+      vehicles: selectedModels.map(vehicleId => ({ vehicle_id: parseInt(vehicleId) })),
+      venues: [{ venue_id: parseInt(formData.venue) }],
     };
-  
+
     try {
       const response = await axios.post('http://localhost/coc/gsd/insertbyadmin.php', payload);
-  
+
       console.log("API Response:", response.data);
-  
+
       if (response.data.status === 'success') {
         toast.success('Reservation successfully added!', {
           icon: '🎉',
@@ -215,6 +221,7 @@ const AddReservation = () => {
       endDate: '',
       selectedUserId: '',
       selectedUserName: '',
+      participants: '', // Add this line
     });
     setSelectedModels([]);
     setSelectedEquipment({});
@@ -294,7 +301,8 @@ const AddReservation = () => {
 
   return (
     <div className="flex bg-gradient-to-br from-green-50 to-white min-h-screen">
-      <Sidebar />
+      {userLevel === '100' && <Sidebar />}
+      {userLevel === '1' && <Sidebar1 />}
       <div className="flex-grow p-6">
         <div className="max-w-5xl mx-auto bg-white shadow-xl rounded-lg overflow-hidden">
           <div className="bg-gradient-to-r from-green-600 to-green-500 p-5 text-white">
@@ -392,6 +400,21 @@ const AddReservation = () => {
                   </div>
                 </Form.Group>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <Form.Group controlId="participants">
+                    <Form.Label className="block text-sm font-medium text-gray-700 mb-1">Number of Participants</Form.Label>
+                    <Form.Control
+                      type="number"
+                      placeholder="Enter number of participants"
+                      name="participants"
+                      value={formData.participants}
+                      onChange={handleInputChange}
+                      min="1"
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500 text-sm"
+                    />
+                  </Form.Group>
+                </div>
+
                 <div className="border-t border-gray-200 pt-6">
                   <div className="flex flex-wrap gap-3">
                     <button
@@ -458,10 +481,10 @@ const AddReservation = () => {
                   leaveFrom="opacity-100 scale-100"
                   leaveTo="opacity-0 scale-95"
                 >
-                  <Dialog.Panel className="w-full max-w-3xl transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+                  <Dialog.Panel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
                     <Dialog.Title
                       as="h3"
-                      className="text-lg font-medium leading-6 text-gray-900 flex justify-between items-center"
+                      className="text-lg font-medium leading-6 text-gray-900 flex justify-between items-center mb-4"
                     >
                       Select Vehicles
                       <button
@@ -474,24 +497,39 @@ const AddReservation = () => {
                       </button>
                     </Dialog.Title>
                     <div className="mt-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                        {vehicles.map(vehicle => (
-                          <div key={vehicle.vehicle_id} className="bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition duration-300">
-                            <h4 className="text-lg font-semibold mb-2">Vehicle ID: {vehicle.vehicle_id}</h4>
-                            <p className="text-sm text-gray-600 mb-1"><strong>Make:</strong> {vehicle.vehicle_make_name}</p>
-                            <p className="text-sm text-gray-600 mb-1"><strong>Category:</strong> {vehicle.vehicle_category_name}</p>
-                            <p className="text-sm text-gray-600 mb-3"><strong>License:</strong> {vehicle.vehicle_license}</p>
-                            <label className="inline-flex items-center mt-2">
-                              <input
-                                type="checkbox"
-                                className="form-checkbox h-5 w-5 text-green-600"
-                                checked={selectedModels.includes(vehicle.vehicle_id)}
-                                onChange={() => handleCheckboxChange(vehicle.vehicle_id)}
-                              />
-                              <span className="ml-2 text-gray-700">Select</span>
-                            </label>
-                          </div>
-                        ))}
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vehicle ID</th>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Make</th>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">License</th>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {vehicles.map(vehicle => (
+                              <tr key={vehicle.vehicle_id}>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{vehicle.vehicle_id}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{vehicle.vehicle_make_name}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{vehicle.vehicle_category_name}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{vehicle.vehicle_license}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                  <label className="inline-flex items-center">
+                                    <input
+                                      type="checkbox"
+                                      className="form-checkbox h-5 w-5 text-green-600"
+                                      checked={selectedModels.includes(vehicle.vehicle_id)}
+                                      onChange={() => handleCheckboxChange(vehicle.vehicle_id)}
+                                    />
+                                    <span className="ml-2 text-gray-700">Select</span>
+                                  </label>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
                     <div className="mt-6 flex justify-end">
@@ -536,10 +574,10 @@ const AddReservation = () => {
                   leaveFrom="opacity-100 scale-100"
                   leaveTo="opacity-0 scale-95"
                 >
-                  <Dialog.Panel className="w-full max-w-3xl transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+                  <Dialog.Panel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
                     <Dialog.Title
                       as="h3"
-                      className="text-lg font-medium leading-6 text-gray-900 flex justify-between items-center"
+                      className="text-lg font-medium leading-6 text-gray-900 flex justify-between items-center mb-4"
                     >
                       Select Equipment
                       <button
@@ -552,46 +590,60 @@ const AddReservation = () => {
                       </button>
                     </Dialog.Title>
                     <div className="mt-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                        {equipment.map(item => (
-                          <div key={item.equip_id} className="bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition duration-300">
-                            <h4 className="text-lg font-semibold mb-2">{item.equip_name}</h4>
-                            <p className="text-sm text-gray-600 mb-1"><strong>Category:</strong> {item.equipments_category_name}</p>
-                            <p className="text-sm text-gray-600 mb-3"><strong>Available:</strong> {item.equip_quantity}</p>
-                            <label className="inline-flex items-center mt-2">
-                              <input
-                                type="checkbox"
-                                className="form-checkbox h-5 w-5 text-green-600"
-                                checked={selectedEquipment[item.equip_id] !== undefined}
-                                onChange={() => handleEquipmentCheckboxChange(item.equip_id)}
-                              />
-                              <span className="ml-2 text-gray-700">Select</span>
-                            </label>
-                            {selectedEquipment[item.equip_id] !== undefined && (
-                              <div className="mt-2">
-                                <label htmlFor={`quantity-${item.equip_id}`} className="block text-sm font-medium text-gray-700">
-                                  Quantity
-                                </label>
-                                <input
-                                  type="number"
-                                  id={`quantity-${item.equip_id}`}
-                                  min="1"
-                                  max={item.equip_quantity}
-                                  value={selectedEquipment[item.equip_id] || ''}
-                                  onChange={(e) => {
-                                    const value = parseInt(e.target.value);
-                                    if (value > parseInt(item.equip_quantity)) {
-                                      toast.error(`Quantity exceeds available amount (${item.equip_quantity})`);
-                                      return;
-                                    }
-                                    handleEquipmentQuantityChange(item.equip_id, value);
-                                  }}
-                                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm"
-                                />
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Available</th>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {equipment.map(item => (
+                              <tr key={item.equip_id}>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm font-medium text-gray-900">{item.equip_name}</div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-500">{item.equipments_category_name}</div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-500">{item.equip_quantity}</div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                  <label className="inline-flex items-center">
+                                    <input
+                                      type="checkbox"
+                                      className="form-checkbox h-5 w-5 text-green-600"
+                                      checked={selectedEquipment[item.equip_id] !== undefined}
+                                      onChange={() => handleEquipmentCheckboxChange(item.equip_id)}
+                                    />
+                                    <span className="ml-2 text-gray-700">Select</span>
+                                  </label>
+                                  {selectedEquipment[item.equip_id] !== undefined && (
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      max={item.equip_quantity}
+                                      value={selectedEquipment[item.equip_id] || ''}
+                                      onChange={(e) => {
+                                        const value = parseInt(e.target.value);
+                                        if (value > parseInt(item.equip_quantity)) {
+                                          toast.error(`Quantity exceeds available amount (${item.equip_quantity})`);
+                                          return;
+                                        }
+                                        handleEquipmentQuantityChange(item.equip_id, value);
+                                      }}
+                                      className="ml-2 w-16 rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm"
+                                    />
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
                     <div className="mt-6 flex justify-end">
@@ -636,10 +688,10 @@ const AddReservation = () => {
                   leaveFrom="opacity-100 scale-100"
                   leaveTo="opacity-0 scale-95"
                 >
-                  <Dialog.Panel className="w-full max-w-3xl transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+                  <Dialog.Panel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
                     <Dialog.Title
                       as="h3"
-                      className="text-lg font-medium leading-6 text-gray-900 flex justify-between items-center"
+                      className="text-lg font-medium leading-6 text-gray-900 flex justify-between items-center mb-4"
                     >
                       Select Venue
                       <button
@@ -652,22 +704,62 @@ const AddReservation = () => {
                       </button>
                     </Dialog.Title>
                     <div className="mt-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                        {venues.map(venue => (
-                          <div key={venue.ven_id} className="bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition duration-300">
-                            <h4 className="text-lg font-semibold mb-2">Venue ID: {venue.ven_id}</h4>
-                            <p className="text-sm text-gray-600 mb-1"><strong>Name:</strong> {venue.ven_name}</p>
-                            <label className="inline-flex items-center mt-2">
-                              <input
-                                type="radio"
-                                className="form-radio h-5 w-5 text-green-600"
-                                checked={formData.venue === venue.ven_id}
-                                onChange={() => handleInputChange({ target: { name: 'venue', value: venue.ven_id } })}
-                              />
-                              <span className="ml-2 text-gray-700">Select</span>
-                            </label>
-                          </div>
-                        ))}
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Venue Name</th>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Occupancy</th>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {venues
+                              .sort((a, b) => {
+                                const aRecommended = parseInt(a.ven_occupancy) >= parseInt(formData.participants);
+                                const bRecommended = parseInt(b.ven_occupancy) >= parseInt(formData.participants);
+                                return bRecommended - aRecommended;
+                              })
+                              .map(venue => (
+                                <tr key={venue.ven_id} className={parseInt(venue.ven_occupancy) >= parseInt(formData.participants) ? 'bg-green-50' : ''}>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="flex items-center">
+                                      <div className="ml-4">
+                                        <div className="text-sm font-medium text-gray-900">{venue.ven_name}</div>
+                                        {parseInt(venue.ven_occupancy) >= parseInt(formData.participants) && (
+                                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                            Recommended
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="text-sm text-gray-900">{venue.ven_occupancy}</div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                      venue.status_availability_name === 'available' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                    }`}>
+                                      {venue.status_availability_name}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <label className="inline-flex items-center">
+                                      <input
+                                        type="radio"
+                                        className="form-radio h-5 w-5 text-green-600"
+                                        checked={formData.venue === venue.ven_id}
+                                        onChange={() => handleInputChange({ target: { name: 'venue', value: venue.ven_id } })}
+                                      />
+                                      <span className="ml-2 text-gray-700">Select</span>
+                                    </label>
+                                  </td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
                     <div className="mt-6 flex justify-end">

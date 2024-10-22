@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Sidebar from './Sidebar';
+import Sidebar1 from './sidebarpersonel';
 import { Modal, Button, Spinner } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import axios from 'axios';
@@ -11,6 +12,7 @@ import 'react-datepicker/dist/react-datepicker.css';
 
 const ReservationRequests = () => {
     const [reservations, setReservations] = useState([]);
+    const [userLevel, setUserLevel] = useState(null);
     const [loading, setLoading] = useState(false);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
     const [isDeclineModalOpen, setIsDeclineModalOpen] = useState(false);
@@ -111,6 +113,12 @@ const ReservationRequests = () => {
         return icons[type] || null;
     };
 
+    useEffect(() => {
+        const level = localStorage.getItem('user_level');
+        setUserLevel(level);
+        fetchReservations();
+    }, []);
+
     const filteredReservations = reservations.filter(reservation => 
         (filter === 'All' || (reservation.type && reservation.type === filter)) &&
         (searchTerm === '' || reservation.reservation_id.toString().includes(searchTerm) || 
@@ -121,7 +129,8 @@ const ReservationRequests = () => {
 
     return (
         <div className="flex flex-col lg:flex-row bg-gray-100 min-h-screen">
-            <Sidebar />
+            {userLevel === '100' && <Sidebar />}
+            {userLevel === '1' && <Sidebar1 />}
             <div className="flex-grow p-8 lg:p-12">
                 <motion.h2 
                     initial={{ opacity: 0, y: -20 }}
