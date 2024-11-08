@@ -96,10 +96,7 @@ const Sidebar = () => {
                 <SidebarSubItem icon={FaFolder} text="Master" link="/Master" active={activeItem === '/Master'} />
               </SidebarDropdown>
 
-              <SidebarDropdown icon={FaUserCircle} text="Users" active={['/personel', '/Faculty'].includes(activeItem)}>
-                <SidebarSubItem icon={FaUserCircle} text="Personnel" link="/personel" active={activeItem === '/personel'} />
-                <SidebarSubItem icon={FaUserCircle} text="Faculty" link="/Faculty" active={activeItem === '/Faculty'} />
-              </SidebarDropdown>
+              <SidebarItem icon={FaUserCircle} text="Users" link="/Users" active={activeItem === '/Users'} />
 
               <SidebarDropdown icon={FaCar} text="Reservations" active={['/viewReservation', '/ViewRequest', '/AddReservation'].includes(activeItem)}>
                 <SidebarSubItem icon={FaHeadset} text="View Requests" link="/ViewRequest" active={activeItem === '/ViewRequest'} />
@@ -107,6 +104,13 @@ const Sidebar = () => {
               </SidebarDropdown>
 
               <SidebarSubItem icon={FaFileAlt} text="Reports" link="/viewReservation" active={activeItem === '/viewReservation'} />
+              
+              <SidebarItem 
+                icon={FaCalendarAlt} 
+                text="Released & Returned Record" 
+                link="/release&return" 
+                active={activeItem === '/releasedReturnedRecord'} 
+              />
             </nav>
           </div>
 

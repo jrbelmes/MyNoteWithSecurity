@@ -10,7 +10,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 
 const VehicleEntry = () => {
-    const user_level = localStorage.getItem('user_level') || '';
     const [vehicles, setVehicles] = useState([]);
     const [filteredVehicles, setFilteredVehicles] = useState([]);
     const [categories, setCategories] = useState([]);
@@ -28,18 +27,20 @@ const VehicleEntry = () => {
     const [editingVehicle, setEditingVehicle] = useState(null);
     const navigate = useNavigate();
     const BASE_URL = "http://localhost/coc/gsd/user.php";
+    const user_id = localStorage.getItem('user_id');
+
+    useEffect(() => {
+        if (user_id !== '100' && user_id !== '1' && user_id !== '4') {
+            localStorage.clear();
+            navigate('/gsd');
+        }
+    }, [user_id, navigate]);
 
     useEffect(() => {
         fetchVehicles();
         fetchMakes();
         fetchCategoriesAndModels();
     }, []);
-    useEffect(() => {
-        if (user_level !== '100') {
-            localStorage.clear();
-            navigate('/');
-        }
-    }, [user_level, navigate]);
 
     const fetchVehicles = async () => {
         setLoading(true);
@@ -137,19 +138,31 @@ const VehicleEntry = () => {
             toast.error("Please fill in all required fields.");
             return;
         }
-
+    
         const jsonData = {
-            operation: selectedVehicleId ? "updateVehicle" : "saveVehicle",
             vehicle_model_id: vehicleModelId,
             vehicle_license: vehicleLicensed,
-            admin_id: "4",
+           
             vehicle_id: selectedVehicleId || undefined,
         };
-
+    
         setIsSubmitting(true);
-
+    
         try {
-            const response = await axios.post("http://localhost/coc/gsd/insert_master.php", new URLSearchParams(jsonData));
+            let response;
+
+            if (selectedVehicleId) {
+                response = await axios.post("http://localhost/coc/gsd/update_master1.php", new URLSearchParams({
+                    ...jsonData,
+                    operation: "updateVehicle", // Operation specifically for update
+                }));
+            } else {
+                response = await axios.post("http://localhost/coc/gsd/insert_master.php", new URLSearchParams({
+                    ...jsonData,
+                    operation: "saveVehicle", // Operation specifically for save
+                }));
+            }
+    
             if (response.data.status === 'success') {
                 toast.success(response.data.message);
                 resetForm();
@@ -169,7 +182,7 @@ const VehicleEntry = () => {
     const handleDeleteVehicle = async (vehicle) => {
         if (window.confirm("Are you sure you want to delete this vehicle?")) {
             try {
-                const response = await axios.post(BASE_URL, new URLSearchParams({
+                const response = await axios.post("http://localhost/coc/gsd/delete_master.php", new URLSearchParams({
                     operation: "deleteVehicle",
                     vehicle_id: vehicle.vehicle_id,
                 }));
@@ -413,81 +426,83 @@ const VehicleEntry = () => {
 
             {/* Edit Vehicle Modal */}
             <Modal show={showEditModal} onHide={handleCloseModal} centered>
-                <Modal.Header closeButton className="bg-green-600 text-white">
-                    <Modal.Title><FaCar className="inline-block mr-2" /> Edit Vehicle</Modal.Title>
-                </Modal.Header>
-                <Modal.Body className="bg-green-50">
-                    <div className="flex flex-col gap-4">
-                        <div>
-                            <label htmlFor="make" className="block mb-2 font-semibold">Make</label>
-                            <select
-                                id="make"
-                                value={makeId}
-                                onChange={handleMakeChange}
-                                className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                                <option value="">Select Make</option>
-                                {makes.map(make => (
-                                    <option key={make.vehicle_make_id} value={make.vehicle_make_id}>
-                                        {make.vehicle_make_name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label htmlFor="category" className="block mb-2 font-semibold">Category</label>
-                            <select
-                                id="category"
-                                value={category}
-                                onChange={handleCategoryChange}
-                                className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                disabled={!makeId}
-                            >
-                                <option value="">Select Category</option>
-                                {categories.map(cat => (
-                                    <option key={cat.vehicle_category_id} value={cat.vehicle_category_id}>
-                                        {cat.vehicle_category_name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label htmlFor="model" className="block mb-2 font-semibold">Model</label>
-                            <select
-                                id="model"
-                                value={vehicleModelId}
-                                onChange={e => setVehicleModelId(e.target.value)}
-                                className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                disabled={!category}
-                            >
-                                {modelsByCategory[category]?.map(model => (
-                                    <option key={model.vehicle_model_id} value={model.vehicle_model_id}>
-                                        {model.vehicle_model_name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label htmlFor="license" className="block mb-2 font-semibold">License</label>
-                            <input
-                                type="text"
-                                id="license"
-                                value={vehicleLicensed}
-                                onChange={e => setVehicleLicensed(e.target.value)}
-                                className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                        </div>
-                    </div>
-                </Modal.Body>
-                <Modal.Footer className="bg-green-50">
-                    <Button variant="secondary" onClick={handleCloseModal}>
-                        Close
-                    </Button>
-                    <Button variant="primary" onClick={handleSubmit} disabled={isSubmitting} className="bg-green-600 hover:bg-green-700">
-                        {isSubmitting ? 'Saving...' : 'Save Changes'}
-                    </Button>
-                </Modal.Footer>
-            </Modal>
+    <Modal.Header closeButton className="bg-green-600 text-white">
+        <Modal.Title><FaCar className="inline-block mr-2" /> Edit Vehicle</Modal.Title>
+    </Modal.Header>
+    <Modal.Body className="bg-green-50">
+        <div className="flex flex-col gap-4">
+            <div>
+                <label htmlFor="make" className="block mb-2 font-semibold">Make</label>
+                <select
+                    id="make"
+                    value={makeId}
+                    onChange={handleMakeChange}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                    <option value="">Select Make</option>
+                    {makes.map(make => (
+                        <option key={make.vehicle_make_id} value={make.vehicle_make_id}>
+                            {make.vehicle_make_name}
+                        </option>
+                    ))}
+                </select>
+            </div>
+            <div>
+                <label htmlFor="category" className="block mb-2 font-semibold">Category</label>
+                <select
+                    id="category"
+                    value={category}
+                    onChange={handleCategoryChange}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={!makeId}
+                >
+                    <option value="">Select Category</option>
+                    {categories.map(cat => (
+                        <option key={cat.vehicle_category_id} value={cat.vehicle_category_id}>
+                            {cat.vehicle_category_name}
+                        </option>
+                    ))}
+                </select>
+            </div>
+            <div>
+                <label htmlFor="model" className="block mb-2 font-semibold">Model</label>
+                <select
+                    id="model"
+                    value={vehicleModelId}
+                    onChange={e => setVehicleModelId(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={!category}
+                >
+                    <option value="">Select Model</option>
+                    {modelsByCategory[category]?.map(model => (
+                        <option key={model.vehicle_model_id} value={model.vehicle_model_id}>
+                            {model.vehicle_model_name}
+                        </option>
+                    ))}
+                </select>
+            </div>
+            <div>
+                <label htmlFor="license" className="block mb-2 font-semibold">License</label>
+                <input
+                    type="text"
+                    id="license"
+                    value={vehicleLicensed}
+                    onChange={e => setVehicleLicensed(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+            </div>
+        </div>
+    </Modal.Body>
+    <Modal.Footer className="bg-green-50">
+        <Button variant="secondary" onClick={handleCloseModal}>
+            Close
+        </Button>
+        <Button variant="primary" onClick={handleSubmit} disabled={isSubmitting} className="bg-green-600 hover:bg-green-700">
+            {isSubmitting ? 'Saving...' : 'Save Changes'}
+        </Button>
+    </Modal.Footer>
+</Modal>
+
         </div>
     );
 };

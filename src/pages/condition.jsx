@@ -2,23 +2,23 @@ import React, { useEffect, useState } from 'react';
 import { Modal, Button, Form } from 'react-bootstrap';
 import { toast, Toaster } from 'sonner';
 import Sidebar from './Sidebar';
-import { FaArrowLeft, FaPlus, FaTrash, FaSearch, FaTools } from 'react-icons/fa';
+import { FaArrowLeft, FaTrash, FaClipboardCheck } from 'react-icons/fa';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const EquipmentCategories = () => {
+const Conditions = () => {
     const navigate = useNavigate();
-    const [categories, setCategories] = useState([]);
-    const [filteredCategories, setFilteredCategories] = useState([]);
+    const [conditions, setConditions] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [formData, setFormData] = useState({ categoryId: '', name: '' });
+    const [formData, setFormData] = useState({ id: '', name: '' });
     const [showModal, setShowModal] = useState(false);
     const [showConfirmDelete, setShowConfirmDelete] = useState(false);
-    const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+    const [selectedConditionId, setSelectedConditionId] = useState(null);
     const [editMode, setEditMode] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
     const user_id = localStorage.getItem('user_id');
 
     useEffect(() => {
@@ -29,95 +29,88 @@ const EquipmentCategories = () => {
     }, [user_id, navigate]);
 
     useEffect(() => {
-        fetchCategories();
+        fetchConditions();
     }, []);
 
-    const fetchCategories = async () => {
+    const fetchConditions = async () => {
         setLoading(true);
         try {
-            const response = await axios.post('http://localhost/coc/gsd/fetchMaster.php', new URLSearchParams({ operation: 'fetchEquipments' }));
+            const response = await axios.post('http://localhost/coc/gsd/fetchMaster.php', new URLSearchParams({ operation: 'fetchConditions' }));
             if (response.data.status === 'success') {
-                setCategories(response.data.data);
-                setFilteredCategories(response.data.data);
+                setConditions(response.data.data);
             } else {
                 toast.error(response.data.message);
             }
         } catch (error) {
-            toast.error('Error fetching equipment categories');
+            toast.error('Error fetching conditions');
         } finally {
             setLoading(false);
         }
     };
 
     const handleEdit = (id) => {
-        const categoryToEdit = categories.find((category) => category.equipments_category_id === id);
-        if (categoryToEdit) {
-            setFormData({ categoryId: categoryToEdit.equipments_category_id, name: categoryToEdit.equipments_category_name });
+        const conditionToEdit = conditions.find((condition) => condition.condition_id === id);
+        if (conditionToEdit) {
+            setFormData({ id: conditionToEdit.condition_id, name: conditionToEdit.condition_name });
             setEditMode(true);
             setShowModal(true);
         }
     };
 
     const handleDelete = (id) => {
-        setSelectedCategoryId(id);
+        setSelectedConditionId(id);
         setShowConfirmDelete(true);
     };
 
     const confirmDelete = async () => {
-        if (!selectedCategoryId) {
-            toast.error('Equipment category ID is required for deletion.');
-            return;
-        }
-
         try {
-            const response = await axios.post('http://localhost/coc/gsd/delete_master.php', 
-                new URLSearchParams({ 
-                    operation: 'deleteEquipmentCategory', 
-                    equipment_category_id: selectedCategoryId  // Changed from categoryId to equipment_category_id
-                })
-            );
-            
+            const response = await axios.post('http://localhost/coc/gsd/delete_master.php', new URLSearchParams({ operation: 'deleteCondition', condition_id: selectedConditionId }));
             if (response.data.status === 'success') {
-                setCategories(categories.filter(category => category.equipments_category_id !== selectedCategoryId));
-                setFilteredCategories(filteredCategories.filter(category => category.equipments_category_id !== selectedCategoryId));
-                toast.success('Equipment category deleted successfully!');
+                setConditions(conditions.filter(condition => condition.condition_id !== selectedConditionId));
+                toast.success('Condition deleted successfully!');
             } else {
-                toast.error(response.data.message || 'Failed to delete equipment category.');
+                toast.error(response.data.message || 'Failed to delete condition.');
             }
         } catch (error) {
-            console.error('Error deleting category:', error);
-            toast.error('Error deleting equipment category.');
+            toast.error('Error deleting condition.');
         } finally {
             setShowConfirmDelete(false);
-            setSelectedCategoryId(null);
         }
     };
 
     const handleSave = async () => {
         if (!formData.name.trim()) {
-            toast.error("Please enter a category name.");
+            toast.error("Please enter a condition name.");
             return;
         }
         setIsSubmitting(true);
         try {
             const response = await axios.post('http://localhost/coc/gsd/update_master1.php', {
-                operation: editMode ? 'updateEquipmentCategory' : 'saveEquipmentCategory',
-                categoryId: formData.categoryId,
-                name: formData.name.trim()
+                operation: 'updateCondition',
+                conditionData: {
+                    conditionId: formData.id,
+                    name: formData.name.trim()
+                }
             }, {
                 headers: {
                     'Content-Type': 'application/json'
                 }
             });
             if (response.data.status === 'success') {
-                toast.success(editMode ? 'Equipment category updated successfully!' : 'Equipment category added successfully!');
-                fetchCategories();
+                // Update the local state
+                setConditions(prevConditions => prevConditions.map(condition => 
+                    condition.condition_id === formData.id 
+                        ? { ...condition, condition_name: formData.name.trim() } 
+                        : condition
+                ));
+                toast.success('Condition updated successfully!');
                 closeModal();
             } else {
-                toast.error(response.data.message || `Failed to ${editMode ? 'update' : 'add'} equipment category.`);
+                toast.error(response.data.message || 'Failed to update condition.');
             }
         } catch (error) {
-            toast.error(`Error ${editMode ? 'updating' : 'adding'} equipment category.`);
+            console.error('Error updating condition:', error);
+            toast.error('Error updating condition.');
         } finally {
             setIsSubmitting(false);
         }
@@ -126,21 +119,7 @@ const EquipmentCategories = () => {
     const closeModal = () => {
         setShowModal(false);
         setEditMode(false);
-        setFormData({ categoryId: '', name: '' });
-    };
-
-    const handleSearchChange = (e) => {
-        const searchTerm = e.target.value.toLowerCase();
-        const results = categories.filter(category =>
-            category.equipments_category_name.toLowerCase().includes(searchTerm)
-        );
-        setFilteredCategories(results);
-    };
-
-    const handleAddCategory = () => {
-        setFormData({ categoryId: '', name: '' });
-        setEditMode(false);
-        setShowModal(true);
+        setFormData({ id: '', name: '' });
     };
 
     return (
@@ -157,30 +136,8 @@ const EquipmentCategories = () => {
                         <FaArrowLeft className="mr-2" /> Back to Master
                     </Button>
                 </div>
-                <h2 className="text-4xl font-bold mb-6 text-green-800 drop-shadow-lg">Equipment Categories</h2>
+                <h2 className="text-4xl font-bold mb-6 text-green-800 drop-shadow-lg">Vehicle Conditions</h2>
                 <div className="bg-white bg-opacity-90 rounded-lg shadow-xl p-6 mb-6 backdrop-filter backdrop-blur-lg">
-                    <div className="flex flex-col md:flex-row items-center justify-between mb-4">
-                        <motion.div 
-                            whileHover={{ scale: 1.05 }}
-                            className="relative w-full md:w-64 mb-4 md:mb-0"
-                        >
-                            <input
-                                type="text"
-                                onChange={handleSearchChange}
-                                placeholder="Search by category name"
-                                className="w-full pl-10 pr-4 py-2 rounded-full border border-green-300 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-300"
-                            />
-                            <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-400" />
-                        </motion.div>
-                        <motion.button 
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={handleAddCategory}
-                            className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out flex items-center justify-center shadow-md"
-                        >
-                            <FaPlus className="mr-2" /> Add Category
-                        </motion.button>
-                    </div>
                     {loading ? (
                         <motion.div
                             initial={{ opacity: 0 }}
@@ -201,20 +158,20 @@ const EquipmentCategories = () => {
                                 </thead>
                                 <tbody className="text-gray-600 text-sm font-light">
                                     <AnimatePresence>
-                                        {filteredCategories.map((category) => (
+                                        {conditions.map((condition) => (
                                             <motion.tr 
-                                                key={category.equipments_category_id}
+                                                key={condition.condition_id}
                                                 initial={{ opacity: 0 }}
                                                 animate={{ opacity: 1 }}
                                                 exit={{ opacity: 0 }}
                                                 className="border-b border-green-200 hover:bg-green-50 transition-colors duration-200"
                                             >
-                                                <td className="py-3 px-4">{category.equipments_category_name}</td>
+                                                <td className="py-3 px-4">{condition.condition_name}</td>
                                                 <td className="py-3 px-4 text-center">
                                                     <motion.button 
                                                         whileHover={{ scale: 1.1 }}
                                                         whileTap={{ scale: 0.9 }}
-                                                        onClick={() => handleDelete(category.equipments_category_id)}
+                                                        onClick={() => handleDelete(condition.condition_id)}
                                                         className="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded-full transition duration-300 ease-in-out mr-2"
                                                     >
                                                         <FaTrash />
@@ -222,7 +179,7 @@ const EquipmentCategories = () => {
                                                     <motion.button 
                                                         whileHover={{ scale: 1.1 }}
                                                         whileTap={{ scale: 0.9 }}
-                                                        onClick={() => handleEdit(category.equipments_category_id)}
+                                                        onClick={() => handleEdit(condition.condition_id)}
                                                         className="bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-3 rounded-full transition duration-300 ease-in-out"
                                                     >
                                                         Edit
@@ -238,14 +195,14 @@ const EquipmentCategories = () => {
                 </div>
             </motion.div>
 
-            {/* Add/Edit Category Modal */}
+            {/* Edit Condition Modal */}
             <Modal show={showModal} onHide={closeModal} centered>
                 <Modal.Header closeButton className="bg-green-600 text-white">
-                    <Modal.Title><FaTools className="inline-block mr-2" /> {editMode ? 'Edit' : 'Add'} Equipment Category</Modal.Title>
+                    <Modal.Title><FaClipboardCheck className="inline-block mr-2" /> Edit Condition</Modal.Title>
                 </Modal.Header>
                 <Modal.Body className="bg-green-50">
                     <Form>
-                        <Form.Group controlId="formCategoryName">
+                        <Form.Group controlId="formConditionName">
                             <Form.Label>Name:</Form.Label>
                             <Form.Control
                                 type="text"
@@ -272,7 +229,7 @@ const EquipmentCategories = () => {
                     <Modal.Title>Confirm Deletion</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
-                    <p>Are you sure you want to delete this equipment category?</p>
+                    <p>Are you sure you want to delete this condition?</p>
                 </Modal.Body>
                 <Modal.Footer>
                     <Button variant="secondary" onClick={() => setShowConfirmDelete(false)}>
@@ -289,4 +246,4 @@ const EquipmentCategories = () => {
     );
 };
 
-export default EquipmentCategories;
+export default Conditions;

@@ -14,6 +14,7 @@ const Master = () => {
   const [isAddPositionModalOpen, setIsAddPositionModalOpen] = useState(false);
   const [isAddUserLevelModalOpen, setIsAddUserLevelModalOpen] = useState(false);
   const [isAddDepartmentModalOpen, setIsAddDepartmentModalOpen] = useState(false);
+  const [isAddConditionModalOpen, setIsAddConditionModalOpen] = useState(false);
   
   const [categoryName, setCategoryName] = useState('');
   const [makeName, setMakeName] = useState('');
@@ -23,6 +24,7 @@ const Master = () => {
   const [userLevelName, setUserLevelName] = useState('');
   const [userLevelDesc, setUserLevelDesc] = useState('');
   const [departmentName, setDepartmentName] = useState('');
+  const [conditionName, setConditionName] = useState('');
   
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedMake, setSelectedMake] = useState('');
@@ -80,6 +82,8 @@ const Master = () => {
           ? 'User Level' 
           : operation === 'saveDepartmentData'
           ? 'Department'
+          : operation === 'saveConditionData'
+          ? 'Condition'
           : 'Position';
 
         setMessage(`${name} added successfully!`);
@@ -120,6 +124,7 @@ const Master = () => {
     setIsAddPositionModalOpen(false);
     setIsAddUserLevelModalOpen(false);
     setIsAddDepartmentModalOpen(false);
+    setIsAddConditionModalOpen(false);
     setMessage('');
   };
 
@@ -140,7 +145,7 @@ const Master = () => {
       setIsSuccess(false);
       return;
     }
-    handleSaveData('saveModelData', { vehicle_model_name: modelName, category_id: selectedCategory, make_id: selectedMake });
+    handleSaveData('saveModelData', { name: modelName, category_id: selectedCategory, make_id: selectedMake });
   };
 
   const handleSaveEquipmentData = (e) => {
@@ -161,6 +166,16 @@ const Master = () => {
   const handleSaveDepartmentData = async (e) => {
     e.preventDefault();
     handleSaveData('saveDepartmentData', { departments_name: departmentName });
+  };
+
+  const handleSaveConditionData = (e) => {
+    e.preventDefault();
+    if (!conditionName.trim()) {
+      setMessage('Condition name is required.');
+      setIsSuccess(false);
+      return;
+    }
+    handleSaveData('saveConditionData', { condition_name: conditionName.trim() });
   };
 
   return (
@@ -184,7 +199,7 @@ const Master = () => {
             { title: 'Departments', icon: <FaListAlt />, action: () => setIsAddDepartmentModalOpen(true), viewPath: '/departments' },
             { title: 'Equipments', icon: <FaListAlt />, action: () => setIsAddEquipmentModalOpen(true), viewPath: '/equipmentCat' },
             { title: 'Position', icon: <FaCar />, action: () => setIsAddPositionModalOpen(true), viewPath: '/position' },
-            { title: 'User Level', icon: <FaUserShield />, action: () => setIsAddUserLevelModalOpen(true), viewPath: '/userlevel' },
+            { title: 'Condition', icon: <FaCogs />, action: () => setIsAddConditionModalOpen(true), viewPath: '/condition' },
           ].map((card, index) => (
             <motion.div 
               key={index}
@@ -393,6 +408,28 @@ const Master = () => {
                   value={departmentName}
                   onChange={(e) => setDepartmentName(e.target.value)}
                   placeholder="Enter department name"
+                  className="border border-gray-300 rounded px-4 py-2 w-full mb-4"
+                />
+                <div className="flex justify-end">
+                  <button type="button" onClick={resetForm} className="mr-2 py-2 px-4 bg-gray-500 text-white rounded">Cancel</button>
+                  <button type="submit" className="py-2 px-4 bg-blue-500 text-white rounded">Save</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Modal for Adding Condition */}
+        {isAddConditionModalOpen && (
+          <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
+            <div className="bg-white p-8 rounded-lg shadow-lg">
+              <h2 className="text-xl font-bold mb-4">Add Condition</h2>
+              <form onSubmit={handleSaveConditionData}>
+                <input
+                  type="text"
+                  value={conditionName}
+                  onChange={(e) => setConditionName(e.target.value)}
+                  placeholder="Enter condition name"
                   className="border border-gray-300 rounded px-4 py-2 w-full mb-4"
                 />
                 <div className="flex justify-end">

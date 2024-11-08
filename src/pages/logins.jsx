@@ -94,34 +94,70 @@ function Logins() {
         }
 
         try {
-            const jsonData = { username, password };
-            const formDataToSend = new FormData();
-            formDataToSend.append("json", JSON.stringify(jsonData));
-            formDataToSend.append("operation", "login");
-
-            const response = await axios.post(url, formDataToSend);
+            const response = await axios.post(url, 
+                {
+                    operation: "login",
+                    json: {
+                        username: username,
+                        password: password
+                    }
+                },
+                {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
 
             if (response.data) {
                 const user = response.data;
                 
-                if (user.adm_userLevel) {
-                    // Admin login
-                    notify("Login Successful");
+                if (user.admin_id && user.adm_userLevel === 'Super Admin') {
+                    // Super Admin login
+                    notify("Super Admin Login Successful");
                     localStorage.setItem("user_id", user.admin_id);
                     localStorage.setItem("user_level", user.adm_userLevel);
                     localStorage.setItem("name", user.admin_name || "");
                     localStorage.setItem("loggedIn", "true");
                     navigateTo("/adminDashboard");
-                } else if (user.personnel_userLevel) {
+                } else if (user.admin_id && user.adm_userLevel === 'Admin') {
+                    // Regular Admin login
+                    notify("Admin Login Successful");
+                    localStorage.setItem("user_id", user.admin_id);
+                    localStorage.setItem("user_level", user.adm_userLevel);
+                    localStorage.setItem("name", user.admin_name || "");
+                    localStorage.setItem("loggedIn", "true");
+                    navigateTo("/adminDashboard");
+                } else if (user.user_id) {
+                    // Regular User login
+                    notify("User Login Successful");
+                    localStorage.setItem("user_id", user.user_id);
+                    localStorage.setItem("name", `${user.firstname} ${user.middlename} ${user.lastname}`.trim());
+                    localStorage.setItem("school_id", user.school_id);
+                    localStorage.setItem("contact_number", user.contact_number);
+                    localStorage.setItem("user_level", user.user_level);
+                    localStorage.setItem("user_level_id", user.user_level_id);
+                    localStorage.setItem("department_id", user.department_id);
+                    localStorage.setItem("profile_pic", user.profile_pic || "");
+                    localStorage.setItem("loggedIn", "true");
+                    navigateTo("/dashboard");
+                } else if (user.jo_personel_id) {
                     // Personnel login
-                    notify("Login Successful");
+                    notify("Personnel Login Successful");
                     localStorage.setItem("user_id", user.jo_personel_id);
-                    localStorage.setItem("user_level", user.personnel_userLevel);
                     localStorage.setItem("name", user.jo_personel_fname || "");
+                    localStorage.setItem("user_level", "Personnel");
                     localStorage.setItem("loggedIn", "true");
                     navigateTo("/personeldashboard");
                 } else {
                     toast.error("Invalid user type");
+                }
+
+                // Handle "Remember Me" functionality
+                if (rememberMe) {
+                    localStorage.setItem("rememberedUsername", username);
+                } else {
+                    localStorage.removeItem("rememberedUsername");
                 }
             } else {
                 const newAttempts = loginAttempts + 1;

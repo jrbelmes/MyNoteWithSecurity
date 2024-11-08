@@ -80,7 +80,7 @@ const Sidebar = () => {
 
           <div className="flex-grow overflow-y-auto">
             <nav className="mt-5 px-2">
-              <SidebarItem icon={FaTachometerAlt} text="Dashboard" link="/personeldasboard" active={activeItem === '/adminDashboard'} />
+              <SidebarItem icon={FaTachometerAlt} text="Dashboard" link="/personeldashboard" active={activeItem === '/adminDashboard'} />
               
             
               <SidebarDropdown icon={FaCar} text="Reservations" active={['/viewReservation', '/ViewRequest', '/AddReservation'].includes(activeItem)}>
@@ -89,6 +89,12 @@ const Sidebar = () => {
               </SidebarDropdown>
 
               <SidebarSubItem icon={FaFileAlt} text="Reports" link="/viewReservation" active={activeItem === '/viewReservation'} />
+              <SidebarItem 
+                icon={FaCalendarAlt} 
+                text="Released & Returned Record" 
+                link="/release&return" 
+                active={activeItem === '/releasedReturnedRecord'} 
+              />
             </nav>
           </div>
 
@@ -130,6 +136,7 @@ const Sidebar = () => {
                 )}
               </AnimatePresence>
             </button>
+            
           </div>
         </motion.aside>
 

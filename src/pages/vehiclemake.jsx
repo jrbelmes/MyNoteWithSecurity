@@ -1,14 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Modal, Button, Form } from 'react-bootstrap';
-import { ToastContainer, toast } from 'react-toastify';
-import Sidebar from './Sidebar'; // Ensure you have this component
-import { FaArrowLeft } from 'react-icons/fa';
+import { toast, Toaster } from 'sonner';
+import Sidebar from './Sidebar';
+import { FaArrowLeft, FaTrash, FaCar } from 'react-icons/fa';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import 'react-toastify/dist/ReactToastify.css';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const VehicleMakes = () => {
-    const navigate = useNavigate();
+  const navigate = useNavigate();
   const [makes, setMakes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({ id: '', name: '' });
@@ -16,6 +17,19 @@ const VehicleMakes = () => {
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [selectedMakeId, setSelectedMakeId] = useState(null);
   const [editMode, setEditMode] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const user_level = localStorage.getItem('user_level');
+  const [editingModel, setEditingModel] = useState(null);
+
+  const user_id = localStorage.getItem('user_id');
+
+  useEffect(() => {
+      if (user_id !== '100' && user_id !== '1' && user_id !== '4') {
+          localStorage.clear();
+          navigate('/gsd');
+      }
+  }, [user_id, navigate]);
 
   useEffect(() => {
     const fetchMakes = async () => {
@@ -47,6 +61,12 @@ const VehicleMakes = () => {
 
     fetchMakes();
   }, []);
+
+  const filteredMakes = useMemo(() => {
+    return makes.filter(make => 
+      make.vehicle_make_name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [makes, searchTerm]);
 
   const handleEdit = (id) => {
     const makeToEdit = makes.find((make) => make.vehicle_make_id === id);
@@ -88,13 +108,14 @@ const VehicleMakes = () => {
   };
 
   const handleSave = async () => {
+    setIsSubmitting(true);
     try {
       const response = await fetch('http://localhost/coc/gsd/update_master1.php', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
         },
-        body: new URLSearchParams({ operation: 'updateVehicleMake', id: formData.id, name: formData.name }),
+        body: JSON.stringify({ operation: 'updateVehicleMake', id: formData.id, name: formData.name }),
       });
 
       const data = await response.json();
@@ -108,6 +129,7 @@ const VehicleMakes = () => {
       console.error('Error updating vehicle make:', error);
       toast.error('Error updating vehicle make.');
     } finally {
+      setIsSubmitting(false);
       closeModal();
     }
   };
@@ -122,94 +144,138 @@ const VehicleMakes = () => {
     return <div className="text-center text-xl">Loading...</div>;
   }
 
-  return (
-    <div className="d-flex">
-      <Sidebar />
-      <div className="container mx-auto p-6 flex-grow-1">
-        <div className="mb-4">
-          <Button variant="link" onClick={() => navigate('/Master')}>
-            <FaArrowLeft className="mr-2" /> Back to Master
-          </Button>
+    return (
+        <div className="flex flex-col lg:flex-row min-h-screen bg-gradient-to-br from-white to-green-100">
+            <Sidebar />
+            <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="flex-grow p-6 lg:p-10"
+            >
+                <div className="mb-4">
+                    <Button variant="link" onClick={() => navigate('/Master')} className="text-green-800">
+                        <FaArrowLeft className="mr-2" /> Back to Master
+                    </Button>
+                </div>
+                <h2 className="text-4xl font-bold mb-6 text-green-800 drop-shadow-lg">Vehicle Makes</h2>
+                <div className="mb-4">
+                    <input
+                        type="text"
+                        placeholder="Search makes..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="p-2 border rounded"
+                    />
+                </div>
+                <div className="bg-white bg-opacity-90 rounded-lg shadow-xl p-6 mb-6 backdrop-filter backdrop-blur-lg">
+                    
+                    {loading ? (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="flex justify-center items-center h-64"
+                        >
+                            <div className="loader"></div>
+                        </motion.div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full table-auto">
+                                <thead>
+                                    <tr className="bg-green-600 text-white">
+                                        <th className="py-3 px-4 text-left rounded-tl-lg">Name</th>
+                                        <th className="py-3 px-4 text-center rounded-tr-lg">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="text-gray-600 text-sm font-light">
+                                    <AnimatePresence>
+                                        {filteredMakes.map((make) => (
+                                            <motion.tr 
+                                                key={make.vehicle_make_id}
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                exit={{ opacity: 0 }}
+                                                className="border-b border-green-200 hover:bg-green-50 transition-colors duration-200"
+                                            >
+                                                <td className="py-3 px-4">{make.vehicle_make_name}</td>
+                                                <td className="py-3 px-4 text-center">
+                                                    <motion.button 
+                                                        whileHover={{ scale: 1.1 }}
+                                                        whileTap={{ scale: 0.9 }}
+                                                        onClick={() => handleDelete(make.vehicle_make_id)}
+                                                        className="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded-full transition duration-300 ease-in-out mr-2"
+                                                    >
+                                                        <FaTrash />
+                                                    </motion.button>
+                                                    <motion.button 
+                                                        whileHover={{ scale: 1.1 }}
+                                                        whileTap={{ scale: 0.9 }}
+                                                        onClick={() => handleEdit(make.vehicle_make_id)}
+                                                        className="bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-3 rounded-full transition duration-300 ease-in-out"
+                                                    >
+                                                        Edit
+                                                    </motion.button>
+                                                </td>
+                                            </motion.tr>
+                                        ))}
+                                    </AnimatePresence>
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            </motion.div>
+
+            {/* Add/Edit Vehicle Make Modal */}
+            <Modal show={showModal} onHide={closeModal} centered>
+                <Modal.Header closeButton className="bg-green-600 text-white">
+                    <Modal.Title><FaCar className="inline-block mr-2" /> {editMode ? 'Edit' : 'Add'} Vehicle Make</Modal.Title>
+                </Modal.Header>
+                <Modal.Body className="bg-green-50">
+                    <Form>
+                        <Form.Group controlId="formMakeName">
+                            <Form.Label>Name:</Form.Label>
+                            <Form.Control
+                                type="text"
+                                value={formData.name}
+                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                        </Form.Group>
+                    </Form>
+                </Modal.Body>
+                <Modal.Footer className="bg-green-50">
+                    <Button variant="secondary" onClick={closeModal}>
+                        Close
+                    </Button>
+                    <Button variant="primary" onClick={handleSave} disabled={isSubmitting} className="bg-green-600 hover:bg-green-700">
+                        {isSubmitting ? 'Saving...' : 'Save'}
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+
+            {/* Confirm Delete Modal */}
+            <Modal show={showConfirmDelete} onHide={() => setShowConfirmDelete(false)} centered>
+                <Modal.Header closeButton className="bg-red-600 text-white">
+                    <Modal.Title>Confirm Deletion</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <p>Are you sure you want to delete this vehicle make?</p>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowConfirmDelete(false)}>
+                        Cancel
+                    </Button>
+                    <Button variant="danger" onClick={confirmDelete}>
+                        Delete
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+
+            <Toaster position="top-right" />
         </div>
-        <h1 className="text-2xl font-bold text-center mb-6">Vehicle Makes</h1>
-        <table className="min-w-full bg-white shadow-md rounded-lg overflow-hidden">
-          <thead className="bg-green-500 text-white">
-            <tr>
-              <th className="py-3 px-4 text-left">Name</th>
-              <th className="py-3 px-4 text-left">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {makes.map((make) => (
-              <tr key={make.vehicle_make_id} className="border-b hover:bg-gray-100">
-                <td className="py-3 px-4">{make.vehicle_make_name}</td>
-                <td className="py-3 px-4">
-                  <Button 
-                    onClick={() => handleEdit(make.vehicle_make_id)} 
-                    className="bg-blue-500 text-white rounded px-4 py-2 mr-2 hover:bg-blue-600"
-                  >
-                    Edit
-                  </Button>
-                  <Button 
-                    onClick={() => handleDelete(make.vehicle_make_id)} 
-                    className="bg-red-500 text-white rounded px-4 py-2 hover:bg-red-600"
-                  >
-                    Delete
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        <Modal show={showModal} onHide={closeModal}>
-          <Modal.Header closeButton>
-            <Modal.Title>{editMode ? 'Edit Vehicle Make' : 'Vehicle Make Details'}</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <Form>
-              <Form.Group controlId="formMakeName">
-                <Form.Label>Name:</Form.Label>
-                <Form.Control
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                />
-              </Form.Group>
-            </Form>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={closeModal}>
-              Close
-            </Button>
-            <Button variant="primary" onClick={handleSave}>
-              Save
-            </Button>
-          </Modal.Footer>
-        </Modal>
-
-        <Modal show={showConfirmDelete} onHide={() => setShowConfirmDelete(false)}>
-          <Modal.Header closeButton>
-            <Modal.Title>Confirm Deletion</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <p>Are you sure you want to delete this vehicle make?</p>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={() => setShowConfirmDelete(false)}>
-              Cancel
-            </Button>
-            <Button variant="danger" onClick={confirmDelete}>
-              Delete
-            </Button>
-          </Modal.Footer>
-        </Modal>
-
-        <ToastContainer />
-      </div>
-    </div>
-  );
+    );
 };
 
 export default VehicleMakes;
-

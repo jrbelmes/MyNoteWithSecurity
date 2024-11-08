@@ -10,7 +10,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const EquipmentEntry = () => {
-    const user_level = localStorage.getItem('user_level') || '';
+    const adminId = localStorage.getItem('adminId') || '';
     const [equipments, setEquipments] = useState([]);
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -24,15 +24,17 @@ const EquipmentEntry = () => {
     const [selectedCategory, setSelectedCategory] = useState('');
     const [editingEquipment, setEditingEquipment] = useState(null);
     const navigate = useNavigate();
-    const adminLevel = localStorage.getItem('adminLevel');
+    const user_level = localStorage.getItem('user_level');
     const [filteredEquipments, setFilteredEquipments] = useState([]);
 
+    const user_id = localStorage.getItem('user_id');
+
     useEffect(() => {
-        if (user_level !== '100') {
+        if (user_id !== '100' && user_id !== '1' && user_id !== '4') {
             localStorage.clear();
-            navigate('/');
+            navigate('/gsd');
         }
-    }, [user_level, navigate]);
+    }, [user_id, navigate]);
 
     useEffect(() => {
         fetchEquipments();
@@ -256,7 +258,7 @@ const EquipmentEntry = () => {
                                         <th className="py-3 px-4 text-left rounded-tl-lg">No.</th>
                                         <th className="py-3 px-4 text-left">Equipment Name</th>
                                         <th className="py-3 px-4 text-left">Quantity</th>
-                                        <th className="py-3 px-4 text-left">Status</th>
+                                        
                                         <th className="py-3 px-4 text-left">Created At</th>
                                         <th className="py-3 px-4 text-left">Updated At</th>
                                         <th className="py-3 px-4 text-center rounded-tr-lg">Actions</th>
@@ -275,7 +277,7 @@ const EquipmentEntry = () => {
                                                 <td className="py-3 px-4">{indexOfFirstEquipment + index + 1}</td>
                                                 <td className="py-3 px-4">{equipment.equip_name}</td>
                                                 <td className="py-3 px-4">{equipment.equip_quantity}</td>
-                                                <td className="py-3 px-4">{equipment.equip_status}</td>
+                                                
                                                 <td className="py-3 px-4">{equipment.equip_created_at}</td>
                                                 <td className="py-3 px-4">{equipment.equip_updated_at}</td>
                                                 <td className="py-3 px-4 text-center">

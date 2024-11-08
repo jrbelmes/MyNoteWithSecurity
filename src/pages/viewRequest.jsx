@@ -9,7 +9,7 @@ import { FaCheck, FaTimes, FaCar, FaBuilding, FaTools, FaFilter, FaSearch, FaCal
 import { motion, AnimatePresence } from 'framer-motion';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-
+import { useNavigate } from 'react-router-dom';
 const ReservationRequests = () => {
     const [reservations, setReservations] = useState([]);
     const [userLevel, setUserLevel] = useState(null);
@@ -22,6 +22,16 @@ const ReservationRequests = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [dateRange, setDateRange] = useState([null, null]);
     const [startDate, endDate] = dateRange;
+    const navigate = useNavigate();
+
+    const user_id = localStorage.getItem('user_id');
+
+    useEffect(() => {
+        if (user_id !== '100' && user_id !== '1' && user_id !== '4') {
+            localStorage.clear();
+            navigate('/gsd');
+        }
+    }, [user_id, navigate]);
 
     const fetchReservations = async () => {
         setLoading(true);
@@ -127,10 +137,22 @@ const ReservationRequests = () => {
         (!endDate || new Date(reservation.reservation_end_date) <= endDate)
     );
 
+    const renderSidebar = () => {
+        switch (user_id) {
+            case '100': // Admin
+                return <Sidebar />;
+            case '4':   // Personnel
+                return <Sidebar1 />;
+            case '1':   // Super Admin
+                return <Sidebar />;
+            default:
+                return null;
+        }
+    };
+
     return (
-        <div className="flex flex-col lg:flex-row bg-gray-100 min-h-screen">
-            {userLevel === '100' && <Sidebar />}
-            {userLevel === '1' && <Sidebar1 />}
+        <div className="flex flex-col lg:flex-row bg-gradient-to-br from-white to-green-100">
+            {renderSidebar()}
             <div className="flex-grow p-8 lg:p-12">
                 <motion.h2 
                     initial={{ opacity: 0, y: -20 }}

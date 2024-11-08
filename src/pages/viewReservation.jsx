@@ -10,6 +10,7 @@ import 'react-datepicker/dist/react-datepicker.css';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { Pie } from 'react-chartjs-2';
+import { useNavigate } from 'react-router-dom';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -50,7 +51,15 @@ const ReservationReport = ({ reservations, reportType, reportDate, getStatusClas
         } else if (reportType === 'yearly') {
             return `Report As of: ${reportDate.getFullYear()}`;
         } else if (reportType === 'range') {
-            return `Report As of: ${formatDate(startDate)} - ${formatDate(endDate)}`;
+            // Format the date range without time
+            const formatDateWithoutTime = (date) => {
+                return new Date(date).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+            };
+            return `Report As of: ${formatDateWithoutTime(startDate)} - ${formatDateWithoutTime(endDate)}`;
         }
     };
 
@@ -201,6 +210,15 @@ const ViewReservations = () => {
     const [rangeStartDate, setRangeStartDate] = useState(null);
     const [rangeEndDate, setRangeEndDate] = useState(null);
     const [filteredReservations, setFilteredReservations] = useState([]);
+    const navigate = useNavigate();
+    const user_id = localStorage.getItem('user_id');
+
+    useEffect(() => {
+        if (user_id !== '100' && user_id !== '1' && user_id !== '4') {
+            localStorage.clear();
+            navigate('/gsd');
+        }
+    }, [user_id, navigate]);
 
     const fetchReservations = async () => {
         setLoading(true);
@@ -313,8 +331,27 @@ const ViewReservations = () => {
         setShowReport(true);
         setShowReportModal(false);
         setTimeout(() => {
-            window.print();
+            window.print(); 
         }, 500);
+    };
+
+    const handleCancelReservation = async (reservationId) => {
+        try {
+            const response = await axios.post('http://localhost/coc/gsd/cancel_reservation.php', {
+                reservation_id: reservationId
+            });
+
+            if (response.data && response.data.status === 'success') {
+                toast.success('Reservation cancelled successfully');
+                setModalOpen(false);
+                fetchReservations(); // Refresh the reservations list
+            } else {
+                toast.error('Failed to cancel reservation');
+            }
+        } catch (error) {
+            console.error('Error cancelling reservation:', error);
+            toast.error('An error occurred while cancelling the reservation');
+        }
     };
 
     return (
@@ -648,7 +685,7 @@ const ViewReservations = () => {
                                     <h4 className="font-semibold text-green-700 mb-2">Vehicles Used:</h4>
                                     <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
                                         {selectedReservation.vehicles.map((vehicle) => (
-                                            <li key={vehicle.vehicle_license} className="text-sm mb-1">{vehicle.vehicle_license} (ID: {vehicle.vehicle_reservation_vehicle_id})</li>
+                                            <li key={vehicle.vehicle_license} className="text-sm mb-1">{vehicle.vehicle_license}</li>
                                         ))}
                                     </ul>
                                 </div>
@@ -663,7 +700,22 @@ const ViewReservations = () => {
                                     </ul>
                                 </div>
                             )}
-                            <button className="mt-8 bg-green-600 text-white py-2 px-6 rounded-lg hover:bg-green-700 transition-colors" onClick={() => setModalOpen(false)}>Close</button>
+                            <div className="mt-8 flex justify-between">
+                                <button 
+                                    className="bg-green-600 text-white py-2 px-6 rounded-lg hover:bg-green-700 transition-colors" 
+                                    onClick={() => setModalOpen(false)}
+                                >
+                                    Close
+                                </button>
+                                {selectedReservation.reservation.reservation_status_name !== 'cancelled' && (
+                                    <button 
+                                        className="bg-red-600 text-white py-2 px-6 rounded-lg hover:bg-red-700 transition-colors"
+                                        onClick={() => handleCancelReservation(selectedReservation.reservation.reservation_id)}
+                                    >
+                                        Cancel Reservation
+                                    </button>
+                                )}
+                            </div>
                         </motion.div>
                     </motion.div>
                 )}

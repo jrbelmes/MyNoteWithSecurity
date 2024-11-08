@@ -11,7 +11,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const VenueEntry = () => {
-    const user_level = localStorage.getItem('user_level') || '';
+    const adminId = localStorage.getItem('adminId') || '';
     const [venues, setVenues] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -24,14 +24,14 @@ const VenueEntry = () => {
     const [editMode, setEditMode] = useState(false);
     const [currentVenueId, setCurrentVenueId] = useState(null);
     const navigate = useNavigate();
-    const adminLevel = localStorage.getItem('adminLevel');
+    const user_id = localStorage.getItem('user_id');
 
     useEffect(() => {
-        if (user_level !== '100') {
+        if (user_id !== '100' && user_id !== '1' && user_id !== '4') {
             localStorage.clear();
             navigate('/gsd');
         }
-    }, [user_level, navigate]);
+    }, [user_id, navigate]);
 
     useEffect(() => {
         fetchVenues();
@@ -332,3 +332,4 @@ const VenueEntry = () => {
 };
 
 export default VenueEntry;
+
