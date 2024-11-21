@@ -10,6 +10,17 @@ import { motion, AnimatePresence } from 'framer-motion';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { useNavigate } from 'react-router-dom';
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogTitle,
+  DialogClose,
+  DialogDescription,
+  DialogContainer,
+} from '../components/core/dialog';
+import { Loader2 } from 'lucide-react';
+
 const ReservationRequests = () => {
     const [reservations, setReservations] = useState([]);
     const [userLevel, setUserLevel] = useState(null);
@@ -22,16 +33,19 @@ const ReservationRequests = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [dateRange, setDateRange] = useState([null, null]);
     const [startDate, endDate] = dateRange;
+    const [isAccepting, setIsAccepting] = useState(false);
+    const [isDeclining, setIsDeclining] = useState(false);
     const navigate = useNavigate();
+    const user_level_id = localStorage.getItem('user_level_id');
 
     const user_id = localStorage.getItem('user_id');
 
     useEffect(() => {
-        if (user_id !== '100' && user_id !== '1' && user_id !== '4') {
+        if (user_level_id !== '1' && user_level_id !== '2' && user_level_id !== '4') {
             localStorage.clear();
             navigate('/gsd');
         }
-    }, [user_id, navigate]);
+    }, [user_level_id, navigate]);
 
     const fetchReservations = async () => {
         setLoading(true);
@@ -75,41 +89,60 @@ const ReservationRequests = () => {
     }, []);
 
     const handleAccept = async () => {
+        setIsAccepting(true);
         try {
             const response = await axios.post('http://localhost/coc/gsd/update_master2.php', {
                 operation: 'updateReservationStatus',
-                json: JSON.stringify({ reservation_id: currentRequest }),
+                json: JSON.stringify({ reservation_id: currentRequest })
+            }, {
+                headers: {
+                    'Content-Type': 'application/json'
+                }
             });
 
-            if (response.data?.status === 'success') {
-                toast.success('Reservation accepted!');
-                fetchReservations();
+            // Check if the response exists and doesn't contain an error
+            if (response.data) {
+                toast.success('Reservation accepted successfully!', {
+                    icon: '✅',
+                    duration: 3000,
+                });
+                await fetchReservations();
+                setIsDetailModalOpen(false);
             } else {
-                toast.error(response.data?.message || 'Failed to accept reservation.');
+                toast.error('Failed to accept reservation.');
             }
         } catch (error) {
             toast.error(`Error accepting reservation: ${error.response?.data?.message || error.message}`);
         } finally {
-            setIsDetailModalOpen(false);
+            setIsAccepting(false);
         }
     };
 
     const handleDecline = async () => {
+        setIsDeclining(true);
         try {
             const response = await axios.post('http://localhost/coc/gsd/update_master2.php', {
                 operation: 'updateReservationStatus1',
-                json: JSON.stringify({ reservation_id: currentRequest }),
+                json: JSON.stringify({ reservation_id: currentRequest })
+            }, {
+                headers: {
+                    'Content-Type': 'application/json'
+                }
             });
 
             if (response.data?.status === 'success') {
-                toast.success('Reservation declined!');
-                fetchReservations();
+                toast.success('Reservation declined successfully!', {
+                    icon: '❌',
+                    duration: 3000,
+                });
+                await fetchReservations();
             } else {
                 toast.error(response.data?.message || 'Failed to decline reservation.');
             }
         } catch (error) {
             toast.error(`Error declining reservation: ${error.response?.data?.message || error.message}`);
         } finally {
+            setIsDeclining(false);
             setIsDeclineModalOpen(false);
         }
     };
@@ -137,22 +170,9 @@ const ReservationRequests = () => {
         (!endDate || new Date(reservation.reservation_end_date) <= endDate)
     );
 
-    const renderSidebar = () => {
-        switch (user_id) {
-            case '100': // Admin
-                return <Sidebar />;
-            case '4':   // Personnel
-                return <Sidebar1 />;
-            case '1':   // Super Admin
-                return <Sidebar />;
-            default:
-                return null;
-        }
-    };
-
     return (
         <div className="flex flex-col lg:flex-row bg-gradient-to-br from-white to-green-100">
-            {renderSidebar()}
+            <Sidebar />
             <div className="flex-grow p-8 lg:p-12">
                 <motion.h2 
                     initial={{ opacity: 0, y: -20 }}
@@ -282,11 +302,9 @@ const ReservationRequests = () => {
                 )}
 
                 {/* Detail Modal for Accepting */}
-                <Modal show={isDetailModalOpen} onHide={() => setIsDetailModalOpen(false)} centered size="lg">
-                    <Modal.Header closeButton className="bg-gray-100">
-                        <Modal.Title className="text-2xl font-semibold">Reservation Details</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body className="p-6">
+                <Dialog open={isDetailModalOpen} onOpenChange={setIsDetailModalOpen}>
+                    <DialogContent className="sm:max-w-[600px]">
+                        <DialogTitle>Reservation Details</DialogTitle>
                         {reservationDetails && (
                             <motion.div 
                                 initial={{ opacity: 0 }}
@@ -392,26 +410,52 @@ const ReservationRequests = () => {
                                 )}
                             </motion.div>
                         )}
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="outline-secondary" onClick={() => setIsDetailModalOpen(false)}>Close</Button>
-                        <Button variant="success" onClick={handleAccept}>Accept</Button>
-                    </Modal.Footer>
-                </Modal>
+                        <div className="flex justify-end gap-3 mt-6">
+                            <DialogClose asChild>
+                                <button className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
+                                    Close
+                                </button>
+                            </DialogClose>
+                            <button
+                                onClick={handleAccept}
+                                disabled={isAccepting}
+                                className="px-4 py-2 rounded-lg bg-green-500 text-white hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            >
+                                {isAccepting && (
+                                    <Loader2 className="animate-spin h-4 w-4" />
+                                )}
+                                {isAccepting ? 'Accepting...' : 'Accept'}
+                            </button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
 
                 {/* Confirmation Modal for Declining */}
-                <Modal show={isDeclineModalOpen} onHide={() => setIsDeclineModalOpen(false)} centered>
-                    <Modal.Header closeButton>
-                        <Modal.Title className="text-xl font-semibold">Confirm Decline</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
-                        <p className="text-gray-600">Are you sure you want to decline this reservation?</p>
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="outline-secondary" onClick={() => setIsDeclineModalOpen(false)}>Cancel</Button>
-                        <Button variant="danger" onClick={handleDecline}>Confirm Decline</Button>
-                    </Modal.Footer>
-                </Modal>
+                <Dialog open={isDeclineModalOpen} onOpenChange={setIsDeclineModalOpen}>
+                    <DialogContent className="sm:max-w-[400px]">
+                        <DialogTitle>Confirm Decline</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to decline this reservation? This action cannot be undone.
+                        </DialogDescription>
+                        <div className="flex justify-end gap-3 mt-6">
+                            <DialogClose asChild>
+                                <button className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
+                                    Cancel
+                                </button>
+                            </DialogClose>
+                            <button
+                                onClick={handleDecline}
+                                disabled={isDeclining}
+                                className="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            >
+                                {isDeclining && (
+                                    <Loader2 className="animate-spin h-4 w-4" />
+                                )}
+                                {isDeclining ? 'Declining...' : 'Decline'}
+                            </button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
             </div>
         </div>
     );

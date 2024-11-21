@@ -1,15 +1,36 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react'; // Add useRef to imports
 import Sidebar from './Sidebar';
 import { FaPlus, FaTrash, FaSearch, FaCar } from 'react-icons/fa';
 import { toast } from 'sonner';
 import axios from 'axios';
-import { Modal, Button } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '../vehicle.css';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { DataTable } from 'primereact/datatable';
+import { Column } from 'primereact/column';
+import { Dialog } from 'primereact/dialog';
+import { InputText } from 'primereact/inputtext';
+import { Dropdown } from 'primereact/dropdown';
+import { FileUpload } from 'primereact/fileupload';
+import { ProgressSpinner } from 'primereact/progressspinner';
+import { Calendar } from 'primereact/calendar';
+import { Card } from 'primereact/card';
+import 'primereact/resources/themes/lara-light-green/theme.css';
+import 'primereact/resources/primereact.min.css';
+import 'primeicons/primeicons.css';
+import { Tag } from 'primereact/tag';
+import { Divider } from 'primereact/divider';
+import { DataView } from 'primereact/dataview';
+import dayjs from 'dayjs';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faEdit, faTrashAlt, faSearch, faPlus } from '@fortawesome/free-solid-svg-icons';
+import { Modal, Form, Input, TimePicker } from 'antd'; // Add this import
 
 const VehicleEntry = () => {
+    const user_level_id = localStorage.getItem('user_level_id');
+    // Add fileUploadRef before other state declarations
+    const fileUploadRef = useRef(null);
     const [vehicles, setVehicles] = useState([]);
     const [filteredVehicles, setFilteredVehicles] = useState([]);
     const [categories, setCategories] = useState([]);
@@ -25,21 +46,27 @@ const VehicleEntry = () => {
     const [loading, setLoading] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [editingVehicle, setEditingVehicle] = useState(null);
+    const [year, setYear] = useState(new Date());
+    const [vehicleImage, setVehicleImage] = useState(null);
+    const [statusAvailability, setStatusAvailability] = useState([]);
+    const [selectedStatus, setSelectedStatus] = useState('');
     const navigate = useNavigate();
     const BASE_URL = "http://localhost/coc/gsd/user.php";
     const user_id = localStorage.getItem('user_id');
+    const IMAGE_BASE_URL = "http://localhost/coc/gsd/";
 
     useEffect(() => {
-        if (user_id !== '100' && user_id !== '1' && user_id !== '4') {
+        if (user_level_id !== '1' && user_level_id !== '2' && user_level_id !== '4') {
             localStorage.clear();
             navigate('/gsd');
         }
-    }, [user_id, navigate]);
+    }, [user_level_id, navigate]);
 
     useEffect(() => {
         fetchVehicles();
         fetchMakes();
         fetchCategoriesAndModels();
+        fetchStatusAvailability(); // Add this line
     }, []);
 
     const fetchVehicles = async () => {
@@ -77,11 +104,29 @@ const VehicleEntry = () => {
 
     const getVehicleById = async (id) => {
         try {
-            const response = await axios.post("http://localhost/coc/gsd/fetchMaster.php", new URLSearchParams({ operation: "fetchVehicleById", id }));
+            const response = await axios.post("http://localhost/coc/gsd/fetchMaster.php", new URLSearchParams({ 
+                operation: "fetchVehicleById", 
+                id 
+            }));
+
             if (response.data.status === 'success' && response.data.data.length > 0) {
                 const vehicle = response.data.data[0];
                 setEditingVehicle(vehicle);
                 setVehicleLicensed(vehicle.vehicle_license);
+                setYear(new Date(vehicle.year, 0)); // Convert year to Date object
+                
+                // Handle vehicle image
+                if (vehicle.vehicle_pic) {
+                    setVehicleImage(`${IMAGE_BASE_URL}${vehicle.vehicle_pic}`);
+                }
+
+                // Handle status
+                const status = statusAvailability.find(s => s.status_availability_name === vehicle.status_availability_name);
+                if (status) {
+                    setSelectedStatus(status.status_availability_id);
+                }
+
+                // Fetch and set make
                 const makesData = await fetchMakes();
                 const selectedMake = makesData.find(make => make.vehicle_make_name === vehicle.vehicle_make_name);
                 if (selectedMake) {
@@ -92,6 +137,7 @@ const VehicleEntry = () => {
                 toast.error("Failed to fetch vehicle details");
             }
         } catch (error) {
+            console.error('Error fetching vehicle:', error);
             toast.error(error.message);
         }
     };
@@ -134,33 +180,57 @@ const VehicleEntry = () => {
     };
 
     const handleSubmit = async () => {
-        if (!vehicleModelId || !vehicleLicensed) {
+        if (!vehicleLicensed || !vehicleModelId || !year || !selectedStatus) {
             toast.error("Please fill in all required fields.");
             return;
         }
-    
-        const jsonData = {
-            vehicle_model_id: vehicleModelId,
-            vehicle_license: vehicleLicensed,
-           
-            vehicle_id: selectedVehicleId || undefined,
-        };
     
         setIsSubmitting(true);
     
         try {
             let response;
-
             if (selectedVehicleId) {
-                response = await axios.post("http://localhost/coc/gsd/update_master1.php", new URLSearchParams({
-                    ...jsonData,
-                    operation: "updateVehicle", // Operation specifically for update
-                }));
+                // Update operation with JSON format
+                const requestData = {
+                    operation: "updateVehicleLicense",
+                    vehicleData: {
+                        vehicle_id: selectedVehicleId,
+                        vehicle_model_id: vehicleModelId,
+                        vehicle_license: vehicleLicensed,
+                        year: dayjs(year).format('YYYY'),
+                        status_availability_id: selectedStatus,
+                        vehicle_pic: vehicleImage || editingVehicle?.vehicle_pic || ''
+                    }
+                };
+    
+                response = await axios.post(
+                    "http://localhost/coc/gsd/update_master1.php",
+                    JSON.stringify(requestData),
+                    {
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
             } else {
-                response = await axios.post("http://localhost/coc/gsd/insert_master.php", new URLSearchParams({
-                    ...jsonData,
-                    operation: "saveVehicle", // Operation specifically for save
-                }));
+                // Add operation
+                const requestData = JSON.stringify({
+                    operation: "saveVehicle",
+                    data: {
+                        vehicle_model_id: vehicleModelId,
+                        vehicle_license: vehicleLicensed,
+                        year: dayjs(year).format('YYYY'),
+                        vehicle_pic: vehicleImage,
+                        user_admin_id: user_id,  // Add this line
+                        status_availability_id: selectedStatus  // Add this line
+                    }
+                });
+    
+                response = await axios.post("http://localhost/coc/gsd/insert_master.php", requestData, {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
             }
     
             if (response.data.status === 'success') {
@@ -173,7 +243,8 @@ const VehicleEntry = () => {
                 toast.error(response.data.message);
             }
         } catch (error) {
-            toast.error(error.message);
+            console.error('Error details:', error);
+            toast.error(error.response?.data?.message || error.message);
         } finally {
             setIsSubmitting(false);
         }
@@ -235,6 +306,21 @@ const VehicleEntry = () => {
         }
     };
 
+    const fetchStatusAvailability = async () => {
+        try {
+            const response = await axios.post("http://localhost/coc/gsd/fetchMaster.php", 
+                new URLSearchParams({ operation: "fetchStatusAvailability" })
+            );
+            if (response.data.status === 'success') {
+                setStatusAvailability(response.data.data);
+            } else {
+                toast.error(response.data.message);
+            }
+        } catch (error) {
+            toast.error(error.message);
+        }
+    };
+
     const handleSearchChange = (e) => {
         const searchTerm = e.target.value.toLowerCase();
         const results = vehicles.filter(vehicle =>
@@ -249,260 +335,343 @@ const VehicleEntry = () => {
         setEditingVehicle(null);
     };
 
-    return (
-        <div className="flex flex-col lg:flex-row min-h-screen bg-gradient-to-br from-white to-green-500">
-            <Sidebar />
-            <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="flex-grow p-6 lg:p-10"
-            >
-                <h2 className="text-4xl font-bold mb-6 text-green-800 drop-shadow-lg">Vehicle Entry</h2>
-                <div className="bg-white bg-opacity-90 rounded-lg shadow-xl p-6 mb-6 backdrop-filter backdrop-blur-lg">
-                    <div className="flex flex-col md:flex-row items-center justify-between mb-4">
-                        <motion.div 
-                            whileHover={{ scale: 1.05 }}
-                            className="relative w-full md:w-64 mb-4 md:mb-0"
-                        >
-                            <input
-                                type="text"
-                                onChange={handleSearchChange}
-                                placeholder="Search by model name"
-                                className="w-full pl-10 pr-4 py-2 rounded-full border border-green-300 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-300"
-                            />
-                            <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-400" />
-                        </motion.div>
-                        <motion.button 
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={handleAddVehicle}
-                            className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out flex items-center justify-center shadow-md"
-                        >
-                            <FaPlus className="mr-2" /> Add Vehicle
-                        </motion.button>
-                    </div>
-                    {loading ? (
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="flex justify-center items-center h-64"
-                        >
-                            <div className="loader"></div>
-                        </motion.div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full table-auto">
-                                <thead>
-                                    <tr className="bg-green-600 text-white">
-                                        <th className="py-3 px-4 text-left rounded-tl-lg">Make Name</th>
-                                        <th className="py-3 px-4 text-left">Category</th>
-                                        <th className="py-3 px-4 text-left">Model</th>
-                                        <th className="py-3 px-4 text-left">License</th>
-                                        <th className="py-3 px-4 text-center rounded-tr-lg">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="text-gray-600 text-sm font-light">
-                                    <AnimatePresence>
-                                        {filteredVehicles.map((vehicle) => (
-                                            <motion.tr 
-                                                key={vehicle.vehicle_id}
-                                                initial={{ opacity: 0 }}
-                                                animate={{ opacity: 1 }}
-                                                exit={{ opacity: 0 }}
-                                                className="border-b border-green-200 hover:bg-green-50 transition-colors duration-200"
-                                            >
-                                                <td className="py-3 px-4">{vehicle.vehicle_make_name || 'N/A'}</td>
-                                                <td className="py-3 px-4">{vehicle.vehicle_category_name || 'N/A'}</td>
-                                                <td className="py-3 px-4">{vehicle.vehicle_model_name || 'N/A'}</td>
-                                                <td className="py-3 px-4">{vehicle.vehicle_license || 'N/A'}</td>
-                                                <td className="py-3 px-4 text-center">
-                                                    <motion.button 
-                                                        whileHover={{ scale: 1.1 }}
-                                                        whileTap={{ scale: 0.9 }}
-                                                        onClick={() => handleDeleteVehicle(vehicle)}
-                                                        className="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded-full transition duration-300 ease-in-out mr-2"
-                                                    >
-                                                        <FaTrash />
-                                                    </motion.button>
-                                                    <motion.button 
-                                                        whileHover={{ scale: 1.1 }}
-                                                        whileTap={{ scale: 0.9 }}
-                                                        onClick={() => handleEditVehicle(vehicle)}
-                                                        className="bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-3 rounded-full transition duration-300 ease-in-out"
-                                                    >
-                                                        Edit
-                                                    </motion.button>
-                                                </td>
-                                            </motion.tr>
-                                        ))}
-                                    </AnimatePresence>
-                                </tbody>
-                            </table>
+    const itemTemplate = (vehicle) => {
+        // Helper function to determine tag severity based on status
+        const getStatusSeverity = (status) => {
+            return status?.toLowerCase() === 'available' ? 'success' : 'danger';
+        };
+    
+        return (
+            <Card className="mb-4 transform hover:scale-[1.01] transition-transform duration-200">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                    <div className="md:col-span-3 flex justify-center items-start">
+                        <div className="relative group w-full min-h-[200px] bg-gray-100 rounded-lg">
+                            {vehicle.vehicle_pic ? (
+                                <img 
+                                    src={`${IMAGE_BASE_URL}${vehicle.vehicle_pic}`}
+                                    alt={vehicle.vehicle_model_name}
+                                    className="w-full h-48 md:h-64 object-cover rounded-lg"
+                                    onError={(e) => {
+                                        e.target.onerror = null;
+                                        e.target.src = 'placeholder-image-url'; // Optional: provide a fallback image
+                                    }}
+                                />
+                            ) : (
+                                <div className="flex items-center justify-center h-48 md:h-64">
+                                    <FaCar className="text-4xl text-gray-400" />
+                                </div>
+                            )}
                         </div>
-                    )}
+                    </div>
+                    <div className="md:col-span-9">
+                        <div className="flex flex-col h-full">
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <h3 className="text-2xl font-bold text-green-800 mb-2">{vehicle.vehicle_model_name}</h3>
+                                    <p className="text-gray-600 text-sm">
+                                        License: <span className="font-semibold">{vehicle.vehicle_license}</span>
+                                    </p>
+                                    <p className="text-gray-600 text-sm mt-1">
+                                        Year: <span className="font-semibold">{vehicle.year}</span>
+                                    </p>
+                                </div>
+                                <Tag 
+                                    value={vehicle.status_availability_name || 'Unknown'} 
+                                    severity={getStatusSeverity(vehicle.status_availability_name)}
+                                    className="px-4 py-2 text-sm font-semibold capitalize"
+                                />
+                            </div>
+
+                            <Divider className="my-3" />
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div className="flex items-center gap-2">
+                                    <i className="pi pi-car text-green-600"></i>
+                                    <div>
+                                        <p className="text-sm text-gray-500">Make</p>
+                                        <p className="font-semibold">{vehicle.vehicle_make_name}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <i className="pi pi-tag text-green-600"></i>
+                                    <div>
+                                        <p className="text-sm text-gray-500">Category</p>
+                                        <p className="font-semibold">{vehicle.vehicle_category_name}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <i className="pi pi-calendar text-green-600"></i>
+                                    <div>
+                                        <p className="text-sm text-gray-500">Year</p>
+                                        <p className="font-semibold">{vehicle.year}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <i className="pi pi-clock text-green-600"></i>
+                                    <div>
+                                        <p className="text-sm text-gray-500">Last Updated</p>
+                                        <p className="font-semibold">{vehicle.updated_at || 'N/A'}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-3 mt-auto">
+                                <motion.button 
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={() => handleEditVehicle(vehicle)}
+                                    className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-full transition-colors duration-300"
+                                >
+                                    <FontAwesomeIcon icon={faEdit} />
+                                    <span>Edit</span>
+                                </motion.button>
+                                <motion.button 
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={() => handleDeleteVehicle(vehicle)}
+                                    className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-full transition-colors duration-300"
+                                >
+                                    <FontAwesomeIcon icon={faTrashAlt} />
+                                    <span>Delete</span>
+                                </motion.button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </motion.div>
+            </Card>
+        );
+    };
 
-            {/* Add Vehicle Modal */}
-            <Modal show={showAddModal} onHide={handleCloseModal} centered>
-                <Modal.Header closeButton className="bg-green-600 text-white">
-                    <Modal.Title><FaCar className="inline-block mr-2" /> Add Vehicle</Modal.Title>
-                </Modal.Header>
-                <Modal.Body className="bg-green-50">
-                    <div className="flex flex-col gap-4">
-                        <div>
-                            <label htmlFor="make" className="block mb-2 font-semibold">Make</label>
-                            <select
-                                id="make"
-                                value={makeId}
-                                onChange={handleMakeChange}
-                                className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+    const handleImageUpload = (event) => {
+        const file = event.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setVehicleImage(reader.result); // This will store the base64 image data
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    return (
+        <div className="flex h-screen bg-gradient-to-br from-white to-green-500 overflow-hidden">
+            <div className="flex-none">
+                <Sidebar />
+            </div>
+            <div className="flex-1 overflow-y-auto">
+                <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5 }}
+                    className="p-6 lg:p-10"
+                >
+                    <h2 className="text-4xl font-bold mb-6 text-green-800 drop-shadow-lg">Vehicle Management</h2>
+                    <div className="bg-white bg-opacity-90 rounded-lg shadow-xl p-6 mb-6 backdrop-filter backdrop-blur-lg">
+                        <div className="flex flex-col md:flex-row items-center justify-between mb-4">
+                            <motion.div 
+                                whileHover={{ scale: 1.05 }}
+                                className="relative w-full md:w-64 mb-4 md:mb-0"
                             >
-                                <option value="">Select Make</option>
-                                {makes.map(make => (
-                                    <option key={make.vehicle_make_id} value={make.vehicle_make_id}>
-                                        {make.vehicle_make_name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label htmlFor="category" className="block mb-2 font-semibold">Category</label>
-                            <select
-                                id="category"
-                                value={category}
-                                onChange={handleCategoryChange}
-                                className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                disabled={!makeId}
+                                <input
+                                    type="text"
+                                    onChange={handleSearchChange}
+                                    placeholder="Search vehicles..."
+                                    className="w-full pl-10 pr-4 py-2 rounded-full border border-green-300 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-300"
+                                />
+                                <FontAwesomeIcon icon={faSearch} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-400" />
+                            </motion.div>
+                            <motion.button 
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={handleAddVehicle}
+                                className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out flex items-center justify-center shadow-md"
                             >
-                                <option value="">Select Category</option>
-                                {categories.map(cat => (
-                                    <option key={cat.vehicle_category_id} value={cat.vehicle_category_id}>
-                                        {cat.vehicle_category_name}
-                                    </option>
-                                ))}
-                            </select>
+                                <FontAwesomeIcon icon={faPlus} className="mr-2" /> Add Vehicle
+                            </motion.button>
                         </div>
-                        <div>
-                            <label htmlFor="model" className="block mb-2 font-semibold">Model</label>
-                            <select
-                                id="model"
-                                value={vehicleModelId}
-                                onChange={e => setVehicleModelId(e.target.value)}
-                                className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                disabled={!category}
+
+                        {loading ? (
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="flex justify-center items-center h-64"
                             >
-                                <option value="">Select Model</option>
-                                {modelsByCategory[category]?.map(model => (
-                                    <option key={model.vehicle_model_id} value={model.vehicle_model_id}>
-                                        {model.vehicle_model_name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label htmlFor="license" className="block mb-2 font-semibold">License</label>
-                            <input
-                                type="text"
-                                id="license"
-                                value={vehicleLicensed}
-                                onChange={e => setVehicleLicensed(e.target.value)}
-                                className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                <div className="loader"></div>
+                            </motion.div>
+                        ) : (
+                            <DataView
+                                value={filteredVehicles}
+                                itemTemplate={itemTemplate}
+                                paginator
+                                rows={10}
+                                emptyMessage={
+                                    <div className="text-center py-8">
+                                        <i className="pi pi-car text-6xl text-gray-300 mb-4"></i>
+                                        <p className="text-xl text-gray-500">No vehicles found</p>
+                                    </div>
+                                }
+                                className="p-4"
                             />
+                        )}
+                    </div>
+                </motion.div>
+            </div>
+
+            <Modal
+                title={selectedVehicleId ? "Edit Vehicle" : "Add Vehicle"}
+                open={showAddModal || showEditModal}
+                onCancel={handleCloseModal}
+                okText={selectedVehicleId ? "Update" : "Add"}
+                onOk={handleSubmit}
+                confirmLoading={isSubmitting}
+                width={800}
+                className="vehicle-modal"
+            >
+                <Form layout="vertical">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-4">
+                            <Form.Item
+                                label="Make"
+                                required
+                                tooltip="Select the vehicle make"
+                            >
+                                <Dropdown
+                                    value={makeId}
+                                    options={makes.map(make => ({
+                                        label: make.vehicle_make_name,
+                                        value: make.vehicle_make_id
+                                    }))}
+                                    onChange={handleMakeChange}
+                                    placeholder="Select Make"
+                                    className="w-full"
+                                />
+                            </Form.Item>
+
+                            <Form.Item
+                                label="Category"
+                                required
+                                tooltip="Select the vehicle category"
+                            >
+                                <Dropdown
+                                    value={category}
+                                    options={categories.map(cat => ({
+                                        label: cat.vehicle_category_name,
+                                        value: cat.vehicle_category_id
+                                    }))}
+                                    onChange={handleCategoryChange}
+                                    placeholder="Select Category"
+                                    className="w-full"
+                                    disabled={!makeId}
+                                />
+                            </Form.Item>
+
+                            <Form.Item
+                                label="Model"
+                                required
+                                tooltip="Select the vehicle model"
+                            >
+                                <Dropdown
+                                    value={vehicleModelId}
+                                    options={modelsByCategory[category]?.map(model => ({
+                                        label: model.vehicle_model_name,
+                                        value: model.vehicle_model_id
+                                    }))}
+                                    onChange={(e) => setVehicleModelId(e.value)}
+                                    placeholder="Select Model"
+                                    className="w-full"
+                                    disabled={!category}
+                                />
+                            </Form.Item>
+
+                            <Form.Item
+                                label="License Number"
+                                required
+                                tooltip="Enter the vehicle license number"
+                            >
+                                <Input
+                                    value={vehicleLicensed}
+                                    onChange={(e) => setVehicleLicensed(e.target.value)}
+                                    placeholder="Enter license number"
+                                />
+                            </Form.Item>
+
+                            <Form.Item
+                                label="Year"
+                                required
+                                tooltip="Select the vehicle year"
+                            >
+                                <Calendar
+                                    value={year}
+                                    onChange={(e) => setYear(e.value)}
+                                    view="year"
+                                    dateFormat="yy"
+                                    placeholder="Select Year"
+                                    className="w-full"
+                                />
+                            </Form.Item>
+
+                            <Form.Item
+                                label="Availability Status"
+                                required
+                                tooltip="Select the vehicle availability status"
+                            >
+                                <Dropdown
+                                    value={selectedStatus}
+                                    options={statusAvailability.map(status => ({
+                                        label: status.status_availability_name,
+                                        value: status.status_availability_id
+                                    }))}
+                                    onChange={(e) => setSelectedStatus(e.value)}
+                                    placeholder="Select Status"
+                                    className="w-full"
+                                />
+                            </Form.Item>
+                        </div>
+
+                        <div className="space-y-4">
+                            <Form.Item
+                                label="Vehicle Image"
+                                tooltip="Upload vehicle image (max 5MB)"
+                            >
+                                <FileUpload
+                                    ref={fileUploadRef}
+                                    mode="advanced"
+                                    name="vehicle-pic"
+                                    multiple={false}
+                                    accept="image/*"
+                                    maxFileSize={5000000}
+                                    onSelect={handleImageUpload}
+                                    headerTemplate={options => {
+                                        const { className, chooseButton } = options;
+                                        return (
+                                            <div className={className} style={{backgroundColor: 'transparent', display: 'flex', alignItems: 'center'}}>
+                                                {chooseButton}
+                                            </div>
+                                        );
+                                    }}
+                                    emptyTemplate={
+                                        <div className="flex flex-col items-center p-6 border-2 border-dashed border-gray-300 rounded-lg">
+                                            <i className="pi pi-image mb-2 text-4xl text-gray-400" />
+                                            <p className="m-0 text-gray-500">
+                                                Drag and drop image here or click to browse
+                                            </p>
+                                        </div>
+                                    }
+                                />
+                                {vehicleImage && (
+                                    <div className="mt-4">
+                                        <img src={vehicleImage} 
+                                            alt="Vehicle Preview" 
+                                            className="max-w-full h-auto rounded-lg shadow-lg" 
+                                        />
+                                    </div>
+                                )}
+                            </Form.Item>
                         </div>
                     </div>
-                </Modal.Body>
-                <Modal.Footer className="bg-green-50">
-                    <Button variant="secondary" onClick={handleCloseModal}>
-                        Close
-                    </Button>
-                    <Button variant="primary" onClick={handleSubmit} disabled={isSubmitting} className="bg-green-600 hover:bg-green-700">
-                        {isSubmitting ? 'Saving...' : 'Save'}
-                    </Button>
-                </Modal.Footer>
+                </Form>
             </Modal>
-
-            {/* Edit Vehicle Modal */}
-            <Modal show={showEditModal} onHide={handleCloseModal} centered>
-    <Modal.Header closeButton className="bg-green-600 text-white">
-        <Modal.Title><FaCar className="inline-block mr-2" /> Edit Vehicle</Modal.Title>
-    </Modal.Header>
-    <Modal.Body className="bg-green-50">
-        <div className="flex flex-col gap-4">
-            <div>
-                <label htmlFor="make" className="block mb-2 font-semibold">Make</label>
-                <select
-                    id="make"
-                    value={makeId}
-                    onChange={handleMakeChange}
-                    className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                    <option value="">Select Make</option>
-                    {makes.map(make => (
-                        <option key={make.vehicle_make_id} value={make.vehicle_make_id}>
-                            {make.vehicle_make_name}
-                        </option>
-                    ))}
-                </select>
-            </div>
-            <div>
-                <label htmlFor="category" className="block mb-2 font-semibold">Category</label>
-                <select
-                    id="category"
-                    value={category}
-                    onChange={handleCategoryChange}
-                    className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    disabled={!makeId}
-                >
-                    <option value="">Select Category</option>
-                    {categories.map(cat => (
-                        <option key={cat.vehicle_category_id} value={cat.vehicle_category_id}>
-                            {cat.vehicle_category_name}
-                        </option>
-                    ))}
-                </select>
-            </div>
-            <div>
-                <label htmlFor="model" className="block mb-2 font-semibold">Model</label>
-                <select
-                    id="model"
-                    value={vehicleModelId}
-                    onChange={e => setVehicleModelId(e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    disabled={!category}
-                >
-                    <option value="">Select Model</option>
-                    {modelsByCategory[category]?.map(model => (
-                        <option key={model.vehicle_model_id} value={model.vehicle_model_id}>
-                            {model.vehicle_model_name}
-                        </option>
-                    ))}
-                </select>
-            </div>
-            <div>
-                <label htmlFor="license" className="block mb-2 font-semibold">License</label>
-                <input
-                    type="text"
-                    id="license"
-                    value={vehicleLicensed}
-                    onChange={e => setVehicleLicensed(e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-            </div>
-        </div>
-    </Modal.Body>
-    <Modal.Footer className="bg-green-50">
-        <Button variant="secondary" onClick={handleCloseModal}>
-            Close
-        </Button>
-        <Button variant="primary" onClick={handleSubmit} disabled={isSubmitting} className="bg-green-600 hover:bg-green-700">
-            {isSubmitting ? 'Saving...' : 'Save Changes'}
-        </Button>
-    </Modal.Footer>
-</Modal>
-
         </div>
     );
 };

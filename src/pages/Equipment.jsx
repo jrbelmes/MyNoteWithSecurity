@@ -5,9 +5,15 @@ import { faEdit, faTrashAlt, faSearch, faPlus } from '@fortawesome/free-solid-sv
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import axios from 'axios';
-import { Modal, Button } from 'react-bootstrap';
+import {Button } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { motion, AnimatePresence } from 'framer-motion';
+import { DataView } from 'primereact/dataview';
+import { Card } from 'primereact/card';
+import { Tag } from 'primereact/tag';
+import { Divider } from 'primereact/divider';
+import { Modal, Form, Input, Upload } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
 
 const EquipmentEntry = () => {
     const adminId = localStorage.getItem('adminId') || '';
@@ -24,21 +30,27 @@ const EquipmentEntry = () => {
     const [selectedCategory, setSelectedCategory] = useState('');
     const [editingEquipment, setEditingEquipment] = useState(null);
     const navigate = useNavigate();
-    const user_level = localStorage.getItem('user_level');
+    
     const [filteredEquipments, setFilteredEquipments] = useState([]);
+    const [form] = Form.useForm();
+    const [equipmentImage, setEquipmentImage] = useState(null);
+    const [fileList, setFileList] = useState([]);
+    const [statusAvailability, setStatusAvailability] = useState([]);
+    const [selectedStatus, setSelectedStatus] = useState('');
 
-    const user_id = localStorage.getItem('user_id');
+    const user_level_id = localStorage.getItem('user_level_id');
 
     useEffect(() => {
-        if (user_id !== '100' && user_id !== '1' && user_id !== '4') {
+        if (user_level_id !== '1' && user_level_id !== '2' && user_level_id !== '4') {
             localStorage.clear();
             navigate('/gsd');
         }
-    }, [user_id, navigate]);
+    }, [user_level_id, navigate]);
 
     useEffect(() => {
         fetchEquipments();
         fetchCategories();
+        fetchStatusAvailability();
     }, []);
 
     useEffect(() => {
@@ -93,34 +105,72 @@ const EquipmentEntry = () => {
         }
     };
 
+    const fetchStatusAvailability = async () => {
+        const url = "http://localhost/coc/gsd/fetchMaster.php";
+        const jsonData = { operation: "fetchStatusAvailability" };
+
+        try {
+            const response = await axios.post(url, new URLSearchParams(jsonData));
+            if (response.data.status === 'success') {
+                setStatusAvailability(response.data.data);
+            } else {
+                toast.error("Error fetching status availability: " + response.data.message);
+            }
+        } catch (error) {
+            console.error("Error fetching status availability:", error);
+            toast.error("An error occurred while fetching status availability.");
+        }
+    };
+
     const handleSubmit = async () => {
-        if (!newEquipmentName || !newEquipmentQuantity || !selectedCategory) {
+        if (!newEquipmentName || !newEquipmentQuantity || !selectedCategory || !selectedStatus) {
             toast.error("All fields are required!");
             return;
         }
-    
-        const equipmentData = {
-            name: newEquipmentName,
-            quantity: newEquipmentQuantity,
-            categoryId: selectedCategory, // Updated to match the JSON structure
-        };
-    
-        let url = "http://localhost/coc/gsd/insert_master.php";
-        let operation = "saveEquipment";
-    
+
+        const user_admin_id = localStorage.getItem('user_id'); // Add this line
+
+        let requestData;
         if (editingEquipment) {
-            equipmentData.equipmentId = editingEquipment.equip_id; // Update to match PHP
-            url = "http://localhost/coc/gsd/update_master1.php";
-            operation = "updateEquipment";
+            requestData = {
+                operation: "updateEquipment",
+                equipmentData: {
+                    equipmentId: editingEquipment.equip_id,
+                    name: newEquipmentName,
+                    quantity: newEquipmentQuantity,
+                    categoryId: selectedCategory,
+                    equip_pic: equipmentImage,
+                    user_admin_id: user_admin_id, // Add this line
+                    statusId: selectedStatus
+                }
+            };
+        } else {
+            requestData = {
+                operation: "saveEquipment",
+                data: {
+                    name: newEquipmentName,
+                    quantity: newEquipmentQuantity,
+                    categoryId: selectedCategory,
+                    equip_pic: equipmentImage,
+                    user_admin_id: user_admin_id, // Add this line
+                    status_availability_id: selectedStatus
+                }
+            };
         }
     
-        const formData = new FormData();
-        formData.append("operation", operation);
-        formData.append("json", JSON.stringify(equipmentData)); // No need to add equipmentId separately
+        const url = editingEquipment 
+            ? "http://localhost/coc/gsd/update_master1.php"
+            : "http://localhost/coc/gsd/insert_master.php";
     
         setLoading(true);
         try {
-            const response = await axios.post(url, formData);
+            // Update the request to send data as JSON
+            const response = await axios.post(url, JSON.stringify(requestData), {
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
             if (response.data.status === 'success') {
                 toast.success(`Equipment successfully ${editingEquipment ? "updated" : "added"}!`);
                 fetchEquipments();
@@ -141,13 +191,30 @@ const EquipmentEntry = () => {
         }
     };
     
-    
+    const handleImageUpload = ({ fileList: newFileList }) => {
+        setFileList(newFileList);
+        if (newFileList.length > 0) {
+            const file = newFileList[0].originFileObj;
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                // Store the complete base64 string including data URL
+                setEquipmentImage(reader.result);
+            };
+            reader.readAsDataURL(file);
+        } else {
+            setEquipmentImage(null);
+        }
+    };
 
     const resetForm = () => {
         setNewEquipmentName('');
         setNewEquipmentQuantity('');
         setSelectedCategory('');
         setEditingEquipment(null);
+        setEquipmentImage(null);
+        setFileList([]);
+        setSelectedStatus('');
+        form.resetFields();
     };
 
     const handleEditClick = async (equipment) => {
@@ -166,7 +233,16 @@ const EquipmentEntry = () => {
                 setNewEquipmentName(equipment.equip_name);
                 setNewEquipmentQuantity(equipment.equip_quantity);
                 setSelectedCategory(equipment.equipment_equipment_category_id);
+                setSelectedStatus(equipment.status_availability_id); // Add this line
                 setEditingEquipment(equipment);
+                
+                // Update form values
+                form.setFieldsValue({
+                    equipmentName: equipment.equip_name,
+                    equipmentQuantity: equipment.equip_quantity,
+                    category: equipment.equipment_equipment_category_id,
+                    status: equipment.status_availability_id  // Add this line
+                });
             } else {
                 toast.error("Error fetching equipment details: " + response.data.message);
             }
@@ -206,175 +282,283 @@ const EquipmentEntry = () => {
 
     const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
-    return (
-        <div className="flex flex-col lg:flex-row min-h-screen bg-gradient-to-br from-white to-green-500">
-            <Sidebar />
-            <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="flex-grow p-6 lg:p-10"
-            >
-                <h2 className="text-4xl font-bold mb-6 text-green-800 drop-shadow-lg">Equipment Management</h2>
-                <div className="bg-white bg-opacity-90 rounded-lg shadow-xl p-6 mb-6 backdrop-filter backdrop-blur-lg">
-                    <div className="flex flex-col md:flex-row items-center justify-between mb-4">
-                        <motion.div 
-                            whileHover={{ scale: 1.05 }}
-                            className="relative w-full md:w-64 mb-4 md:mb-0"
-                        >
-                            <input
-                                type="text"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                placeholder="Search equipment..."
-                                className="w-full pl-10 pr-4 py-2 rounded-full border border-green-300 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-300"
-                            />
-                            <FontAwesomeIcon icon={faSearch} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-400" />
-                        </motion.div>
-                        <motion.button 
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => setIsAddModalOpen(true)}
-                            className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out flex items-center justify-center shadow-md"
-                        >
-                            <FontAwesomeIcon icon={faPlus} className="mr-2" /> Add Equipment
-                        </motion.button>
-                    </div>
-
-                    {loading ? (
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="flex justify-center items-center h-64"
-                        >
-                            <div className="loader"></div>
-                        </motion.div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full table-auto">
-                                <thead>
-                                    <tr className="bg-green-600 text-white">
-                                        <th className="py-3 px-4 text-left rounded-tl-lg">No.</th>
-                                        <th className="py-3 px-4 text-left">Equipment Name</th>
-                                        <th className="py-3 px-4 text-left">Quantity</th>
-                                        
-                                        <th className="py-3 px-4 text-left">Created At</th>
-                                        <th className="py-3 px-4 text-left">Updated At</th>
-                                        <th className="py-3 px-4 text-center rounded-tr-lg">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="text-gray-600 text-sm font-light">
-                                    <AnimatePresence>
-                                        {currentEquipments.map((equipment, index) => (
-                                            <motion.tr 
-                                                key={equipment.equip_id}
-                                                initial={{ opacity: 0 }}
-                                                animate={{ opacity: 1 }}
-                                                exit={{ opacity: 0 }}
-                                                className="border-b border-green-200 hover:bg-green-50 transition-colors duration-200"
-                                            >
-                                                <td className="py-3 px-4">{indexOfFirstEquipment + index + 1}</td>
-                                                <td className="py-3 px-4">{equipment.equip_name}</td>
-                                                <td className="py-3 px-4">{equipment.equip_quantity}</td>
-                                                
-                                                <td className="py-3 px-4">{equipment.equip_created_at}</td>
-                                                <td className="py-3 px-4">{equipment.equip_updated_at}</td>
-                                                <td className="py-3 px-4 text-center">
-                                                    <motion.button 
-                                                        whileHover={{ scale: 1.1 }}
-                                                        whileTap={{ scale: 0.9 }}
-                                                        onClick={() => handleEditClick(equipment)}
-                                                        className="bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-3 rounded-full transition duration-300 ease-in-out mr-2"
-                                                    >
-                                                        <FontAwesomeIcon icon={faEdit} />
-                                                    </motion.button>
-                                                    <motion.button 
-                                                        whileHover={{ scale: 1.1 }}
-                                                        whileTap={{ scale: 0.9 }}
-                                                        onClick={() => handleDeleteClick(equipment.equip_id)}
-                                                        className="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded-full transition duration-300 ease-in-out"
-                                                    >
-                                                        <FontAwesomeIcon icon={faTrashAlt} />
-                                                    </motion.button>
-                                                </td>
-                                            </motion.tr>
-                                        ))}
-                                    </AnimatePresence>
-                                </tbody>
-                            </table>
+    const itemTemplate = (equipment) => {
+        return (
+            <Card className="mb-4 transform hover:scale-[1.01] transition-transform duration-200">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                    <div className="md:col-span-3 flex justify-center items-start">
+                        <div className="relative group w-full min-h-[200px] bg-gray-100 rounded-lg">
+                            <div className="flex items-center justify-center h-48 md:h-64">
+                                {equipment.equip_pic ? (
+                                    <img 
+                                        src={`http://localhost/coc/gsd/${equipment.equip_pic}`}
+                                        alt={equipment.equip_name}
+                                        className="object-cover w-full h-full rounded-lg"
+                                        onError={(e) => {
+                                            e.target.onerror = null;
+                                            e.target.src = 'path/to/fallback/image.png'; // Add a fallback image
+                                        }}
+                                    />
+                                ) : (
+                                    <i className="pi pi-cog text-4xl text-gray-400"></i>
+                                )}
+                            </div>
                         </div>
-                    )}
+                    </div>
+                    <div className="md:col-span-9">
+                        <div className="flex flex-col h-full">
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <h3 className="text-2xl font-bold text-green-800 mb-2">{equipment.equip_name}</h3>
+                                    <p className="text-gray-600 text-sm">
+                                        Quantity: <span className="font-semibold">{equipment.equip_quantity}</span>
+                                    </p>
+                                </div>
+                                <Tag 
+                                    value={equipment.status || 'Available'} 
+                                    severity={equipment.status === 'Available' ? 'success' : 'danger'}
+                                    className="px-4 py-2 text-sm font-semibold"
+                                />
+                            </div>
 
-                    {totalPages > 1 && (
-                        <div className="flex justify-center mt-6">
-                            {Array.from({ length: totalPages }, (_, i) => (
-                                <button
-                                    key={i}
-                                    onClick={() => paginate(i + 1)}
-                                    className={`mx-1 px-4 py-2 rounded-md ${currentPage === i + 1 ? 'bg-green-600 text-white' : 'bg-green-200 text-green-800 hover:bg-green-300'}`}
+                            <Divider className="my-3" />
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div className="flex items-center gap-2">
+                                    <i className="pi pi-tag text-green-600"></i>
+                                    <div>
+                                        <p className="text-sm text-gray-500">Category</p>
+                                        <p className="font-semibold">{equipment.equipment_category_name || 'N/A'}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <i className="pi pi-calendar text-green-600"></i>
+                                    <div>
+                                        <p className="text-sm text-gray-500">Created At</p>
+                                        <p className="font-semibold">{equipment.equip_created_at}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <i className="pi pi-clock text-green-600"></i>
+                                    <div>
+                                        <p className="text-sm text-gray-500">Last Updated</p>
+                                        <p className="font-semibold">{equipment.equip_updated_at || 'N/A'}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-3 mt-auto">
+                                <motion.button 
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={() => handleEditClick(equipment)}
+                                    className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-full transition-colors duration-300"
                                 >
-                                    {i + 1}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </motion.div>
-
-            {/* Equipment Modal */}
-            <Modal show={isAddModalOpen || isEditModalOpen} onHide={() => {setIsAddModalOpen(false); setIsEditModalOpen(false);}} centered>
-                <Modal.Header closeButton className="bg-green-600 text-white">
-                    <Modal.Title>{isEditModalOpen ? 'Edit Equipment' : 'Add Equipment'}</Modal.Title>
-                </Modal.Header>
-                <Modal.Body className="bg-green-50">
-                    <div className="flex flex-col gap-4">
-                        <div>
-                            <label htmlFor="equipmentName" className="block mb-2 font-semibold">Equipment Name</label>
-                            <input
-                                type="text"
-                                id="equipmentName"
-                                value={newEquipmentName}
-                                onChange={(e) => setNewEquipmentName(e.target.value)}
-                                className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                            />
-                        </div>
-                        <div>
-                            <label htmlFor="equipmentQuantity" className="block mb-2 font-semibold">Equipment Quantity</label>
-                            <input
-                                type="number"
-                                id="equipmentQuantity"
-                                value={newEquipmentQuantity}
-                                onChange={(e) => setNewEquipmentQuantity(e.target.value)}
-                                className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                            />
-                        </div>
-                        <div>
-                            <label htmlFor="category" className="block mb-2 font-semibold">Category</label>
-                            <select
-                                id="category"
-                                value={selectedCategory}
-                                onChange={(e) => setSelectedCategory(e.target.value)}
-                                className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                            >
-                                <option value="">Select a category</option>
-                                {categories.map(category => (
-                                    <option key={category.equipments_category_id} value={category.equipments_category_id}>
-                                        {category.equipments_category_name}
-                                    </option>
-                                ))}
-                            </select>
+                                    <FontAwesomeIcon icon={faEdit} />
+                                    <span>Edit</span>
+                                </motion.button>
+                                <motion.button 
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={() => handleDeleteClick(equipment.equip_id)}
+                                    className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-full transition-colors duration-300"
+                                >
+                                    <FontAwesomeIcon icon={faTrashAlt} />
+                                    <span>Delete</span>
+                                </motion.button>
+                            </div>
                         </div>
                     </div>
-                </Modal.Body>
-                <Modal.Footer className="bg-green-50">
-                    <Button variant="secondary" onClick={() => {setIsAddModalOpen(false); setIsEditModalOpen(false);}}>
-                        Close
-                    </Button>
-                    <Button variant="primary" onClick={handleSubmit} className="bg-green-600 hover:bg-green-700">
-                        {isEditModalOpen ? 'Update' : 'Add'}
-                    </Button>
-                </Modal.Footer>
+                </div>
+            </Card>
+        );
+    };
+
+    return (
+        <div className="flex h-screen bg-gradient-to-br from-white to-green-500 overflow-hidden">
+            <div className="flex-none">
+                <Sidebar />
+            </div>
+            <div className="flex-1 overflow-y-auto">
+                <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5 }}
+                    className="p-6 lg:p-10"
+                >
+                    <h2 className="text-4xl font-bold mb-6 text-green-800 drop-shadow-lg">Equipment Management</h2>
+                    <div className="bg-white bg-opacity-90 rounded-lg shadow-xl p-6 mb-6 backdrop-filter backdrop-blur-lg">
+                        <div className="flex flex-col md:flex-row items-center justify-between mb-4">
+                            <motion.div 
+                                whileHover={{ scale: 1.05 }}
+                                className="relative w-full md:w-64 mb-4 md:mb-0"
+                            >
+                                <input
+                                    type="text"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    placeholder="Search equipment..."
+                                    className="w-full pl-10 pr-4 py-2 rounded-full border border-green-300 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-300"
+                                />
+                                <FontAwesomeIcon icon={faSearch} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-400" />
+                            </motion.div>
+                            <motion.button 
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => setIsAddModalOpen(true)}
+                                className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out flex items-center justify-center shadow-md"
+                            >
+                                <FontAwesomeIcon icon={faPlus} className="mr-2" /> Add Equipment
+                            </motion.button>
+                        </div>
+
+                        {loading ? (
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="flex justify-center items-center h-64"
+                            >
+                                <div className="loader"></div>
+                            </motion.div>
+                        ) : (
+                            <DataView
+                                value={filteredEquipments}
+                                itemTemplate={itemTemplate}
+                                paginator
+                                rows={10}
+                                emptyMessage={
+                                    <div className="text-center py-8">
+                                        <i className="pi pi-cog text-6xl text-gray-300 mb-4"></i>
+                                        <p className="text-xl text-gray-500">No equipment found</p>
+                                    </div>
+                                }
+                                className="p-4"
+                            />
+                        )}
+                    </div>
+                </motion.div>
+            </div>
+
+            <Modal
+                title={editingEquipment ? "Edit Equipment" : "Add Equipment"}
+                open={isAddModalOpen || isEditModalOpen}
+                onCancel={() => {
+                    setIsAddModalOpen(false);
+                    setIsEditModalOpen(false);
+                    resetForm();
+                }}
+                onOk={handleSubmit}
+                width={800}
+            >
+                <Form
+                    form={form}
+                    layout="vertical"
+                    initialValues={{
+                        equipmentName: newEquipmentName,
+                        equipmentQuantity: newEquipmentQuantity,
+                        category: selectedCategory
+                    }}
+                >
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-4">
+                            <Form.Item
+                                label="Equipment Name"
+                                name="equipmentName"
+                                rules={[{ required: true, message: 'Please input equipment name!' }]}
+                            >
+                                <Input
+                                    value={newEquipmentName}
+                                    onChange={(e) => setNewEquipmentName(e.target.value)}
+                                    placeholder="Enter equipment name"
+                                />
+                            </Form.Item>
+
+                            <Form.Item
+                                label="Quantity"
+                                name="equipmentQuantity"
+                                rules={[{ required: true, message: 'Please input quantity!' }]}
+                            >
+                                <Input
+                                    type="number"
+                                    value={newEquipmentQuantity}
+                                    onChange={(e) => setNewEquipmentQuantity(e.target.value)}
+                                    placeholder="Enter quantity"
+                                />
+                            </Form.Item>
+
+                            <Form.Item
+                                label="Category"
+                                name="category"
+                                rules={[{ required: true, message: 'Please select a category!' }]}
+                            >
+                                <select
+                                    value={selectedCategory}
+                                    onChange={(e) => setSelectedCategory(e.target.value)}
+                                    className="w-full p-2 border border-gray-300 rounded-lg"
+                                >
+                                    <option value="">Select a category</option>
+                                    {categories.map(category => (
+                                        <option key={category.equipments_category_id} value={category.equipments_category_id}>
+                                            {category.equipments_category_name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </Form.Item>
+
+                            <Form.Item
+                                label="Status Availability"
+                                name="status"
+                                rules={[{ required: true, message: 'Please select status!' }]}
+                            >
+                                <select
+                                    value={selectedStatus}
+                                    onChange={(e) => setSelectedStatus(e.target.value)}
+                                    className="w-full p-2 border border-gray-300 rounded-lg"
+                                >
+                                    <option value="">Select status</option>
+                                    {statusAvailability.map(status => (
+                                        <option key={status.status_availability_id} value={status.status_availability_id}>
+                                            {status.status_availability_name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </Form.Item>
+                        </div>
+
+                        <div className="space-y-4">
+                            <Form.Item
+                                label="Equipment Image"
+                                tooltip="Upload equipment image (max 5MB)"
+                            >
+                                <Upload
+                                    listType="picture-card"
+                                    fileList={fileList}
+                                    onChange={handleImageUpload}
+                                    beforeUpload={() => false}
+                                    maxCount={1}
+                                >
+                                    {fileList.length < 1 && (
+                                        <div>
+                                            <PlusOutlined />
+                                            <div style={{ marginTop: 8 }}>Upload</div>
+                                        </div>
+                                    )}
+                                </Upload>
+                            </Form.Item>
+
+                            {equipmentImage && (
+                                <div className="mt-4">
+                                    <img
+                                        src={equipmentImage}
+                                        alt="Equipment Preview"
+                                        className="max-w-full h-auto rounded-lg shadow-lg"
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </Form>
             </Modal>
         </div>
     );

@@ -112,61 +112,57 @@ function Logins() {
             if (response.data) {
                 const user = response.data;
                 
-                if (user.admin_id && user.adm_userLevel === 'Super Admin') {
-                    // Super Admin login
-                    notify("Super Admin Login Successful");
-                    localStorage.setItem("user_id", user.admin_id);
-                    localStorage.setItem("user_level", user.adm_userLevel);
-                    localStorage.setItem("name", user.admin_name || "");
+                if (user.status === "success" && user.data) {
+                    const userData = user.data;
+                    
+                    // Set common localStorage items
+                    localStorage.setItem("user_id", userData.user_id);
+                    localStorage.setItem("name", `${userData.firstname} ${userData.middlename} ${userData.lastname}`.trim());
+                    localStorage.setItem("school_id", userData.school_id);
+                    localStorage.setItem("contact_number", userData.contact_number);
+                    localStorage.setItem("user_level", userData.user_level_name);
+                    localStorage.setItem("user_level_id", userData.user_level_id);
+                    localStorage.setItem("department_id", userData.department_id);
+                    localStorage.setItem("profile_pic", userData.profile_pic || "");
                     localStorage.setItem("loggedIn", "true");
-                    navigateTo("/adminDashboard");
-                } else if (user.admin_id && user.adm_userLevel === 'Admin') {
-                    // Regular Admin login
-                    notify("Admin Login Successful");
-                    localStorage.setItem("user_id", user.admin_id);
-                    localStorage.setItem("user_level", user.adm_userLevel);
-                    localStorage.setItem("name", user.admin_name || "");
-                    localStorage.setItem("loggedIn", "true");
-                    navigateTo("/adminDashboard");
-                } else if (user.user_id) {
-                    // Regular User login
-                    notify("User Login Successful");
-                    localStorage.setItem("user_id", user.user_id);
-                    localStorage.setItem("name", `${user.firstname} ${user.middlename} ${user.lastname}`.trim());
-                    localStorage.setItem("school_id", user.school_id);
-                    localStorage.setItem("contact_number", user.contact_number);
-                    localStorage.setItem("user_level", user.user_level);
-                    localStorage.setItem("user_level_id", user.user_level_id);
-                    localStorage.setItem("department_id", user.department_id);
-                    localStorage.setItem("profile_pic", user.profile_pic || "");
-                    localStorage.setItem("loggedIn", "true");
-                    navigateTo("/dashboard");
-                } else if (user.jo_personel_id) {
-                    // Personnel login
-                    notify("Personnel Login Successful");
-                    localStorage.setItem("user_id", user.jo_personel_id);
-                    localStorage.setItem("name", user.jo_personel_fname || "");
-                    localStorage.setItem("user_level", "Personnel");
-                    localStorage.setItem("loggedIn", "true");
-                    navigateTo("/personeldashboard");
-                } else {
-                    toast.error("Invalid user type");
-                }
 
-                // Handle "Remember Me" functionality
-                if (rememberMe) {
-                    localStorage.setItem("rememberedUsername", username);
+                    // Add session storage items
+                    sessionStorage.setItem("user_id", userData.user_id);
+                    sessionStorage.setItem("name", `${userData.firstname} ${userData.middlename} ${userData.lastname}`.trim());
+                    sessionStorage.setItem("school_id", userData.school_id);
+                    sessionStorage.setItem("contact_number", userData.contact_number);
+                    sessionStorage.setItem("user_level", userData.user_level_name);
+                    sessionStorage.setItem("user_level_id", userData.user_level_id);
+                    sessionStorage.setItem("department_id", userData.department_id);
+                    sessionStorage.setItem("profile_pic", userData.profile_pic || "");
+                    sessionStorage.setItem("loggedIn", "true");
+
+                    if (userData.user_level_name === "Super Admin") {
+                        notify("Super Admin Login Successful");
+                        navigateTo("/adminDashboard");
+                    } else if (userData.user_level_name === "Personnel") {
+                        notify("Personnel Login Successful");
+                        navigateTo("/personeldashboard");
+                    } else {
+                        notify("User Login Successful");
+                        navigateTo("/dashboard");
+                    }
+
+                    // Handle "Remember Me" functionality
+                    if (rememberMe) {
+                        localStorage.setItem("rememberedUsername", username);
+                    } else {
+                        localStorage.removeItem("rememberedUsername");
+                    }
                 } else {
-                    localStorage.removeItem("rememberedUsername");
-                }
-            } else {
-                const newAttempts = loginAttempts + 1;
-                setLoginAttempts(newAttempts);
-                if (newAttempts >= 3) {
-                    notify("Too many failed attempts. Please try again later.", 'error');
-                    setTimeout(() => setLoginAttempts(0), 300000); // Reset after 5 minutes
-                } else {
-                    notify("Invalid Credentials", 'error');
+                    const newAttempts = loginAttempts + 1;
+                    setLoginAttempts(newAttempts);
+                    if (newAttempts >= 3) {
+                        notify("Too many failed attempts. Please try again later.", 'error');
+                        setTimeout(() => setLoginAttempts(0), 300000); // Reset after 5 minutes
+                    } else {
+                        notify("Invalid Credentials", 'error');
+                    }
                 }
             }
         } catch (error) {

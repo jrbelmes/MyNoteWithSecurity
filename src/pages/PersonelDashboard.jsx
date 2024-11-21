@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Sidebar from './sidebarpersonel';
+import Sidebar from './Sidebar';
 import { FaClipboardList, FaCar, FaUsers, FaBuilding, FaTools, FaUserTie, FaEye, FaCheckCircle, FaBell, FaPlus, FaSearch, FaCog, FaUserCog, FaUserCircle, FaSun, FaMoon } from 'react-icons/fa';
 import { Line, Doughnut, Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, ArcElement, BarElement, Title, Tooltip, Legend } from 'chart.js';
@@ -94,10 +94,11 @@ const Dashboard = () => {
 
     useEffect(() => {
         const hasLoadedBefore = localStorage.getItem('hasLoadedDashboard');
+        const user_level_id = localStorage.getItem('user_level_id');
 
-        if (user_level !== '1') {
+        if (user_level_id !== '2') { // Check for Personnel level ID
             localStorage.clear(); 
-            navigate('/gsd');
+            navigate('/');
         } else {
             if (!hasLoadedBefore) {
                 const timeoutId = setTimeout(() => {
@@ -112,7 +113,7 @@ const Dashboard = () => {
                 setFadeIn(true);
             }
         }
-    }, [user_level, navigate]);
+    }, [navigate]);
 
     useEffect(() => {
         if (!loading) {

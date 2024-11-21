@@ -19,14 +19,14 @@ const Conditions = () => {
     const [editMode, setEditMode] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const user_id = localStorage.getItem('user_id');
+    const user_level_id = localStorage.getItem('user_level_id');
 
     useEffect(() => {
-        if (user_id !== '100' && user_id !== '1' && user_id !== '4') {
+        if (user_level_id !== '1' && user_level_id !== '2' && user_level_id !== '4') {
             localStorage.clear();
             navigate('/gsd');
         }
-    }, [user_id, navigate]);
+    }, [user_level_id, navigate]);
 
     useEffect(() => {
         fetchConditions();

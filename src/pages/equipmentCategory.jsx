@@ -19,14 +19,14 @@ const EquipmentCategories = () => {
     const [selectedCategoryId, setSelectedCategoryId] = useState(null);
     const [editMode, setEditMode] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const user_id = localStorage.getItem('user_id');
+    const user_level_id = localStorage.getItem('user_level_id');
 
     useEffect(() => {
-        if (user_id !== '100' && user_id !== '1' && user_id !== '4') {
+        if (user_level_id !== '1' && user_level_id !== '2' && user_level_id !== '4') {
             localStorage.clear();
             navigate('/gsd');
         }
-    }, [user_id, navigate]);
+    }, [user_level_id, navigate]);
 
     useEffect(() => {
         fetchCategories();
@@ -100,15 +100,24 @@ const EquipmentCategories = () => {
         }
         setIsSubmitting(true);
         try {
-            const response = await axios.post('http://localhost/coc/gsd/update_master1.php', {
+            const requestData = {
                 operation: editMode ? 'updateEquipmentCategory' : 'saveEquipmentCategory',
-                categoryId: formData.categoryId,
-                name: formData.name.trim()
-            }, {
-                headers: {
-                    'Content-Type': 'application/json'
+                categoryData: {
+                    categoryId: formData.categoryId,
+                    name: formData.name.trim()
                 }
-            });
+            };
+
+            const response = await axios.post(
+                'http://localhost/coc/gsd/update_master1.php',
+                JSON.stringify(requestData),
+                {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+            
             if (response.data.status === 'success') {
                 toast.success(editMode ? 'Equipment category updated successfully!' : 'Equipment category added successfully!');
                 fetchCategories();

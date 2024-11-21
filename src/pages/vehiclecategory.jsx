@@ -19,14 +19,15 @@ const VehicleCategories = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const user_level = localStorage.getItem('user_level');
+  const user_id = localStorage.getItem('user_id');
+  const user_level_id = localStorage.getItem('user_level_id');
 
     useEffect(() => {
-        if (user_level !== '100') {
+        if (user_level_id !== '1' && user_level_id !== '2' && user_level_id !== '4') {
             localStorage.clear();
             navigate('/gsd');
         }
-    }, [user_level, navigate]);
+    }, [user_level_id, navigate]);
 
   
 

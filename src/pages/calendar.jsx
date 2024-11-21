@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
+import { useNavigate } from 'react-router-dom';
 import format from 'date-fns/format';
 import parse from 'date-fns/parse';
 import startOfWeek from 'date-fns/startOfWeek';
@@ -33,6 +34,9 @@ const categories = [
 ];
 
 const ModernCalendar = () => {
+
+    const navigate = useNavigate();
+    const user_level_id = localStorage.getItem('user_level_id');
     const [events, setEvents] = useState([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState(null);
@@ -43,6 +47,13 @@ const ModernCalendar = () => {
         category: 'default',
         description: '',
     });
+
+    useEffect(() => {
+        if (user_level_id !== '1' && user_level_id !== '2' && user_level_id !== '4') {
+            localStorage.clear();
+            navigate('/gsd');
+        }
+    }, [user_level_id, navigate]);
 
     const handleSelectSlot = ({ start, end }) => {
         setNewEvent({

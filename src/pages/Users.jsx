@@ -8,22 +8,55 @@ import axios from 'axios';
 import { Modal, Button, Form } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { motion, AnimatePresence } from 'framer-motion';
+import { DataTable } from 'primereact/datatable';
+import { Column } from 'primereact/column';
+import { InputText } from 'primereact/inputtext';
+import { FilterMatchMode } from 'primereact/api';
+import "primereact/resources/themes/lara-light-indigo/theme.css";  // theme
+import "primereact/resources/primereact.css";     // core css
+import "primeicons/primeicons.css";               // icons
+import { Card } from 'primereact/card';
+import { Badge } from 'primereact/badge';
+import { Divider } from 'primereact/divider';
+import { Chip } from 'primereact/chip';
+import { IconField } from 'primereact/iconfield';
+import { InputIcon } from 'primereact/inputicon';
 
 const Faculty = () => {
+    const user_level_id = localStorage.getItem('user_level_id');
     const [users, setUsers] = useState([]);
     const [departments, setDepartments] = useState([]);
+    const [userLevels, setUserLevels] = useState([]); // Add this new state for user levels
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [modalState, setModalState] = useState({ isOpen: false, type: '', user: null });
+    const [filters, setFilters] = useState({
+        global: { value: null, matchMode: FilterMatchMode.CONTAINS },
+        'users_fname': { value: null, matchMode: FilterMatchMode.STARTS_WITH },
+        'users_lname': { value: null, matchMode: FilterMatchMode.STARTS_WITH },
+        'departments_name': { value: null, matchMode: FilterMatchMode.CONTAINS },
+        'users_school_id': { value: null, matchMode: FilterMatchMode.CONTAINS },
+    });
+
+    // Add this new state for role filter
+    const [selectedRole, setSelectedRole] = useState('');
+
+    // Add this function to filter by role
+    const handleRoleFilter = (role) => {
+        setSelectedRole(role);
+    };
+
     const navigate = useNavigate();
     const user_id = localStorage.getItem('user_id');
 
+  
+
     useEffect(() => {
-        if (user_id !== '100' && user_id !== '1' && user_id !== '4') {
+        if (user_level_id !== '1' && user_level_id !== '2' && user_level_id !== '4') {
             localStorage.clear();
             navigate('/gsd');
         }
-    }, [user_id, navigate]);
+    }, [user_level_id, navigate]);
 
     const fetchUsers = async () => {
         setLoading(true);
@@ -45,23 +78,92 @@ const Faculty = () => {
     };
 
     const fetchDepartments = async () => {
+        setLoading(true);
         try {
-            const response = await axios.post("http://localhost/coc/gsd/user.php", 
-                new URLSearchParams({ operation: "fetchDepartments" }),
-                { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-            );
-            if (response.data.status === 'success') {
+            const response = await axios({
+                method: 'post',
+                url: 'http://localhost/coc/gsd/fetchMaster.php',
+                data: new URLSearchParams({
+                    operation: 'fetchDepartments'
+                }).toString(),
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            });
+    
+            console.log('Department response:', response.data); // Debug log
+    
+            if (response.data && Array.isArray(response.data.data)) {
                 setDepartments(response.data.data);
             } else {
-                toast.error("Error fetching departments: " + response.data.message);
+                console.error('Invalid department data:', response.data);
+                toast.error("Invalid department data format");
             }
         } catch (error) {
-            toast.error("An error occurred while fetching departments.");
+            console.error('Department fetch error:', error);
+            toast.error(error.response?.data?.message || "Failed to fetch departments");
+        } finally {
+            setLoading(false);
+        }
+    };
+    
+    // Add this new function after other fetch functions
+    const fetchUserLevels = async () => {
+        try {
+            const response = await axios({
+                method: 'post',
+                url: 'http://localhost/coc/gsd/fetchMaster.php',
+                data: new URLSearchParams({
+                    operation: 'fetchUserLevels'
+                }).toString(),
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            });
+
+            if (response.data && Array.isArray(response.data.data)) {
+                setUserLevels(response.data.data);
+            } else {
+                console.error('Invalid user level data:', response.data);
+                toast.error("Invalid user level data format");
+            }
+        } catch (error) {
+            console.error('User level fetch error:', error);
+            toast.error("Failed to fetch user levels");
         }
     };
 
+    const getUserDetails = async (userId) => {
+        try {
+            const response = await axios({
+                method: 'post',
+                url: 'http://localhost/coc/gsd/fetchMaster.php',
+                data: new URLSearchParams({
+                    operation: 'fetchUsersById',
+                    id: userId
+                }).toString(),
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            });
+
+            if (response.data.status === 'success') {
+                return response.data.data[0];
+            } else {
+                throw new Error('Failed to fetch user details');
+            }
+        } catch (error) {
+            console.error('Error fetching user details:', error);
+            toast.error("Failed to fetch user details");
+            return null;
+        }
+    };
+
+    // Add to useEffect
     useEffect(() => {
         fetchDepartments();
+        fetchUsers();
+        fetchUserLevels(); // Add this line
     }, []);
 
     useEffect(() => {
@@ -120,104 +222,220 @@ const Faculty = () => {
     };
 
     const filteredUsers = users?.filter(user =>
-        user?.users_name?.toLowerCase().includes(searchTerm.toLowerCase())
+        (user?.users_fname + ' ' + user?.users_lname)?.toLowerCase().includes(searchTerm.toLowerCase())
     ) || [];  // Add null checks and provide empty array fallback
 
+    const imageBodyTemplate = (rowData) => {
+        return (
+            <img 
+                src={`http://localhost/coc/gsd/${rowData.users_pic || 'uploads/profileni.png'}`}
+                alt={rowData.users_name}
+                className="w-12 h-12 rounded-full object-cover"
+                onError={(e) => e.target.src = 'http://localhost/coc/gsd/uploads/profileni.png'}
+            />
+        );
+    };
+
+    const actionsBodyTemplate = (rowData) => {
+        const handleEditClick = async () => {
+            const userDetails = await getUserDetails(rowData.users_id);
+            if (userDetails) {
+                setModalState({ isOpen: true, type: 'edit', user: userDetails });
+            }
+        };
+
+        return (
+            <div className="flex gap-2">
+                <motion.button 
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={handleEditClick}
+                    className="bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-3 rounded-full"
+                >
+                    <FontAwesomeIcon icon={faEdit} />
+                </motion.button>
+                <motion.button 
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => setModalState({ isOpen: true, type: 'delete', user: rowData })}
+                    className="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded-full"
+                >
+                    <FontAwesomeIcon icon={faTrashAlt} />
+                </motion.button>
+            </div>
+        );
+    };
+
+    const userLevelTemplate = (rowData) => {
+        const levelConfig = {
+            'Admin': { color: 'bg-purple-500', icon: 'pi pi-star' },
+            'Faculty': { color: 'bg-blue-500', icon: 'pi pi-users' },
+            'Staff': { color: 'bg-green-500', icon: 'pi pi-user' }
+        };
+        const config = levelConfig[rowData.user_level_name] || { color: 'bg-gray-500', icon: 'pi pi-user' };
+        
+        return (
+            <Chip
+                icon={`${config.icon}`}
+                label={rowData.user_level_name}
+                className={`${config.color} text-white`}
+            />
+        );
+    };
+
+    const departmentTemplate = (rowData) => {
+        return (
+            <Chip
+                icon="pi pi-building"
+                label={rowData.departments_name}
+                className="bg-teal-500 text-white"
+            />
+        );
+    };
+
+    const header = (
+        <div className="flex flex-col gap-6">
+            {/* Header Title Section */}
+            <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
+                <div className="flex items-center gap-3">
+                    <div className="p-3 bg-green-50 rounded-full">
+                        <FontAwesomeIcon icon={faUser} className="text-2xl text-green-600" />
+                    </div>
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-800 m-0">Faculty Management</h2>
+                        <p className="text-gray-500 text-sm mt-1">Manage your faculty members here</p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-4">
+                    {/* Role Filter Dropdown */}
+                    <select
+                        className="p-2 border rounded-lg"
+                        value={selectedRole}
+                        onChange={(e) => handleRoleFilter(e.target.value)}
+                    >
+                        <option value="">All Roles</option>
+                        <option value="Admin">Admin</option>
+                        <option value="Faculty">Faculty</option>
+                        <option value="Staff">Staff</option>
+                    </select>
+                    <motion.button 
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => setModalState({ isOpen: true, type: 'add', user: null })}
+                        className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 px-4 rounded-lg flex items-center gap-2 shadow-sm transition-all"
+                    >
+                        <FontAwesomeIcon icon={faPlus} className="text-sm" />
+                        <span>Add Faculty</span>
+                    </motion.button>
+                </div>
+            </div>
+
+            <Divider className="my-0" />
+
+            
+        </div>
+    );
+
+    // Modify the DataTable value prop to include role filtering
+    const filteredData = selectedRole 
+        ? users.filter(user => user.user_level_name === selectedRole)
+        : users;
+
     return (
-        <div className="flex flex-col lg:flex-row min-h-screen bg-gradient-to-br from-green-100 to-white">
+        <div className="flex flex-col lg:flex-row min-h-screen bg-gray-50">
             <Sidebar />
             <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
-                className="flex-grow p-6 lg:p-10"
+                className="flex-grow p-6 lg:p-8 overflow-hidden"
             >
-                <h2 className="text-4xl font-bold mb-6 text-green-800 drop-shadow-lg">Users Management</h2>
-                <div className="bg-white bg-opacity-90 rounded-lg shadow-xl p-6 mb-6 backdrop-filter backdrop-blur-lg">
-                    <div className="flex flex-col md:flex-row items-center justify-between mb-4">
-                        <motion.div 
-                            whileHover={{ scale: 1.05 }}
-                            className="relative w-full md:w-64 mb-4 md:mb-0"
-                        >
-                            <input
-                                type="text"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                placeholder="Search by Name..."
-                                className="w-full pl-10 pr-4 py-2 rounded-full border border-green-300 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-300"
-                            />
-                            <FontAwesomeIcon icon={faSearch} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-400" />
-                        </motion.div>
-                        <motion.button 
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => setModalState({ isOpen: true, type: 'add', user: null })}
-                            className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out flex items-center justify-center shadow-md"
-                        >
-                            <FontAwesomeIcon icon={faPlus} className="mr-2" /> Add Faculty
-                        </motion.button>
-                    </div>
-                    {loading ? (
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="flex justify-center items-center h-64"
-                        >
-                            <div className="loader"></div>
-                        </motion.div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full table-auto">
-                                <thead>
-                                    <tr className="bg-green-600 text-white">
-                                        <th className="py-3 px-4 text-left rounded-tl-lg">Name</th>
-                                        <th className="py-3 px-4 text-left">School ID</th>
-                                        <th className="py-3 px-4 text-left">Contact Number</th>
-                                        <th className="py-3 px-4 text-left">Department</th>
-                                        <th className="py-3 px-4 text-center rounded-tr-lg">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="text-gray-600 text-sm font-light">
-                                    <AnimatePresence>
-                                        {filteredUsers.map((user, index) => (
-                                            <motion.tr 
-                                                key={user.users_id}
-                                                initial={{ opacity: 0 }}
-                                                animate={{ opacity: 1 }}
-                                                exit={{ opacity: 0 }}
-                                                className="border-b border-green-200 hover:bg-green-50 transition-colors duration-200"
-                                            >
-                                                <td className="py-3 px-4">{user.users_name}</td>
-                                                <td className="py-3 px-4">{user.users_school_id}</td>
-                                                <td className="py-3 px-4">{user.users_contact_number}</td>
-                                                <td className="py-3 px-4">{user.departments_name}</td>
-                                                <td className="py-3 px-4 text-center">
-                                                    <motion.button 
-                                                        whileHover={{ scale: 1.1 }}
-                                                        whileTap={{ scale: 0.9 }}
-                                                        onClick={() => setModalState({ isOpen: true, type: 'edit', user: user })}
-                                                        className="bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-3 rounded-full transition duration-300 ease-in-out mr-2"
-                                                    >
-                                                        <FontAwesomeIcon icon={faEdit} />
-                                                    </motion.button>
-                                                    <motion.button 
-                                                        whileHover={{ scale: 1.1 }}
-                                                        whileTap={{ scale: 0.9 }}
-                                                        onClick={() => setModalState({ isOpen: true, type: 'delete', user: user })}
-                                                        className="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded-full transition duration-300 ease-in-out"
-                                                    >
-                                                        <FontAwesomeIcon icon={faTrashAlt} />
-                                                    </motion.button>
-                                                </td>
-                                            </motion.tr>
-                                        ))}
-                                    </AnimatePresence>
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
+                <Card className="shadow-md border-0">
+                    <DataTable
+                        value={filteredData}
+                        paginator
+                        rows={10}
+                        dataKey="users_id"
+                        filters={filters}
+                        filterDisplay="row"
+                        loading={loading}
+                        header={header}
+                        emptyMessage={
+                            <div className="text-center py-8">
+                                <i className="pi pi-search text-gray-300 text-4xl mb-4"></i>
+                                <p className="text-gray-500">No faculty members found</p>
+                            </div>
+                        }
+                        className="p-datatable-users"
+                        responsiveLayout="scroll"
+                        showGridlines
+                        stripedRows
+                        size="small"
+                        tableStyle={{ minWidth: '50rem' }}
+                        rowClassName="hover:bg-gray-50 transition-colors duration-200"
+                    >
+                        <Column 
+                            header="Photo" 
+                            body={imageBodyTemplate} 
+                            style={{ width: '100px' }}
+                            className="text-center"
+                        />
+                        <Column 
+                            field="users_school_id" 
+                            header="School ID" 
+                            filter 
+                            filterPlaceholder="Search ID"
+                            sortable 
+                            className="font-semibold"
+                        />
+                        <Column 
+                            field="users_fname" 
+                            header="First Name" 
+                            filter 
+                            filterPlaceholder="Search first name"
+                            sortable 
+                        />
+                        <Column 
+                            field="users_lname" 
+                            header="Last Name" 
+                            filter 
+                            filterPlaceholder="Search last name"
+                            sortable 
+                        />
+                        <Column 
+                            field="departments_name" 
+                            header="Department" 
+                            body={departmentTemplate}
+                            filter 
+                            filterPlaceholder="Search department"
+                            sortable 
+                        />
+                        <Column 
+                            field="user_level_name" 
+                            header="Role" 
+                            body={userLevelTemplate}
+                            sortable 
+                            style={{ width: '150px' }}
+                        />
+                        <Column 
+                            field="users_contact_number" 
+                            header="Contact" 
+                            sortable 
+                            body={(rowData) => (
+                                <div className="flex items-center gap-2">
+                                    <i className="pi pi-phone text-green-500" />
+                                    {rowData.users_contact_number}
+                                </div>
+                            )}
+                        />
+                        <Column 
+                            header="Actions" 
+                            body={actionsBodyTemplate} 
+                            style={{ width: '150px' }}
+                            className="text-center"
+                        />
+                    </DataTable>
+                </Card>
             </motion.div>
 
             <FacultyModal 
@@ -228,12 +446,24 @@ const Faculty = () => {
                 departments={departments}
                 onSubmit={handleSubmit}
                 onDelete={deleteUser}
+                userLevels={userLevels} // Pass userLevels to FacultyModal
+                getUserDetails={getUserDetails} // Add this line
             />
         </div>
     );
 };
 
-const FacultyModal = ({ show, onHide, type, user, departments, onSubmit, onDelete }) => {
+const FacultyModal = ({ 
+    show, 
+    onHide, 
+    type, 
+    user, 
+    departments, 
+    onSubmit, 
+    onDelete, 
+    userLevels,
+    getUserDetails // Add this line
+}) => {
     const [formData, setFormData] = useState({
         users_id: '',
         users_firstname: '',
@@ -252,39 +482,50 @@ const FacultyModal = ({ show, onHide, type, user, departments, onSubmit, onDelet
     const fileInputRef = useRef(null);
 
     useEffect(() => {
-        if (user) {
-            setFormData({
-                users_id: user.users_id || '',
-                users_firstname: user.users_firstname || '',
-                users_middlename: user.users_middlename || '',
-                users_lastname: user.users_lastname || '',
-                users_school_id: user.users_school_id || '',
-                users_contact_number: user.users_contact_number || '',
-                users_email: user.users_email || '',
-                departments_name: user.departments_name || '',
-                users_password: '',
-                users_role: user.users_role || '',
-                users_image: user.users_image || null,
-                // Removed users_username
-            });
-            setImagePreview(user.users_image || null);
-        } else {
-            setFormData({
-                users_id: '',
-                users_firstname: '',
-                users_middlename: '',
-                users_lastname: '',
-                users_school_id: '',
-                users_contact_number: '',
-                users_email: '',
-                departments_name: '',
-                users_password: '',
-                users_role: '',
-                users_image: null,
-            });
-            setImagePreview(null);
-        }
-    }, [user]);
+        const fetchUserData = async () => {
+            if (user && type === 'edit') {
+                const userDetails = await getUserDetails(user.users_id);
+                if (userDetails) {
+                    setFormData({
+                        users_id: userDetails.users_id || '',
+                        users_firstname: userDetails.users_fname || '',
+                        users_middlename: userDetails.users_mname || '',
+                        users_lastname: userDetails.users_lname || '',
+                        users_school_id: userDetails.users_school_id || '',
+                        users_contact_number: userDetails.users_contact_number || '',
+                        users_email: userDetails.users_email || '',
+                        departments_name: userDetails.departments_name || '',
+                        users_password: '',
+                        users_role: userDetails.users_user_level_id || '',
+                        users_image: userDetails.users_pic || 'uploads/profileni.png',
+                    });
+                    setImagePreview(
+                        userDetails.users_pic 
+                            ? `http://localhost/coc/gsd/${userDetails.users_pic}` 
+                            : 'http://localhost/coc/gsd/uploads/profileni.png'
+                    );
+                }
+            } else {
+                // Reset form for new user
+                setFormData({
+                    users_id: '',
+                    users_firstname: '',
+                    users_middlename: '',
+                    users_lastname: '',
+                    users_school_id: '',
+                    users_contact_number: '',
+                    users_email: '',
+                    departments_name: '',
+                    users_password: '',
+                    users_role: '',
+                    users_image: 'uploads/profileni.png',
+                });
+                setImagePreview('http://localhost/coc/gsd/uploads/profileni.png');
+            }
+        };
+
+        fetchUserData();
+    }, [user, type, getUserDetails]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -305,24 +546,7 @@ const FacultyModal = ({ show, onHide, type, user, departments, onSubmit, onDelet
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
-        // Map role to user_level_id
-        let userLevelId;
-        switch (formData.users_role) {
-            case 'admin':
-                userLevelId = '1';
-                break;
-            case 'faculty':
-                userLevelId = '2';
-                break;
-            case 'staff':
-                userLevelId = '3';
-                break;
-            default:
-                userLevelId = '2'; // default to faculty
-        }
-        
-        // Get department ID from departments array
+       
         const selectedDepartment = departments.find(
             dept => dept.departments_name === formData.departments_name
         );
@@ -339,9 +563,10 @@ const FacultyModal = ({ show, onHide, type, user, departments, onSubmit, onDelet
                 fname: formData.users_firstname,
                 mname: formData.users_middlename,
                 lname: formData.users_lastname,
+                email: formData.users_email, // Add email field
                 schoolId: formData.users_school_id,
                 contact: formData.users_contact_number,
-                userLevelId: userLevelId,
+                userLevelId: formData.users_role, // Use the selected role from form
                 password: formData.users_password,
                 departmentId: selectedDepartment.departments_id,
                 pic: imagePreview // This will be the base64 string if an image was selected
@@ -355,9 +580,14 @@ const FacultyModal = ({ show, onHide, type, user, departments, onSubmit, onDelet
     };
 
     return (
-        <Modal show={show} onHide={onHide} centered size="lg">
-            <Modal.Header closeButton className="bg-green-600 text-white">
-                <Modal.Title><FontAwesomeIcon icon={faUser} className="mr-2" /> {type === 'add' ? 'Add Faculty' : type === 'edit' ? 'Edit Faculty' : 'Confirm Deletion'}</Modal.Title>
+        <Modal show={show} onHide={onHide} centered size="lg" className="rounded-xl">
+            <Modal.Header closeButton className="bg-gradient-to-r from-green-600 to-green-700 text-white">
+                <Modal.Title className="flex items-center gap-2">
+                    <FontAwesomeIcon icon={faUser} className="text-xl" />
+                    <span className="font-bold">
+                        {type === 'add' ? 'Add New Faculty' : type === 'edit' ? 'Edit Faculty Details' : 'Confirm Deletion'}
+                    </span>
+                </Modal.Title>
             </Modal.Header>
             <Modal.Body className="bg-green-50 px-4 py-4">
                 {type === 'delete' ? (
@@ -432,9 +662,11 @@ const FacultyModal = ({ show, onHide, type, user, departments, onSubmit, onDelet
                                 <Form.Label>Role</Form.Label>
                                 <Form.Select name="users_role" value={formData.users_role} onChange={handleChange} required>
                                     <option value="">Select Role</option>
-                                    <option value="admin">Admin</option>
-                                    <option value="faculty">Faculty</option>
-                                    <option value="staff">Staff</option>
+                                    {userLevels.map((level) => (
+                                        <option key={level.user_level_id} value={level.user_level_id}>
+                                            {level.user_level_name}
+                                        </option>
+                                    ))}
                                 </Form.Select>
                             </Form.Group>
                         </div>
@@ -458,6 +690,7 @@ const FacultyModal = ({ show, onHide, type, user, departments, onSubmit, onDelet
                                         </option>
                                     ))}
                                 </Form.Select>
+
                             </Form.Group>
                         </div>
 

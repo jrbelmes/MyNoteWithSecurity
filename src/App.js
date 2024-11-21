@@ -30,6 +30,8 @@ import ViewReserve from './page_user/viewReserve';
 import Profile from './page_user/profile'
 import Calendar from './pages/calendar';
 import Calendars from './pages/landCalendar';
+import Pofiles from './pages/profile';
+import Settings from './pages/Settings';
 
 import Chat from './components/chat';
 
@@ -64,6 +66,8 @@ const App = () => {
                 <main className="main-content">
                     <Routes>
                         <Route path="/" element={<Navigate to="/gsd" replace />} />
+                        <Route path="/settings" element={<Settings />} />
+                        <Route path="/profile1" element={<Pofiles />} />
                         <Route path="/chat" element={<Chat />} />
                         <Route path="/landCalendar" element={<Calendars />} />
                         <Route path="/calendar" element={<Calendar />} />

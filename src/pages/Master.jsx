@@ -11,7 +11,6 @@ const Master = () => {
   const [isAddMakeModalOpen, setIsAddMakeModalOpen] = useState(false);
   const [isAddModelModalOpen, setIsAddModelModalOpen] = useState(false);
   const [isAddEquipmentModalOpen, setIsAddEquipmentModalOpen] = useState(false);
-  const [isAddPositionModalOpen, setIsAddPositionModalOpen] = useState(false);
   const [isAddUserLevelModalOpen, setIsAddUserLevelModalOpen] = useState(false);
   const [isAddDepartmentModalOpen, setIsAddDepartmentModalOpen] = useState(false);
   const [isAddConditionModalOpen, setIsAddConditionModalOpen] = useState(false);
@@ -20,7 +19,6 @@ const Master = () => {
   const [makeName, setMakeName] = useState('');
   const [modelName, setModelName] = useState('');
   const [equipmentName, setEquipmentName] = useState('');
-  const [positionName, setPositionName] = useState('');
   const [userLevelName, setUserLevelName] = useState('');
   const [userLevelDesc, setUserLevelDesc] = useState('');
   const [departmentName, setDepartmentName] = useState('');
@@ -34,6 +32,8 @@ const Master = () => {
   const [isSuccess, setIsSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [popupMessage, setPopupMessage] = useState('');
+
+  const user_level_id = localStorage.getItem('user_level_id');
 
   const fetchCategoriesAndMakes = async () => {
     setLoading(true);
@@ -61,6 +61,13 @@ const Master = () => {
   useEffect(() => {
     fetchCategoriesAndMakes();
   }, []);
+
+  useEffect(() => {
+    if (user_level_id !== '1' && user_level_id !== '2' && user_level_id !== '4') {
+        localStorage.clear();
+        navigate('/gsd');
+    }
+  }, [user_level_id, navigate]);
 
   const handleSaveData = async (operation, data) => {
     try {
@@ -111,7 +118,6 @@ const Master = () => {
     setMakeName('');
     setModelName('');
     setEquipmentName('');
-    setPositionName('');
     setUserLevelName('');
     setUserLevelDesc('');
     setDepartmentName('');
@@ -121,7 +127,6 @@ const Master = () => {
     setIsAddMakeModalOpen(false);
     setIsAddModelModalOpen(false);
     setIsAddEquipmentModalOpen(false);
-    setIsAddPositionModalOpen(false);
     setIsAddUserLevelModalOpen(false);
     setIsAddDepartmentModalOpen(false);
     setIsAddConditionModalOpen(false);
@@ -151,11 +156,6 @@ const Master = () => {
   const handleSaveEquipmentData = (e) => {
     e.preventDefault();
     handleSaveData('saveEquipmentCategory', { equipments_category_name: equipmentName });
-  };
-
-  const handleSavePositionData = (e) => {
-    e.preventDefault();
-    handleSaveData('savePosition', { position_name: positionName });
   };
 
   const handleSaveUserLevelData = (e) => {
@@ -198,7 +198,6 @@ const Master = () => {
             { title: 'Vehicle Model', icon: <FaCogs />, action: () => setIsAddModelModalOpen(true), viewPath: '/vehiclemodel' },
             { title: 'Departments', icon: <FaListAlt />, action: () => setIsAddDepartmentModalOpen(true), viewPath: '/departments' },
             { title: 'Equipments', icon: <FaListAlt />, action: () => setIsAddEquipmentModalOpen(true), viewPath: '/equipmentCat' },
-            { title: 'Position', icon: <FaCar />, action: () => setIsAddPositionModalOpen(true), viewPath: '/position' },
             { title: 'Condition', icon: <FaCogs />, action: () => setIsAddConditionModalOpen(true), viewPath: '/condition' },
           ].map((card, index) => (
             <motion.div 
@@ -336,28 +335,6 @@ const Master = () => {
                   value={equipmentName}
                   onChange={(e) => setEquipmentName(e.target.value)}
                   placeholder="Enter equipment name"
-                  className="border border-gray-300 rounded px-4 py-2 w-full mb-4"
-                />
-                <div className="flex justify-end">
-                  <button type="button" onClick={resetForm} className="mr-2 py-2 px-4 bg-gray-500 text-white rounded">Cancel</button>
-                  <button type="submit" className="py-2 px-4 bg-blue-500 text-white rounded">Save</button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Modal for Adding Position */}
-        {isAddPositionModalOpen && (
-          <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
-            <div className="bg-white p-8 rounded-lg shadow-lg">
-              <h2 className="text-xl font-bold mb-4">Add Position</h2>
-              <form onSubmit={handleSavePositionData}>
-                <input
-                  type="text"
-                  value={positionName}
-                  onChange={(e) => setPositionName(e.target.value)}
-                  placeholder="Enter position name"
                   className="border border-gray-300 rounded px-4 py-2 w-full mb-4"
                 />
                 <div className="flex justify-end">

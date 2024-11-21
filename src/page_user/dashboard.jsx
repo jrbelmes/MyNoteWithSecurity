@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiCalendar, FiList, FiHelpCircle, FiLogOut, FiBell, FiUser, FiSettings, FiClock, FiCheckCircle, FiAlertCircle, FiBarChart2, FiUsers, FiBookmark, FiX, FiCheck, FiTrash2, FiInfo } from 'react-icons/fi';
+import { FiCalendar, FiList, FiHelpCircle, FiLogOut, FiBell, FiUser, FiSettings, FiClock, FiCheckCircle, FiAlertCircle, FiBarChart2, FiUsers, FiBookmark, FiX, FiCheck, FiTrash2, FiInfo, FiMessageSquare } from 'react-icons/fi';
 import ReservationCalendar from '../components/ReservationCalendar';
 
 const Dashboard = () => {
@@ -11,6 +11,7 @@ const Dashboard = () => {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [notificationsLoading, setNotificationsLoading] = useState(true);
   const [userName, setUserName] = useState('');
+  const [showSupportTicket, setShowSupportTicket] = useState(false);
 
   const navButtonVariants = {
     hover: { 
@@ -39,13 +40,13 @@ const Dashboard = () => {
     setNotificationsLoading(true);
     try {
       const response = await fetch('http://localhost/coc/gsd/fetch_reserve.php', {
-        method: 'POST', // Changed to POST
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           operation: 'fetchNotificationsByUserId',
-          user_id: 14 // You should get this from your auth/session management
+          user_id: localStorage.getItem('user_id')
         })
       });
       
@@ -238,6 +239,36 @@ const Dashboard = () => {
     </AnimatePresence>
   );
 
+  const SupportTicketPopup = () => (
+    <motion.div
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-2xl z-50"
+    >
+      <div className="p-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-t-lg">
+        <h3 className="font-bold text-lg">Support Tickets</h3>
+        <p className="text-sm text-blue-100">Create or view your support tickets</p>
+      </div>
+      <div className="p-4 space-y-3">
+        <button
+          onClick={() => navigate('/support/new')}
+          className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 py-3 px-4 rounded-lg flex items-center space-x-3 transition-colors"
+        >
+          <FiMessageSquare className="w-5 h-5" />
+          <span>Create New Ticket</span>
+        </button>
+        <button
+          onClick={() => navigate('/support/list')}
+          className="w-full bg-gray-50 hover:bg-gray-100 text-gray-700 py-3 px-4 rounded-lg flex items-center space-x-3 transition-colors"
+        >
+          <FiList className="w-5 h-5" />
+          <span>View My Tickets</span>
+        </button>
+      </div>
+    </motion.div>
+  );
+
   const NotificationBell = () => (
     <div className="relative">
       <motion.button
@@ -330,16 +361,21 @@ const Dashboard = () => {
                 <span>View Reserve</span>
               </motion.button>
 
-              <motion.button 
-                variants={navButtonVariants}
-                whileHover="hover"
-                whileTap="tap"
-                className="flex items-center space-x-2 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium"
-                onClick={() => navigate('/support')}
-              >
-                <FiHelpCircle className="w-5 h-5" />
-                <span>Support</span>
-              </motion.button>
+              <div className="relative">
+                <motion.button 
+                  variants={navButtonVariants}
+                  whileHover="hover"
+                  whileTap="tap"
+                  className="flex items-center space-x-2 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium"
+                  onClick={() => setShowSupportTicket(!showSupportTicket)}
+                >
+                  <FiHelpCircle className="w-5 h-5" />
+                  <span>Support</span>
+                </motion.button>
+                <AnimatePresence>
+                  {showSupportTicket && <SupportTicketPopup />}
+                </AnimatePresence>
+              </div>
 
               {/* Notification Bell */}
               <NotificationBell />

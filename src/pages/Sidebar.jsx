@@ -3,9 +3,11 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   FaSignOutAlt, FaTachometerAlt, FaCar, FaCog, FaFileAlt, FaHeadset,
   FaChevronDown, FaBars, FaHome, FaTools, FaUserCircle, FaFolder,
-  FaBell, FaMoon, FaSun, FaBuilding, FaSearch, FaQuestionCircle, FaCalendarAlt, FaChartBar
+  FaCalendarAlt, FaChartBar
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
+import { format } from 'date-fns';
+import { Popover } from '@headlessui/react';
 
 const SidebarContext = createContext();
 
@@ -23,8 +25,27 @@ const Sidebar = () => {
     const savedMode = localStorage.getItem('darkMode');
     return savedMode ? JSON.parse(savedMode) : false;
   });
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [searchQuery, setSearchQuery] = useState('');
+  const [notifications, setNotifications] = useState([]);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [systemStatus, setSystemStatus] = useState('online');
 
   const name = localStorage.getItem('name') || 'Admin User';
+  const user_level_id = localStorage.getItem('user_level_id');
+
+  const canAccessMenu = (menuType) => {
+    switch (user_level_id) {
+      case '1':
+        return menuType !== 'master'; // All access except masters
+      case '2':
+        return ['calendar', 'viewRequest', 'viewReservation'].includes(menuType); // Limited access
+      case '4':
+        return true; // Full access
+      default:
+        return false;
+    }
+  };
 
   useEffect(() => {
     setActiveItem(location.pathname);
@@ -41,6 +62,13 @@ const Sidebar = () => {
     localStorage.setItem('darkMode', JSON.stringify(isDarkMode));
   }, [isDarkMode]);
 
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   const toggleSidebar = () => setSidebarOpen(!isSidebarOpen);
   const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
 
@@ -52,6 +80,9 @@ const Sidebar = () => {
   };
 
   const contextValue = useMemo(() => ({ isSidebarOpen }), [isSidebarOpen]);
+
+  const formattedTime = format(currentTime, 'h:mm:ss a');
+  const formattedDate = format(currentTime, 'EEEE, MMMM d, yyyy');
 
   return (
     <SidebarContext.Provider value={contextValue}>
@@ -84,79 +115,106 @@ const Sidebar = () => {
             </button>
           </div>
 
+          {isSidebarOpen && (
+            <div className="px-4 py-3 border-b border-green-200 bg-green-50">
+              <div className="text-lg font-bold text-green-600">{formattedTime}</div>
+              <div className="text-sm text-green-500">{formattedDate}</div>
+            </div>
+          )}
+
           <div className="flex-grow overflow-y-auto">
             <nav className="mt-5 px-2">
-              <SidebarItem icon={FaTachometerAlt} text="Dashboard" link="/adminDashboard" active={activeItem === '/adminDashboard'} />
+              {(user_level_id === '1' || user_level_id === '4') && (
+                <SidebarItem icon={FaTachometerAlt} text="Dashboard" link="/adminDashboard" active={activeItem === '/adminDashboard'} />
+              )}
               
+              {canAccessMenu('calendar') && (
+                <SidebarItem icon={FaCalendarAlt} text="Calendar" link="/landCalendar" active={activeItem === '/landCalendar'} />
+              )}
               
-              <SidebarDropdown icon={FaFileAlt} text="Master File" active={['/Venue', '/VehicleEntry', '/Equipment', '/Master'].includes(activeItem)}>
-                <SidebarSubItem icon={FaHome} text="Venue" link="/Venue" active={activeItem === '/Venue'} />
-                <SidebarSubItem icon={FaCar} text="Vehicle" link="/VehicleEntry" active={activeItem === '/VehicleEntry'} />
-                <SidebarSubItem icon={FaTools} text="Equipments" link="/Equipment" active={activeItem === '/Equipment'} />
-                <SidebarSubItem icon={FaFolder} text="Master" link="/Master" active={activeItem === '/Master'} />
-              </SidebarDropdown>
+              {(user_level_id === '1' || user_level_id === '4') && (
+                <SidebarDropdown icon={FaFileAlt} text="Manage Resources" active={['/Venue', '/VehicleEntry', '/Equipment'].includes(activeItem)}>
+                  <SidebarSubItem icon={FaHome} text="Venue" link="/Venue" active={activeItem === '/Venue'} />
+                  <SidebarSubItem icon={FaCar} text="Vehicle" link="/VehicleEntry" active={activeItem === '/VehicleEntry'} />
+                  <SidebarSubItem icon={FaTools} text="Equipments" link="/Equipment" active={activeItem === '/Equipment'} />
+                </SidebarDropdown>
+              )}
 
-              <SidebarItem icon={FaUserCircle} text="Users" link="/Users" active={activeItem === '/Users'} />
+              {user_level_id === '4' && (
+                <SidebarItem icon={FaFolder} text="Master" link="/Master" active={activeItem === '/Master'} />
+              )}
 
-              <SidebarDropdown icon={FaCar} text="Reservations" active={['/viewReservation', '/ViewRequest', '/AddReservation'].includes(activeItem)}>
-                <SidebarSubItem icon={FaHeadset} text="View Requests" link="/ViewRequest" active={activeItem === '/ViewRequest'} />
-                <SidebarSubItem icon={FaCar} text="Add Reservation" link="/AddReservation" active={activeItem === '/AddReservation'} />
-              </SidebarDropdown>
+              {(user_level_id === '1' || user_level_id === '4') && (
+                <SidebarItem icon={FaUserCircle} text="Users" link="/Users" active={activeItem === '/Users'} />
+              )}
 
-              <SidebarSubItem icon={FaFileAlt} text="Reports" link="/viewReservation" active={activeItem === '/viewReservation'} />
-              
-              <SidebarItem 
-                icon={FaCalendarAlt} 
-                text="Released & Returned Record" 
-                link="/release&return" 
-                active={activeItem === '/releasedReturnedRecord'} 
-              />
+              {canAccessMenu('viewRequest') && (
+                <SidebarDropdown icon={FaCar} text="Reservations" active={['/viewReservation', '/ViewRequest', '/AddReservation'].includes(activeItem)}>
+                  <SidebarSubItem icon={FaHeadset} text="View Requests" link="/ViewRequest" active={activeItem === '/ViewRequest'} />
+                  {(user_level_id === '1' || user_level_id === '4') && (
+                    <SidebarSubItem icon={FaCar} text="Add Reservation" link="/AddReservation" active={activeItem === '/AddReservation'} />
+                  )}
+                </SidebarDropdown>
+              )}
+
+              {canAccessMenu('viewReservation') && (
+                <SidebarSubItem icon={FaFileAlt} text="Reports" link="/viewReservation" active={activeItem === '/viewReservation'} />
+              )}
             </nav>
           </div>
 
           <div className="border-t border-green-200 p-4">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-3">
+            <Popover className="relative">
+              <Popover.Button className="flex items-center space-x-3 w-full hover:bg-green-50 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
                 <FaUserCircle className="text-2xl text-green-600" />
-                <AnimatePresence>
-                  {isSidebarOpen && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                    >
-                      <p className="font-medium text-gray-700">{name}</p>
-                      
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-              <button onClick={toggleDarkMode} className="text-green-600 hover:text-green-700">
-                {isDarkMode ? <FaSun /> : <FaMoon />}
-              </button>
-            </div>
-            <button 
-              onClick={handleLogout}
-              className="w-full flex items-center justify-center space-x-2 py-2 px-4 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-            >
-              <FaSignOutAlt />
-              <AnimatePresence>
                 {isSidebarOpen && (
-                  <motion.span
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                  >
-                    Logout
-                  </motion.span>
+                  <div className="flex-1 text-left">
+                    <p className="font-medium text-gray-700">{name}</p>
+                    <p className="text-sm text-gray-500">Admin</p>
+                  </div>
                 )}
-              </AnimatePresence>
-            </button>
+              </Popover.Button>
+
+              <Popover.Panel className="absolute bottom-full left-0 w-full mb-2">
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden"
+                >
+                  <div className="p-4 border-b border-gray-200 bg-green-50">
+                    <p className="font-semibold text-green-600">{name}</p>
+                    <p className="text-sm text-gray-500">Administrator</p>
+                  </div>
+                  
+                  <div className="p-2">
+                    <button 
+                      onClick={() => navigate('/profile1')}
+                      className="w-full text-left px-4 py-2 hover:bg-green-50 text-gray-700 rounded flex items-center space-x-2"
+                    >
+                      <FaUserCircle />
+                      <span>Profile</span>
+                    </button>
+                    <button 
+                      onClick={() => navigate('/settings')}
+                      className="w-full text-left px-4 py-2 hover:bg-green-50 text-gray-700 rounded flex items-center space-x-2"
+                    >
+                      <FaCog />
+                      <span>Settings</span>
+                    </button>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 rounded flex items-center space-x-2"
+                    >
+                      <FaSignOutAlt />
+                      <span>Logout</span>
+                    </button>
+                  </div>
+                </motion.div>
+              </Popover.Panel>
+            </Popover>
           </div>
         </motion.aside>
-
-        {/* Main content area */}
-        
       </div>
     </SidebarContext.Provider>
   );

@@ -21,17 +21,17 @@ const VehicleModels = () => {
   const [selectedModelId, setSelectedModelId] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const user_level = localStorage.getItem('user_level');
+  const user_level_id = localStorage.getItem('user_level_id');
   const [editingModel, setEditingModel] = useState(null);
 
   const user_id = localStorage.getItem('user_id');
 
   useEffect(() => {
-      if (user_id !== '100' && user_id !== '1' && user_id !== '4') {
+      if (user_level_id !== '1' && user_level_id !== '2' && user_level_id !== '4') {
           localStorage.clear();
           navigate('/gsd');
       }
-  }, [user_id, navigate]);
+  }, [user_level_id, navigate]);
 
   useEffect(() => {
     fetchModels();
@@ -174,25 +174,28 @@ const VehicleModels = () => {
     }
     setIsSubmitting(true);
     try {
+      const requestData = {
+        operation: 'updateVehicleModel',
+        modelData: {
+          id: formData.id,
+          name: formData.name.trim(),
+          make_id: parseInt(formData.makeId),
+          category_id: parseInt(formData.categoryId)
+        }
+      };
+
       const response = await axios.post('http://localhost/coc/gsd/update_master1.php', 
-        {
-          operation: 'updateModelData',
-          json: {
-            id: formData.id,
-            name: formData.name.trim(),
-            make_id: formData.makeId,
-            category_id: formData.categoryId
-          }
-        },
+        requestData,
         {
           headers: {
             'Content-Type': 'application/json'
           }
         }
       );
+
       if (response.data.status === 'success') {
-        toast.success('Vehicle model updated successfully!');
-        fetchModels(); // Refresh the list
+        toast.success(response.data.message);
+        fetchModels();
         closeModal();
       } else {
         toast.error(response.data.message || 'Failed to update vehicle model.');

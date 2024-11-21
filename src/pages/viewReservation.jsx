@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import Sidebar from './Sidebar';
-import Sidebar1 from './sidebarpersonel';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -14,7 +13,7 @@ import { useNavigate } from 'react-router-dom';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
-const user_level = localStorage.getItem('user_level');
+
 
 // Add this function at the top of the file, along with getStatusClass
 const formatDate = (date) => {
@@ -190,7 +189,6 @@ const ReservationReport = ({ reservations, reportType, reportDate, getStatusClas
 };
 
 const ViewReservations = () => {
-    const [userLevel, setUserLevel] = useState(null);
     const [reservations, setReservations] = useState([]);
     const [loading, setLoading] = useState(false);
     const [filter, setFilter] = useState('All');
@@ -212,13 +210,15 @@ const ViewReservations = () => {
     const [filteredReservations, setFilteredReservations] = useState([]);
     const navigate = useNavigate();
     const user_id = localStorage.getItem('user_id');
+    const user_level_id = localStorage.getItem('user_level_id');
+    
 
     useEffect(() => {
-        if (user_id !== '100' && user_id !== '1' && user_id !== '4') {
+        if (user_level_id !== '1' && user_level_id !== '2' && user_level_id !== '4') {
             localStorage.clear();
             navigate('/gsd');
         }
-    }, [user_id, navigate]);
+    }, [user_level_id, navigate]);
 
     const fetchReservations = async () => {
         setLoading(true);
@@ -259,7 +259,6 @@ const ViewReservations = () => {
 
     useEffect(() => {
         const level = localStorage.getItem('user_level');
-        setUserLevel(level);
         fetchReservations();
     }, []);
 
@@ -358,8 +357,7 @@ const ViewReservations = () => {
         <div className="flex flex-col lg:flex-row min-h-screen bg-gradient-to-br from-green-50 to-white">
             {!showReport ? (
                 <>
-                    {userLevel === '100' && <Sidebar />}
-                    {userLevel === '1' && <Sidebar1 />}
+                    <Sidebar />
                     <div className="flex-grow p-4 lg:p-6">
                         <motion.h2 
                             initial={{ opacity: 0, y: -20 }}    
