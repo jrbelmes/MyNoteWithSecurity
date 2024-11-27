@@ -14,7 +14,7 @@ import { Toaster } from 'sonner';
 import './App.css'; 
 import Logins from './pages/logins';
 import AdminDashboard from './pages/adminDashboard';
-import Users from './pages/Users';
+import Faculty from './pages/Faculty';
 
 import Master from './pages/Master';
 import Vehiclem from './pages/vehiclemake';
@@ -92,7 +92,7 @@ const App = () => {
                         <Route path="/Venue" element={<Venue />} /> 
                         <Route path="/adminDashboard" element={<AdminDashboard />} />
                         <Route path="/Equipment" element={<Equipment />} />
-                        <Route path="/Users" element={<Users />} />
+                        <Route path="/Faculty" element={<Faculty />} />
                         <Route path="/Register" element={<Register />} />
                         <Route path="/viewRequest" element={<ViewRequest />} />
                         <Route path="/Master" element={<Master />} />
