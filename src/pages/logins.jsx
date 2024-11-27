@@ -143,7 +143,10 @@ function Logins() {
                     } else if (userData.user_level_name === "Personnel") {
                         notify("Personnel Login Successful");
                         navigateTo("/personeldashboard");
-                    } else {
+                    } else if (userData.user_level_name === "Admin") {
+                        notify("Personnel Login Successful");
+                        navigateTo("/adminDashboard");
+                    }else {
                         notify("User Login Successful");
                         navigateTo("/dashboard");
                     }

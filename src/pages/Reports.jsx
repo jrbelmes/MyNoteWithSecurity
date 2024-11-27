@@ -42,15 +42,15 @@ const getStatusClass = (status) => {
     }
 };
 
-// Update the ReservationReport component to accept formatDate as a prop
+// Update the ReservationReport component with enhanced features
 const ReservationReport = ({ reservations, reportType, reportDate, getStatusClass, formatDate, startDate, endDate }) => {
+    // Add this formatReportDate function at the beginning of the component
     const formatReportDate = () => {
         if (reportType === 'monthly') {
-            return `Report As of: ${formatDate(reportDate).split(' ').slice(0, 2).join(' ')}`;
+            return `Report As of: ${reportDate.toLocaleString('default', { month: 'long', year: 'numeric' })}`;
         } else if (reportType === 'yearly') {
             return `Report As of: ${reportDate.getFullYear()}`;
         } else if (reportType === 'range') {
-            // Format the date range without time
             const formatDateWithoutTime = (date) => {
                 return new Date(date).toLocaleDateString('en-US', {
                     year: 'numeric',
@@ -62,12 +62,32 @@ const ReservationReport = ({ reservations, reportType, reportDate, getStatusClas
         }
     };
 
-    const statusCounts = reservations.reduce((acc, reservation) => {
-        acc[reservation.reservation_status_name] = (acc[reservation.reservation_status_name] || 0) + 1;
-        return acc;
-    }, {});
+    // Calculate statistics
+    const stats = {
+        total: reservations.length,
+        pending: reservations.filter(r => r.reservation_status_name === 'pending').length,
+        approved: reservations.filter(r => r.reservation_status_name === 'reserve').length,
+        declined: reservations.filter(r => r.reservation_status_name === 'declined').length,
+        cancelled: reservations.filter(r => r.reservation_status_name === 'cancelled').length
+    };
 
-    
+    // Calculate resource usage statistics
+    const resourceStats = reservations.reduce((acc, res) => {
+        if (res.vehicle_ids) acc.vehicles++;
+        if (res.venue_names) acc.venues++;
+        if (res.equipment_names) acc.equipment++;
+        return acc;
+    }, { vehicles: 0, venues: 0, equipment: 0 });
+
+    // Prepare chart data
+    const chartData = {
+        labels: ['Pending', 'Approved', 'Declined', 'Cancelled'],
+        datasets: [{
+            data: [stats.pending, stats.approved, stats.declined, stats.cancelled],
+            backgroundColor: ['#FCD34D', '#34D399', '#EF4444', '#9CA3AF'],
+            borderWidth: 1
+        }]
+    };
 
     return (
         <div className="p-8 bg-white font-sans max-w-4xl mx-auto">
@@ -87,41 +107,62 @@ const ReservationReport = ({ reservations, reportType, reportDate, getStatusClas
             <h2 className="text-2xl font-bold mb-6 text-center text-green-700 bg-green-100 py-2 rounded-lg">
                 {formatReportDate()}
             </h2>
-
-
-            <table className="w-full border-collapse mb-6">
-                <thead>
-                    <tr className="bg-green-600 text-white">
-                        <th className="p-2 text-left">#</th>
-                        <th className="p-2 text-left">Requested By</th>
-                        <th className="p-2 text-left">Event Title</th>
-                        <th className="p-2 text-left">Date Range</th>
-                        <th className="p-2 text-left">Date Created</th>
-                        <th className="p-2 text-left">Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {reservations.map((reservation, index) => (
-                        <tr key={reservation.reservation_id} className={index % 2 === 0 ? 'bg-green-50' : 'bg-white'}>
-                            <td className="p-2 border-b border-green-200">{index + 1}</td>
-                            <td className="p-2 border-b border-green-200">{reservation.reservation_name}</td>
-                            <td className="p-2 border-b border-green-200">{reservation.reservation_event_title}</td>
-                            <td className="p-2 border-b border-green-200">
-                                {formatDate(new Date(reservation.reservation_start_date)).split(',')[0]} - 
-                                {formatDate(new Date(reservation.reservation_end_date)).split(',')[0]}
-                            </td>
-                            <td className="p-2 border-b border-green-200">
-                                {formatDate(new Date(reservation.date_created))}
-                            </td>
-                            <td className="p-2 border-b border-green-200">
-                                <span className={`px-2 py-1 rounded-full text-xs ${getStatusClass(reservation.reservation_status_name)}`}>
-                                    {reservation.reservation_status_name}
-                                </span>
-                            </td>
+            {/* Detailed Table */}
+            <div className="mb-8">
+                <h3 className="text-xl font-semibold text-green-700 mb-4">Reservations</h3>
+                <table className="w-full border-collapse mb-6">
+                    <thead>
+                        <tr className="bg-green-600 text-white">
+                            <th className="p-2 text-left">#</th>
+                            <th className="p-2 text-left">Requested By</th>
+                            <th className="p-2 text-left">Event Title</th>
+                            <th className="p-2 text-left">Date Range</th>
+                            <th className="p-2 text-left">Date Created</th>
+                            <th className="p-2 text-left">Status</th>
                         </tr>
-                    ))}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {reservations.map((reservation, index) => (
+                            <tr key={reservation.reservation_id} className={index % 2 === 0 ? 'bg-green-50' : 'bg-white'}>
+                                <td className="p-2 border-b border-green-200">{index + 1}</td>
+                                <td className="p-2 border-b border-green-200">{reservation.reservation_name}</td>
+                                <td className="p-2 border-b border-green-200">{reservation.reservation_event_title}</td>
+                                <td className="p-2 border-b border-green-200">
+                                    {formatDate(new Date(reservation.reservation_start_date)).split(',')[0]} - 
+                                    {formatDate(new Date(reservation.reservation_end_date)).split(',')[0]}
+                                </td>
+                                <td className="p-2 border-b border-green-200">
+                                    {formatDate(new Date(reservation.date_created))}
+                                </td>
+                                <td className="p-2 border-b border-green-200">
+                                    <span className={`px-2 py-1 rounded-full text-xs ${getStatusClass(reservation.reservation_status_name)}`}>
+                                        {reservation.reservation_status_name}
+                                    </span>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Summary Section */}
+            <div className="mt-8 border-t-2 border-green-200 pt-4">
+                <h3 className="text-xl font-semibold text-green-700 mb-4">Summary</h3>
+                <p className="text-sm text-gray-600">
+                    This report covers {reportType === 'range' ? 'the period from ' + formatDate(startDate) + ' to ' + formatDate(endDate) : 
+                    reportType === 'monthly' ? 'the month of ' + reportDate.toLocaleString('default', { month: 'long', year: 'numeric' }) :
+                    'the year ' + reportDate.getFullYear()}. 
+                    Total reservations: {stats.total}, with {stats.approved} approved, {stats.pending} pending, 
+                    and {stats.declined + stats.cancelled} declined or cancelled requests.
+                </p>
+            </div>
+
+            {/* Footer with metadata */}
+            <div className="mt-8 text-sm text-gray-500 border-t pt-4">
+                <p>Generated on: {new Date().toLocaleString()}</p>
+                <p>Generated by: {localStorage.getItem('name')}</p>
+                <p>Report ID: {Math.random().toString(36).substr(2, 9).toUpperCase()}</p>
+            </div>
 
             <div className="mt-8 flex justify-between items-center text-sm text-gray-600">
                 <p>Generated on: {new Date().toLocaleString()}</p>

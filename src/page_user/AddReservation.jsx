@@ -109,6 +109,16 @@ const DatePickerWithConflict = ({ selected, onChange, hasEndDate, isConflicting,
 };
 
 const AddReservation = () => {
+  const timeSlots = [
+    { id: '08:00-10:00', label: 'Early Morning', time: '8:00 AM - 10:00 AM', start: 8, end: 10 },
+    { id: '10:00-12:00', label: 'Mid Morning', time: '10:00 AM - 12:00 PM', start: 10, end: 12 },
+    { id: '13:00-15:00', label: 'Early Afternoon', time: '1:00 PM - 3:00 PM', start: 13, end: 15 },
+    { id: '15:00-17:00', label: 'Late Afternoon', time: '3:00 PM - 5:00 PM', start: 15, end: 17 },
+    { id: '08:00-12:00', label: 'Morning', time: '8:00 AM - 12:00 PM', start: 8, end: 12 },
+    { id: '13:00-17:00', label: 'Afternoon', time: '1:00 PM - 5:00 PM', start: 13, end: 17 },
+    { id: '08:00-17:00', label: 'Full Day', time: '8:00 AM - 5:00 PM', start: 8, end: 17 },
+  ];
+
   const navigate = useNavigate();
   const [userLevel] = useState(localStorage.getItem('user_level') || '');
   const userId = localStorage.getItem('user_id');
@@ -160,17 +170,7 @@ const AddReservation = () => {
   });
 
   useEffect(() => {
-    const storedUserId = localStorage.getItem('user_id');
-    if (!storedUserId) {
-      localStorage.clear();
-      navigate('/gsd');
-      return;
-    }
-
-    if (storedUserId !== '100' && storedUserId !== '13' && storedUserId !== '4') {
-      localStorage.clear();
-      navigate('/gsd');
-    }
+    
 
     const fetchData = async () => {
       setLoading(true);
@@ -185,6 +185,17 @@ const AddReservation = () => {
 
     fetchData();
   }, [navigate]);
+
+  const user_level_id = localStorage.getItem('user_level_id');
+
+    useEffect(() => {
+        if (user_level_id !== '3' ) {
+            localStorage.clear();
+            navigate('/gsd');
+        }
+    }, [user_level_id, navigate]);
+
+
 
   const fetchVenues = async () => {
     try {
@@ -807,7 +818,16 @@ const handleAddReservation = async (e) => {
 const formatDateForAPI = (date) => {
   if (!date) return null;
   const d = new Date(date);
-  return d.toISOString().slice(0, 19).replace('T', ' ');
+  
+  // Ensure we're using the correct timezone
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const seconds = String(d.getSeconds()).padStart(2, '0');
+  
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 };
 
 const resetForm = () => {
@@ -861,11 +881,16 @@ const renderReviewSection = () => {
   console.log('Selected venue ID:', formData.venue);
   console.log('Selected venue type:', typeof formData.venue);
   
-  const formatDate = (date) => {
+  const formatReviewDate = (date) => {
     if (!date) return 'Not selected';
-    return new Date(date).toLocaleString('en-US', {
-      dateStyle: 'medium',
-      timeStyle: 'short'
+    const d = new Date(date);
+    return d.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
     });
   };
 
@@ -927,11 +952,11 @@ const renderReviewSection = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-6">
               <div>
                 <p className="text-sm text-gray-500">Start Date & Time</p>
-                <p className="font-medium text-gray-900">{formatDate(formData.startDate)}</p>
+                <p className="font-medium text-gray-900">{formatReviewDate(formData.startDate)}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">End Date & Time</p>
-                <p className="font-medium text-gray-900">{formatDate(formData.endDate)}</p>
+                <p className="font-medium text-gray-900">{formatReviewDate(formData.endDate)}</p>
               </div>
               {selectedVenue && (
                 <div className="md:col-span-2">
@@ -1019,62 +1044,30 @@ const handleEquipmentSelect = (equipId, quantity) => {
   });
 };
 
-const handleTimeSlotSelect = (timeSlot) => {
-  if (unavailableSlots.includes(timeSlot)) {
+const handleTimeSlotSelect = (timeSlotId) => {
+  if (unavailableSlots.includes(timeSlotId)) {
     toast.error('This time slot is not available');
     return;
   }
 
-  setSelectedTime(timeSlot);
+  setSelectedTime(timeSlotId);
+  const selectedSlot = timeSlots.find(slot => slot.id === timeSlotId);
+  
+  if (!selectedSlot) return;
+
   const startDate = new Date(formData.startDate);
-  const endDate = new Date(formData.endDate || formData.startDate);
+  const endDate = new Date(formData.startDate); // Use same day for both
 
-  let startTime, endTime;
-  switch (timeSlot) {
-    case '08:00-10:00':
-      startTime = '08:00';
-      endTime = '10:00';
-      break;
-    case '10:00-12:00':
-      startTime = '10:00';
-      endTime = '12:00';
-      break;
-    case '13:00-15:00':
-      startTime = '13:00';
-      endTime = '15:00';
-      break;
-    case '15:00-17:00':
-      startTime = '15:00';
-      endTime = '17:00';
-      break;
-    case '08:00-12:00':
-      startTime = '08:00';
-      endTime = '12:00';
-      break;
-    case '13:00-17:00':
-      startTime = '13:00';
-      endTime = '17:00';
-      break;
-    case '08:00-17:00':
-      startTime = '08:00';
-      endTime = '17:00';
-      break;
-    default:
-      return;
-  }
-
-  const [startHour, startMinute] = startTime.split(':');
-  const [endHour, endMinute] = endTime.split(':');
-
-  startDate.setHours(parseInt(startHour), parseInt(startMinute), 0);
-  endDate.setHours(parseInt(endHour), parseInt(endMinute), 0);
+  // Set the correct hours
+  startDate.setHours(selectedSlot.start, 0, 0, 0);
+  endDate.setHours(selectedSlot.end, 0, 0, 0);
 
   setFormData(prev => ({
     ...prev,
     startDate,
     endDate,
-    customStartTime: startTime,
-    customEndTime: endTime
+    customStartTime: `${selectedSlot.start}:00`,
+    customEndTime: `${selectedSlot.end}:00`
   }));
 };
 
@@ -1133,31 +1126,6 @@ const renderSuccessState = () => (
 );
 
 const TimeSlotVisualizer = ({ selectedTime, unavailableSlots, isChecking, conflicts }) => {
-  const timeSlots = [
-    { id: '08:00-10:00', label: 'Early Morning', time: '8:00 AM - 10:00 AM' },
-    { id: '10:00-12:00', label: 'Mid Morning', time: '10:00 AM - 12:00 PM' },
-    { id: '13:00-15:00', label: 'Early Afternoon', time: '1:00 PM - 3:00 PM' },
-    { id: '15:00-17:00', label: 'Late Afternoon', time: '3:00 PM - 5:00 PM' },
-    { id: '08:00-12:00', label: 'Morning', time: '8:00 AM - 12:00 PM' },
-    { id: '13:00-17:00', label: 'Afternoon', time: '1:00 PM - 5:00 PM' },
-    { id: '08:00-17:00', label: 'Full Day', time: '8:00 AM - 5:00 PM' },
-  ];
-
-  const isTimeSlotConflicting = (slotId) => {
-    if (!conflicts || conflicts.length === 0) return false;
-    
-    const [slotStart, slotEnd] = slotId.split('-').map(time => parseInt(time));
-    
-    return conflicts.some(conflict => {
-      const conflictStart = new Date(conflict.reservation_start_date);
-      const conflictEnd = new Date(conflict.reservation_end_date);
-      const conflictStartHour = conflictStart.getHours();
-      const conflictEndHour = conflictEnd.getHours();
-      
-      return (conflictStartHour < slotEnd && conflictEndHour > slotStart);
-    });
-  };
-
   return (
     <div className="mt-6 p-4 bg-white rounded-lg shadow-sm">
       <h5 className="font-medium mb-4">Select Time Slot</h5>
@@ -1185,7 +1153,16 @@ const TimeSlotVisualizer = ({ selectedTime, unavailableSlots, isChecking, confli
           )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {timeSlots.map(slot => {
-              const isConflicting = isTimeSlotConflicting(slot.id);
+              const isConflicting = conflicts.some(conflict => {
+                const conflictStart = new Date(conflict.reservation_start_date);
+                const conflictEnd = new Date(conflict.reservation_end_date);
+                const conflictStartHour = conflictStart.getHours();
+                const conflictEndHour = conflictEnd.getHours();
+                
+                const [slotStart, slotEnd] = slot.id.split('-').map(time => parseInt(time));
+                
+                return (conflictStartHour < slotEnd && conflictEndHour > slotStart);
+              });
               const isSelected = selectedTime === slot.id;
 
               return (

@@ -180,69 +180,48 @@ const VenueEntry = () => {
     };
 
     const handleUpdateVenue = async () => {
-        if (!venueName || !maxOccupancy || !operatingHours) {
-            toast.error("Please fill in all required fields!");
-            return;
-        }
+       
 
         setLoading(true);
         try {
-            const requestData = {
+            let requestData = {
                 operation: 'updateVenue',
                 venueData: {
                     venue_id: currentVenueId,
                     venue_name: venueName,
                     max_occupancy: maxOccupancy,
                     operating_hours: operatingHours,
-                    status_availability_id: selectedStatus
+                    status_availability_id: parseInt(selectedStatus)
                 }
             };
 
-            // Handle venue picture if exists
+            // If there's a new image file
             if (venuePic instanceof File) {
-                const formData = new FormData();
-                formData.append('venue_pic', venuePic);
-                formData.append('operation', 'updateVenue');
-                formData.append('venueData', JSON.stringify(requestData.venueData));
+                const reader = new FileReader();
+                const base64Image = await new Promise((resolve) => {
+                    reader.onload = (e) => resolve(e.target.result);
+                    reader.readAsDataURL(venuePic);
+                });
+                requestData.venueData.ven_pic = base64Image;
+            }
 
-                const response = await axios.post(
-                    "http://localhost/coc/gsd/update_master1.php",
-                    formData,
-                    {
-                        headers: {
-                            'Content-Type': 'multipart/form-data'
-                        }
+            const response = await axios.post(
+                "http://localhost/coc/gsd/update_master1.php",
+                requestData,
+                {
+                    headers: {
+                        'Content-Type': 'application/json'
                     }
-                );
-
-                if (response.data.status === 'success') {
-                    toast.success("Venue successfully updated!");
-                    fetchVenues();
-                    setShowModal(false);
-                    resetForm();
-                } else {
-                    toast.error(response.data.message || "Failed to update venue");
                 }
+            );
+
+            if (response.data.status === 'success') {
+                toast.success("Venue successfully updated!");
+                fetchVenues();
+                setShowModal(false);
+                resetForm();
             } else {
-                // If no new image, send JSON request
-                const response = await axios.post(
-                    "http://localhost/coc/gsd/update_master1.php",
-                    requestData,
-                    {
-                        headers: {
-                            'Content-Type': 'application/json'
-                        }
-                    }
-                );
-
-                if (response.data.status === 'success') {
-                    toast.success("Venue successfully updated!");
-                    fetchVenues();
-                    setShowModal(false);
-                    resetForm();
-                } else {
-                    toast.error(response.data.message || "Failed to update venue");
-                }
+                toast.error(response.data.message || "Failed to update venue");
             }
         } catch (error) {
             console.error("Error updating venue:", error);
@@ -251,7 +230,6 @@ const VenueEntry = () => {
             setLoading(false);
         }
     };
-    
 
     const resetForm = () => {
         setVenueName('');

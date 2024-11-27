@@ -8,7 +8,7 @@ import Venue from './pages/Venue';
 import  Dashboard from './page_user/dashboard';
 import Equipment from './pages/Equipment';
 import ViewRequest from './pages/viewRequest';
-import ViewReservation from './pages/viewReservation';
+import Reports from './pages/Reports';
 import AddReservation from './page_user/AddReservation'; // Import the AddReservation component
 import { Toaster } from 'sonner';
 import './App.css'; 
@@ -32,6 +32,7 @@ import Calendar from './pages/calendar';
 import Calendars from './pages/landCalendar';
 import Pofiles from './pages/profile';
 import Settings from './pages/Settings';
+import Record from './pages/Record';
 
 import Chat from './components/chat';
 
@@ -66,6 +67,7 @@ const App = () => {
                 <main className="main-content">
                     <Routes>
                         <Route path="/" element={<Navigate to="/gsd" replace />} />
+                        <Route path="/record" element={<Record />} />
                         <Route path="/settings" element={<Settings />} />
                         <Route path="/profile1" element={<Pofiles />} />
                         <Route path="/chat" element={<Chat />} />
@@ -85,7 +87,7 @@ const App = () => {
                         <Route path="/vehiclemake" element={<Vehiclem />} /> 
                         <Route path="/vehicleCategory" element={<Vehiclec />} /> 
                         <Route path="/VehicleEntry" element={<VehicleEntry />} /> 
-                        <Route path="/viewReservation" element={<ViewReservation />} /> 
+                        <Route path="/Reports" element={<Reports />} /> 
                         <Route path="/addReservation" element={<AddReservation />} /> {/* Add new route for AddReservation */}
                         <Route path="/Venue" element={<Venue />} /> 
                         <Route path="/adminDashboard" element={<AdminDashboard />} />

@@ -158,7 +158,7 @@ const Sidebar = () => {
               )}
 
               {canAccessMenu('viewReservation') && (
-                <SidebarSubItem icon={FaFileAlt} text="Reports" link="/viewReservation" active={activeItem === '/viewReservation'} />
+                <SidebarSubItem icon={FaFileAlt} text="Reports" link="/Reports" active={activeItem === '/Reports'} />
               )}
             </nav>
           </div>

@@ -22,6 +22,20 @@ import { Chip } from 'primereact/chip';
 import { IconField } from 'primereact/iconfield';
 import { InputIcon } from 'primereact/inputicon';
 
+const generateAvatarColor = (str) => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const colors = [
+        '#1abc9c', '#2ecc71', '#3498db', '#9b59b6', '#34495e',
+        '#16a085', '#27ae60', '#2980b9', '#8e44ad', '#2c3e50',
+        '#f1c40f', '#e67e22', '#e74c3c', '#95a5a6', '#f39c12',
+        '#d35400', '#c0392b', '#7f8c8d'
+    ];
+    return colors[Math.abs(hash) % colors.length];
+};
+
 const Faculty = () => {
     const user_level_id = localStorage.getItem('user_level_id');
     const [users, setUsers] = useState([]);
@@ -226,13 +240,43 @@ const Faculty = () => {
     ) || [];  // Add null checks and provide empty array fallback
 
     const imageBodyTemplate = (rowData) => {
+        if (rowData.users_pic) {
+            return (
+                <div className="relative w-12 h-12">
+                    <img 
+                        src={`http://localhost/coc/gsd/${rowData.users_pic}`}
+                        alt={rowData.users_name}
+                        className="w-full h-full rounded-full object-cover"
+                        onError={() => {
+                            const initials = `${rowData.users_fname?.[0] || ''}${rowData.users_lname?.[0] || ''}`.toUpperCase();
+                            const bgColor = generateAvatarColor(initials);
+                            const imgElement = document.getElementById(`user-img-${rowData.users_id}`);
+                            if (imgElement) {
+                                imgElement.style.display = 'none';
+                                const parent = imgElement.parentElement;
+                                const fallbackDiv = document.createElement('div');
+                                fallbackDiv.className = 'w-full h-full rounded-full flex items-center justify-center text-white font-bold text-lg';
+                                fallbackDiv.style.backgroundColor = bgColor;
+                                fallbackDiv.textContent = initials;
+                                parent.appendChild(fallbackDiv);
+                            }
+                        }}
+                        id={`user-img-${rowData.users_id}`}
+                    />
+                </div>
+            );
+        }
+    
+        const initials = `${rowData.users_fname?.[0] || ''}${rowData.users_lname?.[0] || ''}`.toUpperCase();
+        const bgColor = generateAvatarColor(initials);
+    
         return (
-            <img 
-                src={`http://localhost/coc/gsd/${rowData.users_pic || 'uploads/profileni.png'}`}
-                alt={rowData.users_name}
-                className="w-12 h-12 rounded-full object-cover"
-                onError={(e) => e.target.src = 'http://localhost/coc/gsd/uploads/profileni.png'}
-            />
+            <div
+                className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg"
+                style={{ backgroundColor: bgColor }}
+            >
+                {initials}
+            </div>
         );
     };
 
@@ -448,6 +492,7 @@ const Faculty = () => {
                 onDelete={deleteUser}
                 userLevels={userLevels} // Pass userLevels to FacultyModal
                 getUserDetails={getUserDetails} // Add this line
+                generateAvatarColor={generateAvatarColor} // Add this prop
             />
         </div>
     );
@@ -462,7 +507,8 @@ const FacultyModal = ({
     onSubmit, 
     onDelete, 
     userLevels,
-    getUserDetails // Add this line
+    getUserDetails,
+    generateAvatarColor // Add this to props
 }) => {
     const [formData, setFormData] = useState({
         users_id: '',
@@ -475,11 +521,10 @@ const FacultyModal = ({
         departments_name: '',
         users_password: '',
         users_role: '',
-        users_image: null,
-        // Removed users_username
     });
-    const [imagePreview, setImagePreview] = useState(null);
-    const fileInputRef = useRef(null);
+
+    // Add imageUrl state
+    const [imageUrl, setImageUrl] = useState('');
 
     useEffect(() => {
         const fetchUserData = async () => {
@@ -497,13 +542,9 @@ const FacultyModal = ({
                         departments_name: userDetails.departments_name || '',
                         users_password: '',
                         users_role: userDetails.users_user_level_id || '',
-                        users_image: userDetails.users_pic || 'uploads/profileni.png',
                     });
-                    setImagePreview(
-                        userDetails.users_pic 
-                            ? `http://localhost/coc/gsd/${userDetails.users_pic}` 
-                            : 'http://localhost/coc/gsd/uploads/profileni.png'
-                    );
+                    // Set the image URL
+                    setImageUrl(`http://localhost/coc/gsd/${userDetails.users_pic || 'uploads/profileni.png'}`);
                 }
             } else {
                 // Reset form for new user
@@ -518,9 +559,8 @@ const FacultyModal = ({
                     departments_name: '',
                     users_password: '',
                     users_role: '',
-                    users_image: 'uploads/profileni.png',
                 });
-                setImagePreview('http://localhost/coc/gsd/uploads/profileni.png');
+                setImageUrl('http://localhost/coc/gsd/uploads/profileni.png');
             }
         };
 
@@ -530,18 +570,6 @@ const FacultyModal = ({
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData({ ...formData, [name]: value });
-    };
-
-    const handleImageChange = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setImagePreview(reader.result);
-                setFormData({ ...formData, users_image: file });
-            };
-            reader.readAsDataURL(file);
-        }
     };
 
     const handleSubmit = async (e) => {
@@ -556,26 +584,22 @@ const FacultyModal = ({
             return;
         }
 
-        // Prepare the JSON data
         const jsonData = {
             operation: "saveUser",
             data: {
                 fname: formData.users_firstname,
                 mname: formData.users_middlename,
                 lname: formData.users_lastname,
-                email: formData.users_email, // Add email field
+                email: formData.users_email,
                 schoolId: formData.users_school_id,
                 contact: formData.users_contact_number,
-                userLevelId: formData.users_role, // Use the selected role from form
+                userLevelId: formData.users_role,
                 password: formData.users_password,
                 departmentId: selectedDepartment.departments_id,
-                pic: imagePreview // This will be the base64 string if an image was selected
             }
         };
 
-        // Debug log
         console.log('Sending data:', jsonData);
-
         onSubmit(jsonData);
     };
 
@@ -594,39 +618,50 @@ const FacultyModal = ({
                     <p>Are you sure you want to delete this faculty member?</p>
                 ) : (
                     <Form onSubmit={handleSubmit}>
-                        <div className="flex flex-col items-center mb-4">
-                            <div className="relative w-32 h-32 mb-2">
-                                <div 
-                                    className="w-full h-full rounded-full border-4 border-green-500 overflow-hidden bg-gray-200 flex items-center justify-center cursor-pointer"
-                                    onClick={() => fileInputRef.current.click()}
-                                >
-                                    {imagePreview ? (
-                                        <img 
-                                            src={imagePreview} 
-                                            alt="Profile" 
-                                            className="w-full h-full object-cover"
-                                        />
+                        {/* Add image preview at the top of the form */}
+                        {type === 'edit' && (
+                            <div className="flex justify-center mb-6">
+                                <div className="relative w-32 h-32">
+                                    {imageUrl ? (
+                                        <div className="w-full h-full">
+                                            <img
+                                                src={imageUrl}
+                                                alt="Profile"
+                                                className="w-full h-full rounded-full object-cover border-4 border-green-500"
+                                                onError={() => {
+                                                    const initials = `${formData.users_firstname?.[0] || ''}${formData.users_lastname?.[0] || ''}`.toUpperCase();
+                                                    const bgColor = generateAvatarColor(initials);
+                                                    const container = document.getElementById('profile-image-container');
+                                                    if (container) {
+                                                        container.innerHTML = `
+                                                            <div
+                                                                class="w-full h-full rounded-full border-4 border-green-500 flex items-center justify-center text-white font-bold text-3xl"
+                                                                style="background-color: ${bgColor}"
+                                                            >
+                                                                ${initials}
+                                                            </div>
+                                                        `;
+                                                    }
+                                                }}
+                                            />
+                                        </div>
                                     ) : (
-                                        <FontAwesomeIcon icon={faUser} className="text-4xl text-gray-400" />
+                                        <div
+                                            className="w-full h-full rounded-full border-4 border-green-500 flex items-center justify-center text-white font-bold text-3xl"
+                                            style={{ 
+                                                backgroundColor: generateAvatarColor(
+                                                    `${formData.users_firstname?.[0] || ''}${formData.users_lastname?.[0] || ''}`
+                                                )
+                                            }}
+                                        >
+                                            {`${formData.users_firstname?.[0] || ''}${formData.users_lastname?.[0] || ''}`.toUpperCase()}
+                                        </div>
                                     )}
                                 </div>
-                                <input
-                                    type="file"
-                                    ref={fileInputRef}
-                                    className="hidden"
-                                    accept="image/*"
-                                    onChange={handleImageChange}
-                                />
                             </div>
-                            <button
-                                type="button"
-                                className="text-green-600 hover:text-green-700 text-sm font-semibold"
-                                onClick={() => fileInputRef.current.click()}
-                            >
-                                {imagePreview ? 'Change Photo' : 'Upload Photo'}
-                            </button>
-                        </div>
-
+                        )}
+                        
+                        {/* Rest of your form groups remain unchanged */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                             <Form.Group>
                                 <Form.Label>First Name</Form.Label>
@@ -674,28 +709,15 @@ const FacultyModal = ({
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                             <Form.Group>
                                 <Form.Label>Department</Form.Label>
-                                <Form.Select 
-                                    name="departments_name" 
-                                    value={formData.departments_name} 
-                                    onChange={handleChange} 
-                                    required
-                                >
+                                <Form.Select name="departments_name" value={formData.departments_name} onChange={handleChange} required>
                                     <option value="">Select Department</option>
                                     {departments && departments.map((department) => (
-                                        <option 
-                                            key={department.departments_id} 
-                                            value={department.departments_name}
-                                        >
+                                        <option key={department.departments_id} value={department.departments_name}>
                                             {department.departments_name}
                                         </option>
                                     ))}
                                 </Form.Select>
-
                             </Form.Group>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                            {/* Only password field remains */}
                             <Form.Group>
                                 <Form.Label>{type === 'edit' ? 'New Password (leave blank to keep current)' : 'Password'}</Form.Label>
                                 <Form.Control type="password" name="users_password" value={formData.users_password} onChange={handleChange} required={type === 'add'} />

@@ -128,7 +128,7 @@ const EquipmentEntry = () => {
             return;
         }
 
-        const user_admin_id = localStorage.getItem('user_id'); // Add this line
+        const user_admin_id = localStorage.getItem('user_id');
 
         let requestData;
         if (editingEquipment) {
@@ -139,9 +139,9 @@ const EquipmentEntry = () => {
                     name: newEquipmentName,
                     quantity: newEquipmentQuantity,
                     categoryId: selectedCategory,
-                    equip_pic: equipmentImage,
-                    user_admin_id: user_admin_id, // Add this line
-                    statusId: selectedStatus
+                    statusId: selectedStatus,
+                    equip_pic: equipmentImage || null,  // Send the base64 image or null
+                    user_admin_id: user_admin_id
                 }
             };
         } else {
@@ -284,65 +284,75 @@ const EquipmentEntry = () => {
 
     const itemTemplate = (equipment) => {
         return (
-            <Card className="mb-4 transform hover:scale-[1.01] transition-transform duration-200">
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-                    <div className="md:col-span-3 flex justify-center items-start">
-                        <div className="relative group w-full min-h-[200px] bg-gray-100 rounded-lg">
-                            <div className="flex items-center justify-center h-48 md:h-64">
+            <motion.div
+                whileHover={{ scale: 1.02 }}
+                transition={{ duration: 0.2 }}
+            >
+                <Card className="mb-4 bg-white bg-opacity-95 shadow-lg hover:shadow-2xl transition-all duration-300">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                        <div className="md:col-span-3 flex justify-center items-start">
+                            <div className="group relative w-full min-h-[200px] rounded-lg overflow-hidden">
                                 {equipment.equip_pic ? (
-                                    <img 
-                                        src={`http://localhost/coc/gsd/${equipment.equip_pic}`}
-                                        alt={equipment.equip_name}
-                                        className="object-cover w-full h-full rounded-lg"
-                                        onError={(e) => {
-                                            e.target.onerror = null;
-                                            e.target.src = 'path/to/fallback/image.png'; // Add a fallback image
-                                        }}
-                                    />
+                                    <div className="relative h-48 md:h-64">
+                                        <img 
+                                            src={`http://localhost/coc/gsd/${equipment.equip_pic}`}
+                                            alt={equipment.equip_name}
+                                            className="object-cover w-full h-full rounded-lg transform group-hover:scale-110 transition-transform duration-300"
+                                        />
+                                        <div className="absolute inset-0 bg-black bg-opacity-20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                                    </div>
                                 ) : (
-                                    <i className="pi pi-cog text-4xl text-gray-400"></i>
+                                    <div className="flex items-center justify-center h-48 md:h-64 bg-gradient-to-br from-gray-100 to-gray-200">
+                                        <i className="pi pi-box text-6xl text-gray-400"></i>
+                                    </div>
                                 )}
+                                <div className="absolute top-2 right-2">
+                                    <Tag 
+                                        value={equipment.status || 'Available'} 
+                                        severity={equipment.status === 'Available' ? 'success' : 'danger'}
+                                        className="px-3 py-1 text-xs font-semibold rounded-full shadow-md"
+                                    />
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <div className="md:col-span-9">
-                        <div className="flex flex-col h-full">
+
+                        <div className="md:col-span-9 flex flex-col">
                             <div className="flex justify-between items-start mb-4">
                                 <div>
-                                    <h3 className="text-2xl font-bold text-green-800 mb-2">{equipment.equip_name}</h3>
-                                    <p className="text-gray-600 text-sm">
-                                        Quantity: <span className="font-semibold">{equipment.equip_quantity}</span>
-                                    </p>
+                                    <h3 className="text-2xl font-bold text-green-800 mb-2 group-hover:text-green-600">
+                                        {equipment.equip_name}
+                                    </h3>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="bg-green-100 text-green-800 text-sm font-medium px-3 py-1 rounded-full">
+                                            ID: {equipment.equip_id}
+                                        </span>
+                                        <span className="bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1 rounded-full">
+                                            QTY: {equipment.equip_quantity}
+                                        </span>
+                                    </div>
                                 </div>
-                                <Tag 
-                                    value={equipment.status || 'Available'} 
-                                    severity={equipment.status === 'Available' ? 'success' : 'danger'}
-                                    className="px-4 py-2 text-sm font-semibold"
-                                />
                             </div>
 
-                            <Divider className="my-3" />
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                <div className="flex items-center gap-2">
-                                    <i className="pi pi-tag text-green-600"></i>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+                                <div className="flex items-center p-3 bg-gray-50 rounded-lg">
+                                    <i className="pi pi-tag text-green-600 mr-2"></i>
                                     <div>
-                                        <p className="text-sm text-gray-500">Category</p>
-                                        <p className="font-semibold">{equipment.equipment_category_name || 'N/A'}</p>
+                                        <p className="text-xs text-gray-500">Category</p>
+                                        <p className="font-semibold text-sm">{equipment.equipment_category_name || 'N/A'}</p>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <i className="pi pi-calendar text-green-600"></i>
+                                <div className="flex items-center p-3 bg-gray-50 rounded-lg">
+                                    <i className="pi pi-calendar text-green-600 mr-2"></i>
                                     <div>
-                                        <p className="text-sm text-gray-500">Created At</p>
-                                        <p className="font-semibold">{equipment.equip_created_at}</p>
+                                        <p className="text-xs text-gray-500">Created</p>
+                                        <p className="font-semibold text-sm">{new Date(equipment.equip_created_at).toLocaleDateString()}</p>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <i className="pi pi-clock text-green-600"></i>
+                                <div className="flex items-center p-3 bg-gray-50 rounded-lg">
+                                    <i className="pi pi-clock text-green-600 mr-2"></i>
                                     <div>
-                                        <p className="text-sm text-gray-500">Last Updated</p>
-                                        <p className="font-semibold">{equipment.equip_updated_at || 'N/A'}</p>
+                                        <p className="text-xs text-gray-500">Last Updated</p>
+                                        <p className="font-semibold text-sm">{equipment.equip_updated_at ? new Date(equipment.equip_updated_at).toLocaleDateString() : 'N/A'}</p>
                                     </div>
                                 </div>
                             </div>
@@ -352,25 +362,25 @@ const EquipmentEntry = () => {
                                     whileHover={{ scale: 1.05 }}
                                     whileTap={{ scale: 0.95 }}
                                     onClick={() => handleEditClick(equipment)}
-                                    className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-full transition-colors duration-300"
+                                    className="flex items-center gap-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-2 rounded-full transition-all duration-300 shadow-md hover:shadow-lg"
                                 >
-                                    <FontAwesomeIcon icon={faEdit} />
+                                    <FontAwesomeIcon icon={faEdit} className="text-sm" />
                                     <span>Edit</span>
                                 </motion.button>
                                 <motion.button 
                                     whileHover={{ scale: 1.05 }}
                                     whileTap={{ scale: 0.95 }}
                                     onClick={() => handleDeleteClick(equipment.equip_id)}
-                                    className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-full transition-colors duration-300"
+                                    className="flex items-center gap-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-4 py-2 rounded-full transition-all duration-300 shadow-md hover:shadow-lg"
                                 >
-                                    <FontAwesomeIcon icon={faTrashAlt} />
+                                    <FontAwesomeIcon icon={faTrashAlt} className="text-sm" />
                                     <span>Delete</span>
                                 </motion.button>
                             </div>
                         </div>
                     </div>
-                </div>
-            </Card>
+                </Card>
+            </motion.div>
         );
     };
 
@@ -388,30 +398,34 @@ const EquipmentEntry = () => {
                 >
                     <h2 className="text-4xl font-bold mb-6 text-green-800 drop-shadow-lg">Equipment Management</h2>
                     <div className="bg-white bg-opacity-90 rounded-lg shadow-xl p-6 mb-6 backdrop-filter backdrop-blur-lg">
-                        <div className="flex flex-col md:flex-row items-center justify-between mb-4">
+                        <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0 md:space-x-4 mb-6">
                             <motion.div 
-                                whileHover={{ scale: 1.05 }}
-                                className="relative w-full md:w-64 mb-4 md:mb-0"
+                                whileHover={{ scale: 1.02 }}
+                                className="relative w-full md:w-96"
                             >
                                 <input
                                     type="text"
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                     placeholder="Search equipment..."
-                                    className="w-full pl-10 pr-4 py-2 rounded-full border border-green-300 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-300"
+                                    className="w-full pl-12 pr-4 py-3 rounded-full border-2 border-green-300 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-300 text-lg"
                                 />
-                                <FontAwesomeIcon icon={faSearch} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-400" />
+                                <FontAwesomeIcon 
+                                    icon={faSearch} 
+                                    className="absolute left-4 top-1/2 transform -translate-y-1/2 text-green-400 text-xl"
+                                />
                             </motion.div>
                             <motion.button 
                                 whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
                                 onClick={() => setIsAddModalOpen(true)}
-                                className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out flex items-center justify-center shadow-md"
+                                className="w-full md:w-auto bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-3 px-8 rounded-full transition duration-300 ease-in-out flex items-center justify-center shadow-lg hover:shadow-xl"
                             >
-                                <FontAwesomeIcon icon={faPlus} className="mr-2" /> Add Equipment
+                                <FontAwesomeIcon icon={faPlus} className="mr-2" />
+                                <span className="text-lg">Add New Equipment</span>
                             </motion.button>
                         </div>
-
+                        
                         {loading ? (
                             <motion.div
                                 initial={{ opacity: 0 }}

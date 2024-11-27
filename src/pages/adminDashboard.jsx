@@ -93,9 +93,9 @@ const Dashboard = () => {
 
     useEffect(() => {
         const hasLoadedBefore = localStorage.getItem('hasLoadedDashboard');
-        const user_id = localStorage.getItem('user_id');
+        const user_level_id = localStorage.getItem('user_level_id');
 
-        if (user_id !== '1' && user_id !== '4') { // Assuming '1' is the Super Admin ID
+        if (user_level_id !== '1' && user_level_id !== '4') { // Assuming '1' is the Super Admin ID
             localStorage.clear(); 
             navigate('/');
         } else {

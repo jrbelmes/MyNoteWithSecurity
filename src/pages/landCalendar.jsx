@@ -19,6 +19,18 @@ import {
   setHours
 } from 'date-fns';
 
+// Add theme constants
+const themeColors = {
+  primary: '#2E7D32', // dark green
+  secondary: '#4CAF50', // medium green
+  light: '#E8F5E9', // light green
+  white: '#FFFFFF',
+  success: '#388E3C',
+  warning: '#FFA000',
+  error: '#D32F2F',
+  text: '#2C3E50'
+};
+
 const Calendar = () => {
   const navigate = useNavigate();
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -616,10 +628,11 @@ const Calendar = () => {
   return (
     <div className="flex h-screen">
       <Sidebar />
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto" style={{ backgroundColor: themeColors.light }}>
         <div className="max-w-[1400px] mx-auto p-4"> {/* decreased from p-8 */}
           <motion.div 
-            className="bg-white rounded-xl shadow-2xl p-6" /* decreased from p-8 */
+            className="rounded-xl shadow-2xl p-6" /* decreased from p-8 */
+            style={{ backgroundColor: themeColors.white }}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
@@ -629,6 +642,7 @@ const Calendar = () => {
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
                   className="p-3 rounded-full hover:bg-gray-100"
+                  style={{ color: themeColors.primary }}
                   onClick={() => handleDateNavigation('prev')}
                 >
                   <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"> 
@@ -637,7 +651,8 @@ const Calendar = () => {
                 </motion.button>
                 <div className="relative">
                   <h2 
-                    className="text-2xl font-bold text-gray-800 cursor-pointer hover:text-blue-500" /* decreased from text-4xl */
+                    className="text-2xl font-bold cursor-pointer hover:text-blue-500" /* decreased from text-4xl */
+                    style={{ color: themeColors.primary }}
                     onClick={() => setIsYearModalOpen(true)}
                   > 
                     {format(currentDate, view === 'month' ? 'MMMM yyyy' : 'MMM d, yyyy')}
@@ -659,11 +674,11 @@ const Calendar = () => {
                 {['month', 'week', 'day'].map((viewOption) => (
                   <motion.button
                     key={viewOption}
-                    className={`px-4 py-2 rounded-lg ${
-                      view === viewOption 
-                        ? 'bg-blue-500 text-white' 
-                        : 'bg-gray-100 hover:bg-gray-200'
-                    }`}
+                    className={`px-4 py-2 rounded-lg`}
+                    style={{
+                      backgroundColor: view === viewOption ? themeColors.primary : themeColors.light,
+                      color: view === viewOption ? themeColors.white : themeColors.text
+                    }}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setView(viewOption)}
@@ -678,7 +693,11 @@ const Calendar = () => {
               <>
                 <div className="grid grid-cols-7 gap-1 mb-2"> {/* decreased gap and margin */}
                   {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                    <div key={day} className="text-center text-base font-semibold text-gray-600 py-1"> {/* decreased text and padding */}
+                    <div 
+                      key={day} 
+                      className="text-center text-base font-semibold text-gray-600 py-1" /* decreased text and padding */
+                      style={{ color: themeColors.primary }}
+                    >
                       {day}
                     </div>
                   ))}

@@ -123,6 +123,15 @@ const GSDCalendar = ({ isOpen, onClose }) => {
       border: 'border-gray-500',
       badge: 'bg-gray-100 text-gray-800 border-gray-200',
       indicator: 'bg-gray-400'
+    },
+    // Add a default style
+    default: {
+      bg: 'bg-gray-50',
+      hover: 'hover:bg-gray-100',
+      text: 'text-gray-800',
+      border: 'border-gray-500',
+      badge: 'bg-gray-100 text-gray-800 border-gray-200',
+      indicator: 'bg-gray-400'
     }
   };
 
@@ -179,7 +188,7 @@ const GSDCalendar = ({ isOpen, onClose }) => {
   };
 
   const EventCard = ({ event }) => {
-    const colors = statusColors[event.status];
+    const colors = statusColors[event.status] || statusColors.default;
 
     return (
       <motion.div
