@@ -145,7 +145,7 @@ const Sidebar = () => {
               )}
 
               {(user_level_id === '1' || user_level_id === '4') && (
-                <SidebarItem icon={FaUserCircle} text="Users" link="/Users" active={activeItem === '/Users'} />
+                <SidebarItem icon={FaUserCircle} text="Users" link="/Faculty" active={activeItem === '/Faculty'} />
               )}
 
               {canAccessMenu('viewRequest') && (
@@ -158,7 +158,7 @@ const Sidebar = () => {
               )}
 
               {canAccessMenu('viewReservation') && (
-                <SidebarSubItem icon={FaFileAlt} text="Reports" link="/Reports" active={activeItem === '/Reports'} />
+                <SidebarSubItem icon={FaFileAlt} text="Records" link="/record" active={activeItem === '/record'} />
               )}
             </nav>
           </div>

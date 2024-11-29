@@ -76,15 +76,33 @@ const Faculty = () => {
         setLoading(true);
         try {
             const response = await axios.post("http://localhost/coc/gsd/user.php", 
-                new URLSearchParams({ operation: "fetchUsers" }),
-                { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+                { operation: "fetchAdmin" },  // Send as JSON object
+                { 
+                    headers: { 'Content-Type': 'application/json' }
+                }
             );
+
             if (response.data.status === 'success') {
-                setUsers(response.data.data);
+                // Transform admin data to match the expected structure
+                const transformedData = response.data.data.map(admin => ({
+                    users_id: admin.admin_id,
+                    users_fname: admin.admin_fname,
+                    users_mname: admin.admin_mname,
+                    users_lname: admin.admin_lname,
+                    users_email: admin.admin_email,
+                    users_school_id: admin.admin_school_id,
+                    users_contact_number: admin.admin_contact_number,
+                    users_user_level_id: admin.admin_user_level_id,
+                    users_pic: admin.admin_pic,
+                    departments_id: admin.admin_department_id,
+                    // Add any other fields needed for display
+                }));
+                setUsers(transformedData);
             } else {
                 toast.error("Error fetching users: " + response.data.message);
             }
         } catch (error) {
+            console.error('Fetch error:', error);
             toast.error("An error occurred while fetching users.");
         } finally {
             setLoading(false);
@@ -289,7 +307,7 @@ const Faculty = () => {
         };
 
         return (
-            <div className="flex gap-2">
+            <div className="flex gap-2" key={`actions-${rowData.users_id}`}>
                 <motion.button 
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
@@ -320,6 +338,7 @@ const Faculty = () => {
         
         return (
             <Chip
+                key={`level-${rowData.users_id}`}
                 icon={`${config.icon}`}
                 label={rowData.user_level_name}
                 className={`${config.color} text-white`}
@@ -330,6 +349,7 @@ const Faculty = () => {
     const departmentTemplate = (rowData) => {
         return (
             <Chip
+                key={`dept-${rowData.users_id}`}
                 icon="pi pi-building"
                 label={rowData.departments_name}
                 className="bg-teal-500 text-white"
@@ -419,12 +439,14 @@ const Faculty = () => {
                         rowClassName="hover:bg-gray-50 transition-colors duration-200"
                     >
                         <Column 
+                            key="photo"
                             header="Photo" 
                             body={imageBodyTemplate} 
                             style={{ width: '100px' }}
                             className="text-center"
                         />
                         <Column 
+                            key="school_id"
                             field="users_school_id" 
                             header="School ID" 
                             filter 
@@ -433,6 +455,7 @@ const Faculty = () => {
                             className="font-semibold"
                         />
                         <Column 
+                            key="first_name"
                             field="users_fname" 
                             header="First Name" 
                             filter 
@@ -440,6 +463,7 @@ const Faculty = () => {
                             sortable 
                         />
                         <Column 
+                            key="last_name"
                             field="users_lname" 
                             header="Last Name" 
                             filter 
@@ -447,6 +471,7 @@ const Faculty = () => {
                             sortable 
                         />
                         <Column 
+                            key="department"
                             field="departments_name" 
                             header="Department" 
                             body={departmentTemplate}
@@ -455,6 +480,7 @@ const Faculty = () => {
                             sortable 
                         />
                         <Column 
+                            key="role"
                             field="user_level_name" 
                             header="Role" 
                             body={userLevelTemplate}
@@ -462,6 +488,7 @@ const Faculty = () => {
                             style={{ width: '150px' }}
                         />
                         <Column 
+                            key="contact"
                             field="users_contact_number" 
                             header="Contact" 
                             sortable 
@@ -473,6 +500,7 @@ const Faculty = () => {
                             )}
                         />
                         <Column 
+                            key="actions"
                             header="Actions" 
                             body={actionsBodyTemplate} 
                             style={{ width: '150px' }}
@@ -518,7 +546,7 @@ const FacultyModal = ({
         users_school_id: '',
         users_contact_number: '',
         users_email: '',
-        departments_name: '',
+        departments_id: '', // Changed from departments_name
         users_password: '',
         users_role: '',
     });
@@ -539,7 +567,7 @@ const FacultyModal = ({
                         users_school_id: userDetails.users_school_id || '',
                         users_contact_number: userDetails.users_contact_number || '',
                         users_email: userDetails.users_email || '',
-                        departments_name: userDetails.departments_name || '',
+                        departments_id: userDetails.departments_id || '', // Changed to use departments_id
                         users_password: '',
                         users_role: userDetails.users_user_level_id || '',
                     });
@@ -556,7 +584,7 @@ const FacultyModal = ({
                     users_school_id: '',
                     users_contact_number: '',
                     users_email: '',
-                    departments_name: '',
+                    departments_id: '', // Changed from departments_name
                     users_password: '',
                     users_role: '',
                 });
@@ -572,17 +600,9 @@ const FacultyModal = ({
         setFormData({ ...formData, [name]: value });
     };
 
+    // Modified handleSubmit to use departments_id directly
     const handleSubmit = async (e) => {
         e.preventDefault();
-       
-        const selectedDepartment = departments.find(
-            dept => dept.departments_name === formData.departments_name
-        );
-        
-        if (!selectedDepartment) {
-            console.error('Department not found:', formData.departments_name);
-            return;
-        }
 
         const jsonData = {
             operation: "saveUser",
@@ -595,7 +615,7 @@ const FacultyModal = ({
                 contact: formData.users_contact_number,
                 userLevelId: formData.users_role,
                 password: formData.users_password,
-                departmentId: selectedDepartment.departments_id,
+                departmentId: formData.departments_id, // Use departments_id directly
             }
         };
 
@@ -709,11 +729,11 @@ const FacultyModal = ({
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                             <Form.Group>
                                 <Form.Label>Department</Form.Label>
-                                <Form.Select name="departments_name" value={formData.departments_name} onChange={handleChange} required>
+                                <Form.Select name="departments_id" value={formData.departments_id} onChange={handleChange} required>
                                     <option value="">Select Department</option>
                                     {departments && departments.map((department) => (
-                                        <option key={department.departments_id} value={department.departments_name}>
-                                            {department.departments_name}
+                                        <option key={department.departments_id} value={department.departments_id}>
+                                            {`${department.departments_name} (ID: ${department.departments_id})`}
                                         </option>
                                     ))}
                                 </Form.Select>

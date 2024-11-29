@@ -1135,88 +1135,48 @@ const TimeSlotVisualizer = ({ selectedTime, unavailableSlots, isChecking, confli
           <span className="text-gray-600">Checking availability...</span>
         </div>
       ) : (
-        <>
-          {conflicts && conflicts.length > 0 && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <h6 className="text-red-700 font-medium mb-2">Conflicting Reservations:</h6>
-              {conflicts.map((conflict, index) => (
-                <div key={index} className="text-sm text-red-600">
-                  • {conflict.reservation_name} ({conflict.ven_name})
-                  <br />
-                  <span className="text-xs">
-                    {new Date(conflict.reservation_start_date).toLocaleTimeString()} - 
-                    {new Date(conflict.reservation_end_date).toLocaleTimeString()}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {timeSlots.map(slot => {
-              const isConflicting = conflicts.some(conflict => {
-                const conflictStart = new Date(conflict.reservation_start_date);
-                const conflictEnd = new Date(conflict.reservation_end_date);
-                const conflictStartHour = conflictStart.getHours();
-                const conflictEndHour = conflictEnd.getHours();
-                
-                const [slotStart, slotEnd] = slot.id.split('-').map(time => parseInt(time));
-                
-                return (conflictStartHour < slotEnd && conflictEndHour > slotStart);
-              });
-              const isSelected = selectedTime === slot.id;
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {timeSlots.map(slot => {
+            const isConflicting = conflicts.some(conflict => {
+              const conflictStart = new Date(conflict.reservation_start_date);
+              const conflictEnd = new Date(conflict.reservation_end_date);
+              const conflictStartHour = conflictStart.getHours();
+              const conflictEndHour = conflictEnd.getHours();
+              
+              const [slotStart, slotEnd] = slot.id.split('-').map(time => parseInt(time));
+              
+              return (conflictStartHour < slotEnd && conflictEndHour > slotStart);
+            });
+            const isSelected = selectedTime === slot.id;
 
-              return (
-                <button
-                  key={slot.id}
-                  onClick={() => !isConflicting && handleTimeSlotSelect(slot.id)}
-                  disabled={isConflicting}
-                  className={`
-                    p-4 rounded-lg border transition-all duration-200 relative
-                    ${isSelected ? 'border-green-500 bg-green-50 text-green-700' : ''}
-                    ${isConflicting 
-                      ? 'border-red-300 bg-red-50 text-red-700 cursor-not-allowed' 
-                      : 'border-gray-200 hover:border-green-300 hover:bg-green-50'}
-                  `}
-                >
-                  <div className="text-center">
-                    <div className="font-medium">{slot.label}</div>
-                    <div className="text-sm">{slot.time}</div>
-                    {isConflicting && (
-                      <div className="text-xs text-red-500 mt-1">
-                        Not Available
-                      </div>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </>
+            return (
+              <button
+                key={slot.id}
+                onClick={() => !isConflicting && handleTimeSlotSelect(slot.id)}
+                disabled={isConflicting}
+                className={`
+                  p-4 rounded-lg border transition-all duration-200 relative
+                  ${isSelected ? 'border-green-500 bg-green-50 text-green-700' : ''}
+                  ${isConflicting 
+                    ? 'border-red-300 bg-red-50 text-red-700 cursor-not-allowed' 
+                    : 'border-gray-200 hover:border-green-300 hover:bg-green-50'}
+                `}
+              >
+                <div className="text-center">
+                  <div className="font-medium">{slot.label}</div>
+                  <div className="text-sm">{slot.time}</div>
+                  {isConflicting && (
+                    <div className="text-xs text-red-500 mt-1">
+                      Unavailable
+                    </div>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
       )}
     </div>
-  );
-};
-
-const ConflictWarning = ({ conflicts }) => {
-  if (!conflicts?.length) return null;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg"
-    >
-      <h5 className="font-medium text-yellow-800 mb-2">
-        Potential Conflicts Found
-      </h5>
-      <ul className="list-disc list-inside text-sm text-yellow-700">
-        {conflicts.map((conflict, index) => (
-          <li key={index}>
-            {`${conflict.reservation_name} - ${conflict.ven_name} (${new Date(conflict.reservation_start_date).toLocaleString()} - ${new Date(conflict.reservation_end_date).toLocaleString()})`}
-          </li>
-        ))}
-      </ul>
-    </motion.div>
   );
 };
 
@@ -1384,6 +1344,7 @@ const checkTimeSlotAvailability = async (startDate, endDate) => {
           const conflictStartHour = conflictStart.getHours();
           const conflictEndHour = conflictEnd.getHours();
           
+          // Check individual time slots
           if (conflictStartHour < 10 && conflictEndHour > 8) {
             unavailableTimeSlots.add('08:00-10:00');
           }
@@ -1399,16 +1360,21 @@ const checkTimeSlotAvailability = async (startDate, endDate) => {
           if (conflictStartHour < 17 && conflictEndHour > 15) {
             unavailableTimeSlots.add('15:00-17:00');
           }
-          
-          if (conflictStartHour < 12 && conflictEndHour > 8) {
+
+          // Check morning slot (8:00-12:00)
+          if ((conflictStartHour < 12 && conflictEndHour > 8) &&
+              (unavailableTimeSlots.has('08:00-10:00') && unavailableTimeSlots.has('10:00-12:00'))) {
             unavailableTimeSlots.add('08:00-12:00');
           }
           
-          if (conflictStartHour < 17 && conflictEndHour > 13) {
+          // Check afternoon slot (13:00-17:00)
+          if ((conflictStartHour < 17 && conflictEndHour > 13) &&
+              (unavailableTimeSlots.has('13:00-15:00') && unavailableTimeSlots.has('15:00-17:00'))) {
             unavailableTimeSlots.add('13:00-17:00');
           }
           
-          if (unavailableTimeSlots.size > 0 || 
+          // Check full day slot (8:00-17:00)
+          if ((unavailableTimeSlots.has('08:00-12:00') && unavailableTimeSlots.has('13:00-17:00')) ||
               (conflictStartHour <= 8 && conflictEndHour >= 17)) {
             unavailableTimeSlots.add('08:00-17:00');
           }
@@ -1423,12 +1389,6 @@ const checkTimeSlotAvailability = async (startDate, endDate) => {
           isSameDay(new Date(conflict.reservation_start_date), startDate)
         )
       });
-
-      if (conflicts.some(conflict => 
-        isSameDay(new Date(conflict.reservation_start_date), startDate)
-      )) {
-        
-      }
     }
 
   } catch (error) {
@@ -1515,7 +1475,6 @@ const renderStepContent = () => {
         className="max-w-4xl mx-auto"
       >
         {renderCalendarSection()}
-        <ConflictWarning conflicts={timeSlotAvailability.conflicts} />
       </motion.div>
     ),
     [STEPS.RESOURCES]: () => (

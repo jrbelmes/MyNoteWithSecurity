@@ -130,20 +130,22 @@ const ReservationRequests = () => {
                 }
             });
 
-            if (response.data?.status === 'success') {
+            // Changed this condition to check for data existence
+            if (response.data) {
                 toast.success('Reservation declined successfully!', {
                     icon: '❌',
                     duration: 3000,
                 });
                 await fetchReservations();
+                setIsDeclineModalOpen(false);
             } else {
-                toast.error(response.data?.message || 'Failed to decline reservation.');
+                toast.error('Failed to decline reservation.');
             }
         } catch (error) {
-            toast.error(`Error declining reservation: ${error.response?.data?.message || error.message}`);
+            console.error('Decline error:', error);
+            toast.error('Error declining reservation. Please try again.');
         } finally {
             setIsDeclining(false);
-            setIsDeclineModalOpen(false);
         }
     };
 

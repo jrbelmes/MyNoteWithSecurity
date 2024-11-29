@@ -38,7 +38,13 @@ const themeColors = {
   success: '#388E3C',
   warning: '#FFA000',
   error: '#D32F2F',
-  text: '#2C3E50'
+  text: '#2C3E50',
+  // Add new status colors
+  pending: '#FFA000',
+  approved: '#388E3C',
+  declined: '#D32F2F',
+  expired: '#9E9E9E',
+  completed: '#1976D2'
 };
 
 const Record = () => {
@@ -63,7 +69,8 @@ const Record = () => {
         if (response.data?.status === 'success') {
             const consolidatedData = consolidateReservations(response.data.data);
             setReservations(consolidatedData);
-        } else {
+            console.log('Consolidated reservations:', consolidatedData);
+        } else { 
             toast.error('No pending reservations found.');
             setReservations([]);
         }
@@ -76,43 +83,34 @@ const Record = () => {
   };
 
   const consolidateReservations = (data) => {
-    const consolidated = {};
-    data.forEach(item => {
-      if (!consolidated[item.reservation_id]) {
-        consolidated[item.reservation_id] = {
-          ...item,
-          vehicles: [],
-          equipments: []
-        };
-      }
-      if (item.vehicle_reservation_vehicle_id) {
-        consolidated[item.reservation_id].vehicles.push(item.vehicle_reservation_vehicle_id);
-      }
-      if (item.equipments_reservation_equip_id) {
-        consolidated[item.reservation_id].equipments.push({
-          id: item.equipments_reservation_equip_id,
-          quantity: item.quantity
-        });
-      }
-    });
-    return Object.values(consolidated);
+    return data.map(item => ({
+      reservation_id: item.reservation_id,
+      reservation_event_title: item.reservation_event_title,
+      reservation_description: item.reservation_description,
+      reservation_start_date: item.reservation_start_date,
+      reservation_end_date: item.reservation_end_date,
+      status_master_name: item.status_master_name,
+      reservation_participants: item.reservation_participants
+    }));
   };
 
-  // Update the getStatusBadge function
   const getStatusBadge = (status) => {
     const statusMap = {
-      '1': { color: themeColors.warning, text: 'Pending' },
-      '2': { color: themeColors.success, text: 'Approved' },
-      '3': { color: themeColors.error, text: 'Rejected' }
+      'pending': { color: themeColors.pending, text: 'pending' },
+      'approved': { color: themeColors.approved, text: 'approved' },
+      'decline': { color: themeColors.declined, text: 'decline' },
+      'cancelled': { color: themeColors.expired, text: 'cancelled' },
+      'completed': { color: themeColors.completed, text: 'completed' }
     };
+    
     return (
       <Badge
         style={{ 
-          backgroundColor: statusMap[status]?.color,
+          backgroundColor: statusMap[status]?.color || themeColors.pending,
           padding: '4px 12px',
           borderRadius: '12px'
         }}
-        text={<span style={{ color: '#fff' }}>{statusMap[status]?.text || 'Unknown'}</span>}
+        text={<span style={{ color: '#fff' }}>{status}</span>}
       />
     );
   };
@@ -142,14 +140,16 @@ const Record = () => {
     },
     {
       title: 'Status',
-      dataIndex: 'reservation_status_master_id',
+      dataIndex: 'status_master_name',
       render: (status) => getStatusBadge(status),
       filters: [
-        { text: 'Pending', value: '1' },
-        { text: 'Approved', value: '2' },
-        { text: 'Rejected', value: '3' },
+        { text: 'pending', value: 'pending' },
+        { text: 'approved', value: 'approved' },
+        { text: 'decline', value: 'decline' },
+        { text: 'cancelled', value: 'cancelled' },
+        { text: 'completed', value: 'completed' },
       ],
-      onFilter: (value, record) => record.reservation_status_master_id === value,
+      onFilter: (value, record) => record.status_master_name === value,
     },
     {
       title: 'Participants',
@@ -259,8 +259,8 @@ const Record = () => {
               <Descriptions.Item label="Description">{detailedData?.reservation?.reservation_description}</Descriptions.Item>
               <Descriptions.Item label="Status">
                 <Tag color={
-                  detailedData?.reservation?.status_master_name === 'Pending' ? 'gold' :
-                  detailedData?.reservation?.status_master_name === 'Approved' ? 'green' : 'red'
+                  detailedData?.reservation?.status_master_name === 'pending' ? 'gold' :
+                  detailedData?.reservation?.status_master_name === 'approved' ? 'green' : 'red'
                 }>
                   {detailedData?.reservation?.status_master_name}
                 </Tag>

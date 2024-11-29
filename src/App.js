@@ -33,6 +33,7 @@ import Calendars from './pages/landCalendar';
 import Pofiles from './pages/profile';
 import Settings from './pages/Settings';
 import Record from './pages/Record';
+import Admin from './pages/Admin';
 
 import Chat from './components/chat';
 
@@ -67,6 +68,7 @@ const App = () => {
                 <main className="main-content">
                     <Routes>
                         <Route path="/" element={<Navigate to="/gsd" replace />} />
+                        <Route path="/Admin" element={<Admin/>} />
                         <Route path="/record" element={<Record />} />
                         <Route path="/settings" element={<Settings />} />
                         <Route path="/profile1" element={<Pofiles />} />

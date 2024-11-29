@@ -398,7 +398,11 @@ const Dashboard = () => {
                 variants={navButtonVariants}
                 whileHover="hover"
                 whileTap="tap"
-                onClick={() => navigate('/login')}
+                onClick={() => {
+                  localStorage.clear();
+                  sessionStorage.clear();
+                  navigate('/');
+                }}
                 className="flex items-center space-x-2 text-red-600 px-4 py-2 rounded-lg text-sm font-medium"
               >
                 <FiLogOut className="w-5 h-5" />
