@@ -97,7 +97,7 @@ const Master = () => {
         setIsSuccess(true);
         setPopupMessage(`Successfully added ${name}!`);
         fetchCategoriesAndMakes();
-        resetForm();
+        clearInputs(); // Only clear inputs, don't close modal
 
         setTimeout(() => {
           setPopupMessage('');
@@ -113,7 +113,7 @@ const Master = () => {
     }
   };
 
-  const resetForm = () => {
+  const clearInputs = () => {
     setCategoryName('');
     setMakeName('');
     setModelName('');
@@ -121,8 +121,14 @@ const Master = () => {
     setUserLevelName('');
     setUserLevelDesc('');
     setDepartmentName('');
+    setConditionName('');
     setSelectedCategory('');
     setSelectedMake('');
+    setMessage('');
+  };
+
+  const resetForm = () => {
+    clearInputs();
     setIsAddCategoryModalOpen(false);
     setIsAddMakeModalOpen(false);
     setIsAddModelModalOpen(false);
@@ -130,7 +136,6 @@ const Master = () => {
     setIsAddUserLevelModalOpen(false);
     setIsAddDepartmentModalOpen(false);
     setIsAddConditionModalOpen(false);
-    setMessage('');
   };
 
   const handleSaveCategoryData = (e) => {

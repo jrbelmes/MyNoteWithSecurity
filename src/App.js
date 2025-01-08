@@ -14,8 +14,7 @@ import { Toaster } from 'sonner';
 import './App.css'; 
 import Logins from './pages/logins';
 import AdminDashboard from './pages/adminDashboard';
-import Faculty from './pages/Faculty';
-
+import Faculty from './pages/Faculty';  // Updated casing to match file name
 import Master from './pages/Master';
 import Vehiclem from './pages/vehiclemake';
 import Departments from './pages/departments';
@@ -34,6 +33,8 @@ import Pofiles from './pages/profile';
 import Settings from './pages/Settings';
 import Record from './pages/Record';
 import Admin from './pages/Admin';
+import DeanDashboard from './page_dean/dashboard';
+import ViewApproval from './page_dean/viewApproval';
 
 import Chat from './components/chat';
 
@@ -69,6 +70,8 @@ const App = () => {
                     <Routes>
                         <Route path="/" element={<Navigate to="/gsd" replace />} />
                         <Route path="/Admin" element={<Admin/>} />
+                        <Route path="/viewApproval" element={<ViewApproval />} />
+                        <Route path="/deanDashboard" element={<DeanDashboard />} />
                         <Route path="/record" element={<Record />} />
                         <Route path="/settings" element={<Settings />} />
                         <Route path="/profile1" element={<Pofiles />} />

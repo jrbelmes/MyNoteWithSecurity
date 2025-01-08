@@ -21,7 +21,8 @@ import {
   Row,
   Col,
   Descriptions,
-  Tag
+  Tag,
+  Spin
 } from 'antd';
 import { EyeOutlined, UserOutlined, ClockCircleOutlined, TeamOutlined, CarOutlined, ToolOutlined } from '@ant-design/icons';
 import moment from 'moment';
@@ -47,6 +48,237 @@ const themeColors = {
   completed: '#1976D2'
 };
 
+// Add this style block
+const styles = {
+  searchInput: {
+    borderColor: themeColors.primary
+  }
+};
+
+// Add this function before DetailModal
+const getStatusColor = (status) => {
+  switch(status?.toLowerCase()) {
+    case 'approve':
+    case 'approved':
+      return 'green';
+    case 'pending':
+      return 'gold';
+    case 'decline':
+    case 'declined':
+      return 'red';
+    case 'reserved':
+      return 'blue';
+    case 'cancelled':
+      return 'gray';
+    default:
+      return 'default';
+  }
+};
+
+// Move DetailModal outside of Record component
+const DetailModal = ({ visible, record, onClose, theme }) => {
+  const [activeTab, setActiveTab] = useState('1');
+  const [modalData, setModalData] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (visible && record?.approval_id) {
+        setIsLoading(true);
+        try {
+          const response = await axios.post('http://localhost/coc/gsd/records&reports.php', {
+            operation: 'getReservationDetailsById',
+            json: {
+              approval_id: record.approval_id
+            }
+          }, {
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (response.data?.status === 'success') {
+            setModalData(response.data.data);
+          }
+        } catch (error) {
+          toast.error('Error fetching details');
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    fetchData();
+  }, [visible, record]);
+
+  // Replace detailedData with modalData in the render logic
+  const VenueView = () => (
+    <div className="p-4">
+      {isLoading ? (
+        <div style={{ textAlign: 'center', padding: '20px' }}>
+          <Spin size="large" />
+        </div>
+      ) : (
+        <Descriptions bordered column={1}>
+          <Descriptions.Item label="Venue Name">{modalData?.venue?.venue_name}</Descriptions.Item>
+          {/* Update all detailedData references to modalData */}
+          <Descriptions.Item label="Form Name">{modalData?.venue?.venue_form_name}</Descriptions.Item>
+          <Descriptions.Item label="Event Title">{modalData?.venue?.venue_form_event_title}</Descriptions.Item>
+          <Descriptions.Item label="Description">{modalData?.venue?.venue_form_description}</Descriptions.Item>
+          <Descriptions.Item label="Participants">{modalData?.venue?.venue_participants}</Descriptions.Item>
+          <Descriptions.Item label="Start Date">
+            {moment(modalData?.venue?.venue_form_start_date).format('MMM DD, YYYY hh:mm A')}
+          </Descriptions.Item>
+          <Descriptions.Item label="End Date">
+            {moment(modalData?.venue?.venue_form_end_date).format('MMM DD, YYYY hh:mm A')}
+          </Descriptions.Item>
+          <Descriptions.Item label="Requester">{modalData?.venue?.venue_form_user_full_name}</Descriptions.Item>
+          <Descriptions.Item label="Approval Status">
+            <Tag color={getStatusColor(record?.approval_status)}>{record?.approval_status}</Tag>
+          </Descriptions.Item>
+          <Descriptions.Item label="Request Status">
+            <Tag color={getStatusColor(modalData?.status_request)}>{modalData?.status_request}</Tag>
+          </Descriptions.Item>
+        </Descriptions>
+      )}
+    </div>
+  );
+
+  const VehicleView = () => (
+    <div className="p-4">
+      {isLoading ? (
+        <div style={{ textAlign: 'center', padding: '20px' }}>
+          <Spin size="large" />
+        </div>
+      ) : (
+        <>
+          <Descriptions bordered column={1}>
+            <Descriptions.Item label="Vehicle Details">
+              <div style={{ padding: '8px' }}>
+                <Row gutter={[16, 16]}>
+                  <Col span={12}>
+                    <strong>Make:</strong> {modalData?.vehicle?.vehicle_make}
+                  </Col>
+                  <Col span={12}>
+                    <strong>Model:</strong> {modalData?.vehicle?.vehicle_model}
+                  </Col>
+                  <Col span={12}>
+                    <strong>Category:</strong> {modalData?.vehicle?.vehicle_category}
+                  </Col>
+                  <Col span={12}>
+                    <strong>License:</strong> {modalData?.vehicle?.vehicle_license}
+                  </Col>
+                </Row>
+              </div>
+            </Descriptions.Item>
+            <Descriptions.Item label="Form Name">{modalData?.vehicle?.vehicle_form_name}</Descriptions.Item>
+            <Descriptions.Item label="Purpose">{modalData?.vehicle?.vehicle_form_purpose}</Descriptions.Item>
+            <Descriptions.Item label="Destination">{modalData?.vehicle?.vehicle_form_destination}</Descriptions.Item>
+            <Descriptions.Item label="Start Date">
+              {modalData?.vehicle?.vehicle_form_start_date && 
+              moment(modalData?.vehicle?.vehicle_form_start_date).format('MMM DD, YYYY hh:mm A')}
+            </Descriptions.Item>
+            <Descriptions.Item label="End Date">
+              {modalData?.vehicle?.vehicle_form_end_date && 
+              moment(modalData?.vehicle?.vehicle_form_end_date).format('MMM DD, YYYY hh:mm A')}
+            </Descriptions.Item>
+            <Descriptions.Item label="Requester">{modalData?.vehicle?.vehicle_form_user_full_name}</Descriptions.Item>
+            <Descriptions.Item label="Approval Status">
+              <Tag color={getStatusColor(record?.approval_status)}>{record?.approval_status}</Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="Request Status">
+              <Tag color={getStatusColor(modalData?.status_request)}>{modalData?.status_request}</Tag>
+            </Descriptions.Item>
+          </Descriptions>
+          
+          {modalData?.passengers?.length > 0 && (
+            <div style={{ marginTop: '24px' }}>
+              <Title level={4}>Passengers</Title>
+              <Table
+                dataSource={modalData.passengers}
+                columns={[
+                  { 
+                    title: 'Name',
+                    dataIndex: 'passenger_name',
+                    key: 'passenger_name'
+                  },
+                  { 
+                    title: 'ID',
+                    dataIndex: 'passenger_id',
+                    key: 'passenger_id'
+                  }
+                ]}
+                pagination={false}
+                bordered
+                size="small"
+              />
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+
+  const items = [
+    {
+      key: '1',
+      label: 'Details',
+      children: record?.form_type === 'Venue' ? <VenueView /> : <VehicleView />
+    },
+    {
+      key: '2',
+      label: 'Equipment',
+      children: (
+        <div className="p-4">
+          {modalData?.equipment && (
+            <Descriptions bordered>
+              <Descriptions.Item label="Equipment Name">{modalData.equipment.equipment_name}</Descriptions.Item>
+              <Descriptions.Item label="Quantity">{modalData.equipment.reservation_equipment_quantity}</Descriptions.Item>
+            </Descriptions>
+          )}
+        </div>
+      )
+    }
+  ];
+
+  return (
+    <Modal
+      title={
+        <span style={{ color: theme.primary }}>
+          Reservation Details - {record?.reservation_event_title}
+        </span>
+      }
+      open={visible}
+      onCancel={onClose}
+      width={800}
+      footer={[
+        <Button 
+          key="close-button"
+          onClick={onClose}
+          style={{
+            backgroundColor: theme.primary,
+            color: theme.white
+          }}
+        >
+          Close
+        </Button>
+      ]}
+      style={{
+        borderRadius: '12px',
+        overflow: 'hidden'
+      }}
+      className="detail-modal"
+    >
+      <Tabs 
+        defaultActiveKey="1" 
+        items={items}
+        onChange={setActiveTab}
+        className="detail-tabs"
+      />
+    </Modal>
+  );
+};
+
 const Record = () => {
   const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -62,8 +294,13 @@ const Record = () => {
   const fetchReservations = async () => {
     setLoading(true);
     try {
-        const response = await axios.post('http://localhost/coc/gsd/fetch_reserve.php', {
-            operation: 'fetchRecords',
+        const response = await axios.post('http://localhost/coc/gsd/records&reports.php', {
+            operation: 'fetchRecord',
+            json: {}
+        }, {
+            headers: {
+                'Content-Type': 'application/json'
+            }
         });
 
         if (response.data?.status === 'success') {
@@ -83,78 +320,63 @@ const Record = () => {
   };
 
   const consolidateReservations = (data) => {
-    return data.map(item => ({
-      reservation_id: item.reservation_id,
-      reservation_event_title: item.reservation_event_title,
-      reservation_description: item.reservation_description,
-      reservation_start_date: item.reservation_start_date,
-      reservation_end_date: item.reservation_end_date,
-      status_master_name: item.status_master_name,
-      reservation_participants: item.reservation_participants
+    const consolidated = data.map(item => ({
+      approval_id: item.approval_id,
+      form_name: item.venue_form_name || item.vehicle_form_name || 'N/A',
+      form_type: item.venue_form_name ? 'Venue' : item.vehicle_form_name ? 'Vehicle' : 'N/A',
+      approval_created_at: item.approval_created_at,
+      approval_status: item.approval_status,
+      reservation_status: item.reservation_status
     }));
-  };
-
-  const getStatusBadge = (status) => {
-    const statusMap = {
-      'pending': { color: themeColors.pending, text: 'pending' },
-      'approved': { color: themeColors.approved, text: 'approved' },
-      'decline': { color: themeColors.declined, text: 'decline' },
-      'cancelled': { color: themeColors.expired, text: 'cancelled' },
-      'completed': { color: themeColors.completed, text: 'completed' }
-    };
-    
-    return (
-      <Badge
-        style={{ 
-          backgroundColor: statusMap[status]?.color || themeColors.pending,
-          padding: '4px 12px',
-          borderRadius: '12px'
-        }}
-        text={<span style={{ color: '#fff' }}>{status}</span>}
-      />
-    );
+    console.log('Consolidated data:', consolidated);
+    return consolidated;
   };
 
   const columns = [
     {
-      title: 'Event Title',
-      dataIndex: 'reservation_event_title',
-      sorter: (a, b) => a.reservation_event_title.localeCompare(b.reservation_event_title),
+      title: 'Approval ID',
+      dataIndex: 'approval_id',
+      sorter: (a, b) => a.approval_id - b.approval_id,
+    },
+    {
+      title: 'Form Name',
+      dataIndex: 'form_name',
+      sorter: (a, b) => a.form_name.localeCompare(b.form_name),
       filterable: true,
     },
     {
-      title: 'Description',
-      dataIndex: 'reservation_description',
-      ellipsis: true,
-    },
-    {
-      title: 'Start Date',
-      dataIndex: 'reservation_start_date',
-      render: (date) => moment(date).format('MMM DD, YYYY hh:mm A'),
-      sorter: (a, b) => moment(a.reservation_start_date).unix() - moment(b.reservation_start_date).unix(),
-    },
-    {
-      title: 'End Date',
-      dataIndex: 'reservation_end_date',
-      render: (date) => moment(date).format('MMM DD, YYYY hh:mm A'),
-    },
-    {
-      title: 'Status',
-      dataIndex: 'status_master_name',
-      render: (status) => getStatusBadge(status),
+      title: 'Type',
+      dataIndex: 'form_type',
       filters: [
-        { text: 'pending', value: 'pending' },
-        { text: 'approved', value: 'approved' },
-        { text: 'decline', value: 'decline' },
-        { text: 'cancelled', value: 'cancelled' },
-        { text: 'completed', value: 'completed' },
+        { text: 'Venue', value: 'Venue' },
+        { text: 'Vehicle', value: 'Vehicle' },
       ],
-      onFilter: (value, record) => record.status_master_name === value,
+      onFilter: (value, record) => record.form_type === value,
     },
     {
-      title: 'Participants',
-      dataIndex: 'reservation_participants',
-      sorter: (a, b) => a.reservation_participants - b.reservation_participants,
+      title: 'Created Date',
+      dataIndex: 'approval_created_at',
+      render: (date) => moment(date).format('MMM DD, YYYY hh:mm A'),
+      sorter: (a, b) => moment(a.approval_created_at).unix() - moment(b.approval_created_at).unix(),
+    },
+    {
+      title: 'Approval Status',
+      dataIndex: 'approval_status',
+      filters: [
+        { text: 'Approved', value: 'approve' },
+        { text: 'Pending', value: 'pending' },
+        { text: 'Declined', value: 'decline' },
+      ],
+      onFilter: (value, record) => record.approval_status === value,
+    },
+    {
+      title: 'Reservation Status',
+      dataIndex: 'reservation_status',
+      filters: [
+        { text: 'Reserved', value: 'Reserved' },
+        { text: 'Cancelled', value: 'Cancelled' },
+      ],
+      onFilter: (value, record) => record.reservation_status === value,
     },
     {
       title: 'Action',
@@ -175,185 +397,16 @@ const Record = () => {
   const filteredReservations = reservations.filter(reservation => {
     const searchLower = searchText.toLowerCase();
     return (
-      reservation.reservation_event_title.toLowerCase().includes(searchLower) ||
-      reservation.reservation_description.toLowerCase().includes(searchLower)
+      reservation.form_name.toLowerCase().includes(searchLower) ||
+      reservation.form_type.toLowerCase().includes(searchLower) ||
+      reservation.approval_status.toLowerCase().includes(searchLower) ||
+      (reservation.reservation_status && reservation.reservation_status.toLowerCase().includes(searchLower))
     );
   });
 
   const showModal = (record) => {
     setSelectedRecord(record);
     setIsModalVisible(true);
-  };
-
-  const DetailModal = ({ visible, record, onClose, theme }) => {
-    const [activeTab, setActiveTab] = useState('1');
-    const [detailedData, setDetailedData] = useState(null);
-  
-    useEffect(() => {
-      if (record?.reservation_id) {
-        fetchDetailedData(record.reservation_id);
-      }
-    }, [record]);
-  
-    const fetchDetailedData = async (id) => {
-      try {
-        const response = await axios.post('http://localhost/coc/gsd/fetch_reserve.php', {
-          operation: 'getReservationDetailsById',
-          reservation_id: id
-        });
-        if (response.data?.status === 'success') {
-          setDetailedData(response.data.data);
-        }
-      } catch (error) {
-        toast.error('Error fetching details');
-      }
-    };
-
-    const getUserProfilePic = (picPath) => {
-      if (!picPath || picPath.endsWith('.')) return null; // Handle invalid paths ending with dot
-      // Assume jpg if no extension is provided
-      const path = picPath.endsWith('.') ? `${picPath}jpg` : picPath;
-      return `http://localhost/coc/gsd/${path}`;
-    };
-  
-    const items = [
-      {
-        key: '1',
-        label: 'Basic Info',
-        children: (
-          <div className="p-4" style={{ backgroundColor: theme.light }}>
-            <div className="flex items-center mb-4">
-              <Avatar 
-                size={64} 
-                src={getUserProfilePic(detailedData?.reservation?.users_pic)}
-                icon={<UserOutlined />}
-                style={{
-                  border: `2px solid ${theme.primary}`,
-                  backgroundColor: theme.light
-                }}
-                onError={(e) => {
-                  // Fallback to UserOutlined icon if image fails to load
-                  const target = e.target;
-                  target.onerror = null; // Prevent infinite loop
-                  target.style.display = 'none';
-                }}
-              />
-              <div className="ml-4">
-                <h3 className="text-lg font-bold">{detailedData?.reservation?.users_full_name}</h3>
-                <p>{detailedData?.reservation?.users_contact_number}</p>
-              </div>
-            </div>
-            <Descriptions 
-              bordered 
-              column={1}
-              style={{
-                backgroundColor: theme.white,
-                borderRadius: '8px',
-                '.ant-descriptions-item-label': {
-                  backgroundColor: theme.light,
-                  color: theme.primary
-                }
-              }}
-            >
-              <Descriptions.Item label="Event Title">{detailedData?.reservation?.reservation_event_title}</Descriptions.Item>
-              <Descriptions.Item label="Description">{detailedData?.reservation?.reservation_description}</Descriptions.Item>
-              <Descriptions.Item label="Status">
-                <Tag color={
-                  detailedData?.reservation?.status_master_name === 'pending' ? 'gold' :
-                  detailedData?.reservation?.status_master_name === 'approved' ? 'green' : 'red'
-                }>
-                  {detailedData?.reservation?.status_master_name}
-                </Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label="Created Date">
-                {moment(detailedData?.reservation?.date_created).format('MMM DD, YYYY hh:mm A')}
-              </Descriptions.Item>
-            </Descriptions>
-          </div>
-        ),
-      },
-      {
-        key: '2',
-        label: 'Timeline',
-        children: (
-          <Timeline mode="left" className="p-4">
-            <Timeline.Item color="green">Created at {moment(detailedData?.reservation?.date_created).format('MMM DD, YYYY hh:mm A')}</Timeline.Item>
-            <Timeline.Item color="blue">Starts at {moment(detailedData?.reservation?.reservation_start_date).format('MMM DD, YYYY hh:mm A')}</Timeline.Item>
-            <Timeline.Item color="red">Ends at {moment(detailedData?.reservation?.reservation_end_date).format('MMM DD, YYYY hh:mm A')}</Timeline.Item>
-          </Timeline>
-        ),
-      },
-      {
-        key: '3',
-        label: 'Resources',
-        children: (
-          <div className="p-4">
-            <Row gutter={[16, 16]}>
-              <Col span={8}>
-                <Card>
-                  <Statistic title="Vehicles" value={record?.vehicles?.length || 0} prefix={<CarOutlined />} />
-                </Card>
-              </Col>
-              <Col span={8}>
-                <Card>
-                  <Statistic title="Equipment" value={record?.equipments?.length || 0} prefix={<ToolOutlined />} />
-                </Card>
-              </Col>
-              <Col span={8}>
-                <Card>
-                  <Statistic title="Participants" value={record?.reservation_participants || 0} prefix={<TeamOutlined />} />
-                </Card>
-              </Col>
-            </Row>
-          </div>
-        ),
-      },
-    ];
-  
-    return (
-      <Modal
-        title={
-          <span style={{ color: theme.primary }}>
-            Reservation Details - {record?.reservation_event_title}
-          </span>
-        }
-        open={visible}
-        onCancel={onClose}
-        width={800}
-        footer={[
-          <Button 
-            key="close" 
-            onClick={onClose}
-            style={{
-              backgroundColor: theme.primary,
-              color: theme.white
-            }}
-          >
-            Close
-          </Button>
-        ]}
-        style={{
-          '.ant-modal-content': {
-            borderRadius: '12px',
-            overflow: 'hidden'
-          }
-        }}
-      >
-        <Tabs 
-          defaultActiveKey="1" 
-          items={items}
-          onChange={setActiveTab}
-          style={{
-            '.ant-tabs-tab.ant-tabs-tab-active': {
-              color: theme.primary
-            },
-            '.ant-tabs-ink-bar': {
-              backgroundColor: theme.primary
-            }
-          }}
-        />
-      </Modal>
-    );
   };
 
   return (
@@ -380,29 +433,20 @@ const Record = () => {
                 placeholder="Search reservations..."
                 allowClear
                 onChange={(e) => setSearchText(e.target.value)}
-                style={{ 
-                  width: 300,
-                  '.ant-input': { borderColor: themeColors.primary }
-                }}
+                style={{ width: 300 }}
+                className="search-input"
               />
               <Select
                 defaultValue="all"
-                style={{ 
-                  width: 120,
-                  '.ant-select-selector': { borderColor: themeColors.primary }
-                }}
+                style={{ width: 120 }}
+                className="status-select"
                 onChange={setStatusFilter}
                 options={[
                   { value: 'all', label: 'All Status' },
                   { value: '1', label: 'Pending' },
                   { value: '2', label: 'Approved' },
-                  { value: '3', label: 'Rejected' },
+                  { value: '3', label: 'Declined' }
                 ]}
-              />
-              <DatePicker.RangePicker 
-                style={{
-                  borderColor: themeColors.primary
-                }}
               />
             </Space>
           </div>
@@ -410,7 +454,7 @@ const Record = () => {
           <Table
             columns={columns}
             dataSource={filteredReservations}
-            rowKey="reservation_id"
+            rowKey="approval_id"
             loading={loading}
             pagination={{
               pageSize: 10,
@@ -419,19 +463,18 @@ const Record = () => {
             }}
             scroll={{ x: 1000 }}
             style={{
-              '.ant-table-thead > tr > th': {
-                backgroundColor: themeColors.light,
-                color: themeColors.primary
-              },
-              '.ant-table-tbody > tr:hover > td': {
-                backgroundColor: themeColors.light
-              }
+              borderRadius: '8px',
+              overflow: 'hidden'
             }}
+            className="record-table"
           />
           <DetailModal
             visible={isModalVisible}
             record={selectedRecord}
-            onClose={() => setIsModalVisible(false)}
+            onClose={() => {
+              setIsModalVisible(false);
+              setSelectedRecord(null);
+            }}
             theme={themeColors}
           />
         </Card>
@@ -441,3 +484,4 @@ const Record = () => {
 };
 
 export default Record;
+

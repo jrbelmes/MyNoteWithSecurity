@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
+import Calendar from './landCalendar';  // Add this import
 import { FaClipboardList, FaCar, FaUsers, FaBuilding, FaTools, FaUserTie, FaEye, FaCheckCircle, FaBell, FaPlus, FaSearch, FaCog, FaUserCog, FaUserCircle, FaSun, FaMoon } from 'react-icons/fa';
 import { Line, Doughnut, Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, ArcElement, BarElement, Title, Tooltip, Legend } from 'chart.js';
@@ -139,9 +140,37 @@ const Dashboard = () => {
         fetchTotals();
     }, []);
 
-    
+    // Add chart data initialization after the state declarations
+    useEffect(() => {
+        const fetchChartData = async () => {
+            try {
+                const response = await axios.post('http://localhost/coc/gsd/fetch_reserve.php', {
+                    operation: 'fetchChartData'
+                });
+                if (response.data.status === 'success') {
+                    setChartData(response.data.data);
+                }
+            } catch (error) {
+                console.error('Error fetching chart data:', error);
+            }
+        };
 
-    
+        if (!loading) {
+            fetchChartData();
+        }
+    }, [loading]);
+
+    // Fix dark mode implementation after useEffect
+    useEffect(() => {
+        // Save dark mode preference to localStorage
+        localStorage.setItem('darkMode', darkMode);
+        // Apply dark mode class to body
+        if (darkMode) {
+            document.body.classList.add('dark');
+        } else {
+            document.body.classList.remove('dark');
+        }
+    }, [darkMode]);
 
     const fetchVenues = useCallback(async () => {
         try {
@@ -345,17 +374,24 @@ const Dashboard = () => {
         visible: { opacity: 1, scale: 1 }
     };
 
+    // Fix getStatusClass function
     const getStatusClass = (status) => {
-        if (!status) return 'bg-gray-100 text-gray-800'; // Default style if status is undefined
-        switch (status.toLowerCase()) {
+        if (!status) return 'bg-gray-100 text-gray-800';
+        
+        const statusLower = status.toLowerCase().trim();
+        switch (statusLower) {
             case 'pending':
                 return 'bg-yellow-100 text-yellow-800';
             case 'reserve':
+            case 'reserved':
                 return 'bg-green-100 text-green-800';
             case 'declined':
+            case 'rejected':
                 return 'bg-red-100 text-red-800';
             case 'released':
                 return 'bg-blue-100 text-blue-800';
+            case 'returned':
+                return 'bg-purple-100 text-purple-800';
             default:
                 return 'bg-gray-100 text-gray-800';
         }
@@ -666,6 +702,15 @@ const Dashboard = () => {
 
                     {/* Main content area */}
                     <div className="flex-1 overflow-y-auto p-6">
+                    <motion.div 
+                                className=""
+                                variants={itemVariants}
+                            >
+                                <h3 className="text-xl font-semibold mb-4 text-green-800"></h3>
+                                <div className="h-[800px] overflow-hidden">
+                                    <Calendar />
+                                </div>
+                            </motion.div>
                         {/* Quick Actions Dropdown */}
                         <AnimatePresence>
                             {showQuickActions && (
@@ -913,613 +958,616 @@ const Dashboard = () => {
                                     </ul>
                                 </div>
                             </motion.div>
+
+                            {/* Calendar Component */}
+                            
                         </div>
+
+                        {/* Existing modals */}
+                        <AnimatePresence>
+                            {modalOpen && selectedReservation && (
+                                <motion.div 
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+                                >
+                                    <motion.div 
+                                        initial={{ scale: 0.9, opacity: 0 }}
+                                        animate={{ scale: 1, opacity: 1 }}
+                                        exit={{ scale: 0.9, opacity: 0 }}
+                                        className="bg-white rounded-xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+                                    >
+                                        <h3 className="text-3xl font-bold mb-6 text-green-800 border-b-2 border-green-500 pb-2">Reservation Details</h3>
+                                        <div className="grid grid-cols-2 gap-6">
+                                            <div>
+                                                <p className="font-medium text-gray-600">Name:</p>
+                                                <p className="text-lg">{selectedReservation.reservation?.reservation_name}</p>
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-gray-600">Status:</p>
+                                                <p className={`px-3 py-1 rounded-full text-sm inline-block ${getStatusClass(selectedReservation.reservation?.status_master_name)}`}>
+                                                    {selectedReservation.reservation?.status_master_name}
+                                                </p>
+                                            </div>
+                                            <div className="col-span-2">
+                                                <p className="font-medium text-gray-600">Event Title:</p>
+                                                <p className="text-lg">{selectedReservation.reservation?.reservation_event_title}</p>
+                                            </div>
+                                            <div className="col-span-2">
+                                                <p className="font-medium text-gray-600">Description:</p>
+                                                <p className="text-sm">{selectedReservation.reservation?.reservation_description}</p>
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-gray-600">Start:</p>
+                                                <p>{formatDate(selectedReservation.reservation?.reservation_start_date)}</p>
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-gray-600">End:</p>
+                                                <p>{formatDate(selectedReservation.reservation?.reservation_end_date)}</p>
+                                            </div>
+                                            <div className="col-span-2">
+                                                <p className="font-medium text-gray-600">Created:</p>
+                                                <p>{formatDate(selectedReservation.reservation?.date_created)}</p>
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-gray-600">Requested By:</p>
+                                                <p className="text-lg">{selectedReservation.reservation?.requested_by}</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Vehicles */}
+                                        {selectedReservation.vehicles && selectedReservation.vehicles.length > 0 && (
+                                            <div className="mt-6">
+                                                <h4 className="font-semibold text-green-700 mb-2">Vehicles Used:</h4>
+                                                <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
+                                                    {selectedReservation.vehicles.map((vehicle) => (
+                                                        <li key={vehicle.vehicle_license} className="text-sm mb-2">
+                                                            {vehicle.vehicle_license} (ID: {vehicle.vehicle_reservation_vehicle_id})
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+
+                                        {/* Equipment */}
+                                        {selectedReservation.equipment && selectedReservation.equipment.length > 0 && (
+                                            <div className="mt-6">
+                                                <h4 className="font-semibold text-green-700 mb-2">Equipment Used:</h4>
+                                                <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
+                                                    {selectedReservation.equipment.map((equip) => (
+                                                        <li key={equip.equip_name} className="text-sm mb-2">
+                                                            {equip.equip_name} (Quantity: {equip.quantity})
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+
+                                        {/* Venues */}
+                                        {selectedReservation.venues && selectedReservation.venues.length > 0 && (
+                                            <div className="mt-6">
+                                                <h4 className="font-semibold text-green-700 mb-2">Venues Used:</h4>
+                                                <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
+                                                    {selectedReservation.venues.map((venue) => (
+                                                        <li key={venue.ven_name} className="text-sm mb-2">
+                                                            {venue.ven_name}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+
+                                        <div className="mt-8 flex justify-end space-x-4">
+                                            {selectedReservation.reservation?.reservation_status_name === 'reserve' && (
+                                                <button 
+                                                    className={`bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600 transition-colors ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                    onClick={() => handleRelease(selectedReservation.reservation.reservation_id)}
+                                                    disabled={loading}
+                                                >
+                                                    {loading ? 'Releasing...' : 'Release'}
+                                                </button>
+                                            )}
+                                            <button 
+                                                className="bg-gray-300 text-gray-800 py-2 px-4 rounded hover:bg-gray-400 transition-colors"
+                                                onClick={() => {
+                                                    setModalOpen(false);
+                                                    setSelectedReservation(null);
+                                                }}
+                                                disabled={loading}
+                                            >
+                                                Close
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {/* Recent Reservation Modal */}
+                        <AnimatePresence>
+                            {recentReservationModalOpen && selectedRecentReservation && (
+                                <motion.div 
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+                                >
+                                    <motion.div 
+                                        initial={{ scale: 0.9, opacity: 0 }}
+                                        animate={{ scale: 1, opacity: 1 }}
+                                        exit={{ scale: 0.9, opacity: 0 }}
+                                        className="bg-white rounded-xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+                                    >
+                                        <h3 className="text-3xl font-bold mb-6 text-green-800 border-b-2 border-green-500 pb-2">Recent Reservation Details</h3>
+                                        <div className="grid grid-cols-2 gap-6">
+                                            <div>
+                                                <p className="font-medium text-gray-600">Name:</p>
+                                                <p className="text-lg">{selectedRecentReservation.reservation?.reservation_name}</p>
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-gray-600">Status:</p>
+                                                <p className={`px-3 py-1 rounded-full text-sm inline-block ${getStatusClass(selectedRecentReservation.reservation?.status_master_name)}`}>
+                                                    {selectedRecentReservation.reservation?.status_master_name}
+                                                </p>
+                                            </div>
+                                            <div className="col-span-2">
+                                                <p className="font-medium text-gray-600">Event Title:</p>
+                                                <p className="text-lg">{selectedRecentReservation.reservation?.reservation_event_title}</p>
+                                            </div>
+                                            <div className="col-span-2">
+                                                <p className="font-medium text-gray-600">Description:</p>
+                                                <p className="text-sm">{selectedRecentReservation.reservation?.reservation_description}</p>
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-gray-600">Start:</p>
+                                                <p>{formatDate(selectedRecentReservation.reservation?.reservation_start_date)}</p>
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-gray-600">End:</p>
+                                                <p>{formatDate(selectedRecentReservation.reservation?.reservation_end_date)}</p>
+                                            </div>
+                                            <div className="col-span-2">
+                                                <p className="font-medium text-gray-600">Created:</p>
+                                                <p>{formatDate(selectedRecentReservation.reservation?.date_created)}</p>
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-gray-600">Requested By:</p>
+                                                <p className="text-lg">{selectedRecentReservation.reservation?.users_name}</p>
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-gray-600">Contact Number:</p>
+                                                <p className="text-lg">{selectedRecentReservation.reservation?.users_contact_number}</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Vehicles */}
+                                        {selectedRecentReservation.vehicles && selectedRecentReservation.vehicles.length > 0 && (
+                                            <div className="mt-6">
+                                                <h4 className="font-semibold text-green-700 mb-2">Vehicles Used:</h4>
+                                                <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
+                                                    {selectedRecentReservation.vehicles.map((vehicle) => (
+                                                        <li key={vehicle.vehicle_license} className="text-sm mb-2">
+                                                            {vehicle.vehicle_license} (ID: {vehicle.vehicle_reservation_vehicle_id})
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+
+                                        {/* Equipment */}
+                                        {selectedRecentReservation.equipment && selectedRecentReservation.equipment.length > 0 && (
+                                            <div className="mt-6">
+                                                <h4 className="font-semibold text-green-700 mb-2">Equipment Used:</h4>
+                                                <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
+                                                    {selectedRecentReservation.equipment.map((equip) => (
+                                                        <li key={equip.equip_name} className="text-sm mb-2">
+                                                            {equip.equip_name} (Quantity: {equip.quantity})
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+
+                                        {/* Venues */}
+                                        {selectedRecentReservation.venues && selectedRecentReservation.venues.length > 0 && (
+                                            <div className="mt-6">
+                                                <h4 className="font-semibold text-green-700 mb-2">Venues Used:</h4>
+                                                <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
+                                                    {selectedRecentReservation.venues.map((venue) => (
+                                                        <li key={venue.ven_name} className="text-sm mb-2">
+                                                            {venue.ven_name}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+
+                                        <div className="mt-8 flex justify-end space-x-4">
+                                            <button 
+                                                className="bg-gray-300 text-gray-800 py-2 px-4 rounded hover:bg-gray-400 transition-colors"
+                                                onClick={() => {
+                                                    setRecentReservationModalOpen(false);
+                                                    setSelectedRecentReservation(null);
+                                                }}
+                                            >
+                                                Close
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {/* Release Reservation Modal */}
+                        <AnimatePresence>
+                            {releaseModalOpen && selectedReleaseReservation && (
+                                <motion.div 
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+                                >
+                                    <motion.div 
+                                        initial={{ scale: 0.9, opacity: 0 }}
+                                        animate={{ scale: 1, opacity: 1 }}
+                                        exit={{ scale: 0.9, opacity: 0 }}
+                                        className="bg-white rounded-xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+                                    >
+                                        <h3 className="text-3xl font-bold mb-6 text-green-800 border-b-2 border-green-500 pb-2">Release Reservation Details</h3>
+                                        <div className="grid grid-cols-2 gap-6">
+                                            <div>
+                                                <p className="font-medium text-gray-600">Name:</p>
+                                                <p className="text-lg">{selectedReleaseReservation.reservation?.reservation_name}</p>
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-gray-600">Status:</p>
+                                                <p className={`px-3 py-1 rounded-full text-sm inline-block ${getStatusClass(selectedReleaseReservation.reservation?.status_master_name)}`}>
+                                                    {selectedReleaseReservation.reservation?.status_master_name}
+                                                </p>
+                                            </div>
+                                            <div className="col-span-2">
+                                                <p className="font-medium text-gray-600">Event Title:</p>
+                                                <p className="text-lg">{selectedReleaseReservation.reservation?.reservation_event_title}</p>
+                                            </div>
+                                            <div className="col-span-2">
+                                                <p className="font-medium text-gray-600">Description:</p>
+                                                <p className="text-sm">{selectedReleaseReservation.reservation?.reservation_description}</p>
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-gray-600">Start:</p>
+                                                <p>{formatDate(selectedReleaseReservation.reservation?.reservation_start_date)}</p>
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-gray-600">End:</p>
+                                                <p>{formatDate(selectedReleaseReservation.reservation?.reservation_end_date)}</p>
+                                            </div>
+                                            <div className="col-span-2">
+                                                <p className="font-medium text-gray-600">Created:</p>
+                                                <p>{formatDate(selectedReleaseReservation.reservation?.date_created)}</p>
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-gray-600">Requested By:</p>
+                                                <p className="text-lg">{selectedReleaseReservation.reservation?.users_name}</p>
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-gray-600">Contact Number:</p>
+                                                <p className="text-lg">{selectedReleaseReservation.reservation?.users_contact_number}</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Vehicles */}
+                                        {selectedReleaseReservation.vehicles && selectedReleaseReservation.vehicles.length > 0 && (
+                                            <div className="mt-6">
+                                                <h4 className="font-semibold text-green-700 mb-2">Vehicles Used:</h4>
+                                                <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
+                                                    {selectedReleaseReservation.vehicles.map((vehicle) => (
+                                                        <li key={vehicle.vehicle_license} className="text-sm mb-2">
+                                                            {vehicle.vehicle_license} (ID: {vehicle.vehicle_reservation_vehicle_id})
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+
+                                        {/* Equipment */}
+                                        {selectedReleaseReservation.equipment && selectedReleaseReservation.equipment.length > 0 && (
+                                            <div className="mt-6">
+                                                <h4 className="font-semibold text-green-700 mb-2">Equipment Used:</h4>
+                                                <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
+                                                    {selectedReleaseReservation.equipment.map((equip) => (
+                                                        <li key={equip.equip_name} className="text-sm mb-2">
+                                                            {equip.equip_name} (Quantity: {equip.quantity})
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+
+                                        {/* Venues */}
+                                        {selectedReleaseReservation.venues && selectedReleaseReservation.venues.length > 0 && (
+                                            <div className="mt-6">
+                                                <h4 className="font-semibold text-green-700 mb-2">Venues Used:</h4>
+                                                <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
+                                                    {selectedReleaseReservation.venues.map((venue) => (
+                                                        <li key={venue.ven_name} className="text-sm mb-2">
+                                                            {venue.ven_name}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+
+                                        <div className="mt-8 flex justify-end space-x-4">
+                                            <button 
+                                                className="bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600 transition-colors"
+                                                onClick={() => handleRelease(selectedReleaseReservation.reservation.reservation_id)}
+                                                disabled={loading}
+                                            >
+                                                {loading ? 'Releasing...' : 'Release'}
+                                            </button>
+                                            <button 
+                                                className="bg-gray-300 text-gray-800 py-2 px-4 rounded hover:bg-gray-400 transition-colors"
+                                                onClick={() => {
+                                                    setReleaseModalOpen(false);
+                                                    setSelectedReleaseReservation(null);
+                                                }}
+                                                disabled={loading}
+                                            >
+                                                Close
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {/* Return Reservation Modal */}
+                        <AnimatePresence>
+                            {returnModalOpen && selectedReturnReservation && (
+                                <motion.div 
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+                                >
+                                    <motion.div 
+                                        initial={{ scale: 0.9, opacity: 0 }}
+                                        animate={{ scale: 1, opacity: 1 }}
+                                        exit={{ scale: 0.9, opacity: 0 }}
+                                        className="bg-white rounded-xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+                                    >
+                                        <h3 className="text-3xl font-bold mb-6 text-green-800 border-b-2 border-green-500 pb-2">Return Reservation Details</h3>
+                                        
+                                        {/* Reservation Details */}
+                                        <div className="grid grid-cols-2 gap-4 mb-6">
+                                            <div>
+                                                <p className="font-medium text-gray-600">Name:</p>
+                                                <p className="text-lg">{selectedReturnReservation.reservation?.reservation_name}</p>
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-gray-600">Event Title:</p>
+                                                <p className="text-lg">{selectedReturnReservation.reservation?.reservation_event_title}</p>
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-gray-600">Start Date:</p>
+                                                <p>{formatDate(selectedReturnReservation.reservation?.reservation_start_date)}</p>
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-gray-600">End Date:</p>
+                                                <p>{formatDate(selectedReturnReservation.reservation?.reservation_end_date)}</p>
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-gray-600">Requested By:</p>
+                                                <p className="text-lg">{selectedReturnReservation.reservation?.requested_by}</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Venues */}
+                                        {selectedReturnReservation.venues && selectedReturnReservation.venues.length > 0 && (
+                                            <div className="mb-6">
+                                                <h4 className="font-semibold text-green-700 mb-2">Venues:</h4>
+                                                <table className="w-full">
+                                                    <thead>
+                                                        <tr>
+                                                            <th className="text-left">Name</th>
+                                                            <th className="text-left">Condition</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {selectedReturnReservation.venues.map((venue) => (
+                                                            <tr key={venue.ven_id}>
+                                                                <td className="py-2">{venue.ven_name}</td>
+                                                                <td className="py-2">
+                                                                    <select
+                                                                        className="w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm rounded-md"
+                                                                        onChange={(e) => handleConditionChange('venue', venue.ven_id, e.target.value)}
+                                                                        value={itemConditions[`venue_${venue.ven_id}`] || ''}
+                                                                    >
+                                                                        <option value="">Select condition</option>
+                                                                        {conditions.map((condition) => (
+                                                                            <option key={condition.condition_id} value={condition.condition_id}>
+                                                                                {condition.condition_name}
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+
+                                        {/* Vehicles */}
+                                        {selectedReturnReservation.vehicles && selectedReturnReservation.vehicles.length > 0 && (
+                                            <div className="mb-6">
+                                                <h4 className="font-semibold text-green-700 mb-2">Vehicles:</h4>
+                                                <table className="w-full">
+                                                    <thead>
+                                                        <tr>
+                                                            <th className="text-left">License</th>
+                                                            <th className="text-left">Condition</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {selectedReturnReservation.vehicles.map((vehicle) => (
+                                                            <tr key={vehicle.vehicle_id}>
+                                                                <td className="py-2">{vehicle.vehicle_license}</td>
+                                                                <td className="py-2">
+                                                                    <select
+                                                                        className="w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm rounded-md"
+                                                                        onChange={(e) => handleConditionChange('vehicle', vehicle.vehicle_id, e.target.value)}
+                                                                        value={itemConditions[`vehicle_${vehicle.vehicle_id}`] || ''}
+                                                                    >
+                                                                        <option value="">Select condition</option>
+                                                                        {conditions.map((condition) => (
+                                                                            <option key={condition.condition_id} value={condition.condition_id}>
+                                                                                {condition.condition_name}
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+
+                                        {/* Equipment */}
+                                        {selectedReturnReservation.equipment && selectedReturnReservation.equipment.length > 0 && (
+                                            <div className="mb-6">
+                                                <h4 className="font-semibold text-green-700 mb-2">Equipment:</h4>
+                                                <table className="w-full">
+                                                    <thead>
+                                                        <tr>
+                                                            <th className="text-left">Name</th>
+                                                            <th className="text-left">Quantity</th>
+                                                            <th className="text-left">Condition</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {selectedReturnReservation.equipment.map((equip) => (
+                                                            <tr key={equip.equip_id}>
+                                                                <td className="py-2">{equip.equip_name}</td>
+                                                                <td className="py-2">{equip.quantity}</td>
+                                                                <td className="py-2">
+                                                                    <select
+                                                                        className="w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm rounded-md"
+                                                                        onChange={(e) => handleConditionChange('equipment', equip.equip_id, e.target.value)}
+                                                                        value={itemConditions[`equipment_${equip.equip_id}`] || ''}
+                                                                    >
+                                                                        <option value="">Select condition</option>
+                                                                        {conditions.map((condition) => (
+                                                                            <option key={condition.condition_id} value={condition.condition_id}>
+                                                                                {condition.condition_name}
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+
+                                        <div className="mt-8 flex justify-end space-x-4">
+                                            <button 
+                                                className="bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600 transition-colors"
+                                                onClick={() => handleReturn(selectedReturnReservation.reservation.reservation_id)}
+                                                
+                                            >
+                                                {loading ? 'Returning...' : 'Return'}
+                                            </button>
+                                            <button 
+                                                className="bg-gray-300 text-gray-800 py-2 px-4 rounded hover:bg-gray-400 transition-colors"
+                                                onClick={() => {
+                                                    setReturnModalOpen(false);
+                                                    setSelectedReturnReservation(null);
+                                                    setItemConditions({});
+                                                }}
+                                                disabled={loading}
+                                            >
+                                                Close
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {/* Return Confirmation Modal */}
+                        <AnimatePresence>
+                            {returnConfirmation.show && (
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+                                >
+                                    <motion.div
+                                        initial={{ scale: 0.9, opacity: 0 }}
+                                        animate={{ scale: 1, opacity: 1 }}
+                                        exit={{ scale: 0.9, opacity: 0 }}
+                                        className={`bg-white rounded-lg p-8 max-w-md w-full ${
+                                            returnConfirmation.success ? 'border-green-500' : 'border-red-500'
+                                        } border-4`}
+                                    >
+                                        <h3 className={`text-2xl font-bold mb-4 ${
+                                            returnConfirmation.success ? 'text-green-600' : 'text-red-600'
+                                        }`}>
+                                            {returnConfirmation.success ? 'Success' : 'Error'}
+                                        </h3>
+                                        <p className="text-gray-700 mb-6">{returnConfirmation.message}</p>
+                                        <button
+                                            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
+                                            onClick={() => setReturnConfirmation({ show: false, success: false, message: '' })}
+                                        >
+                                            Close
+                                        </button>
+                                    </motion.div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {/* Release Confirmation Modal */}
+                        <AnimatePresence>
+                            {releaseConfirmation.show && (
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+                                >
+                                    <motion.div
+                                        initial={{ scale: 0.9, opacity: 0 }}
+                                        animate={{ scale: 1, opacity: 1 }}
+                                        exit={{ scale: 0.9, opacity: 0 }}
+                                        className={`bg-white rounded-lg p-8 max-w-md w-full ${
+                                            releaseConfirmation.success ? 'border-green-500' : 'border-red-500'
+                                        } border-4`}
+                                    >
+                                        <h3 className={`text-2xl font-bold mb-4 ${
+                                            releaseConfirmation.success ? 'text-green-600' : 'text-red-600'
+                                        }`}>
+                                            {releaseConfirmation.success ? 'Success' : 'Error'}
+                                        </h3>
+                                        <p className="text-gray-700 mb-6">{releaseConfirmation.message}</p>
+                                        <button
+                                            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
+                                            onClick={() => setReleaseConfirmation({ show: false, success: false, message: '' })}
+                                        >
+                                            Close
+                                        </button>
+                                    </motion.div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
                 </div>
             </div>
-
-            {/* Modal for Reservation Details */}
-            <AnimatePresence>
-                {modalOpen && selectedReservation && (
-                    <motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
-                    >
-                        <motion.div 
-                            initial={{ scale: 0.9, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.9, opacity: 0 }}
-                            className="bg-white rounded-xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-                        >
-                            <h3 className="text-3xl font-bold mb-6 text-green-800 border-b-2 border-green-500 pb-2">Reservation Details</h3>
-                            <div className="grid grid-cols-2 gap-6">
-                                <div>
-                                    <p className="font-medium text-gray-600">Name:</p>
-                                    <p className="text-lg">{selectedReservation.reservation?.reservation_name}</p>
-                                </div>
-                                <div>
-                                    <p className="font-medium text-gray-600">Status:</p>
-                                    <p className={`px-3 py-1 rounded-full text-sm inline-block ${getStatusClass(selectedReservation.reservation?.status_master_name)}`}>
-                                        {selectedReservation.reservation?.status_master_name}
-                                    </p>
-                                </div>
-                                <div className="col-span-2">
-                                    <p className="font-medium text-gray-600">Event Title:</p>
-                                    <p className="text-lg">{selectedReservation.reservation?.reservation_event_title}</p>
-                                </div>
-                                <div className="col-span-2">
-                                    <p className="font-medium text-gray-600">Description:</p>
-                                    <p className="text-sm">{selectedReservation.reservation?.reservation_description}</p>
-                                </div>
-                                <div>
-                                    <p className="font-medium text-gray-600">Start:</p>
-                                    <p>{formatDate(selectedReservation.reservation?.reservation_start_date)}</p>
-                                </div>
-                                <div>
-                                    <p className="font-medium text-gray-600">End:</p>
-                                    <p>{formatDate(selectedReservation.reservation?.reservation_end_date)}</p>
-                                </div>
-                                <div className="col-span-2">
-                                    <p className="font-medium text-gray-600">Created:</p>
-                                    <p>{formatDate(selectedReservation.reservation?.date_created)}</p>
-                                </div>
-                                <div>
-                                    <p className="font-medium text-gray-600">Requested By:</p>
-                                    <p className="text-lg">{selectedReservation.reservation?.requested_by}</p>
-                                </div>
-                            </div>
-
-                            {/* Vehicles */}
-                            {selectedReservation.vehicles && selectedReservation.vehicles.length > 0 && (
-                                <div className="mt-6">
-                                    <h4 className="font-semibold text-green-700 mb-2">Vehicles Used:</h4>
-                                    <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
-                                        {selectedReservation.vehicles.map((vehicle) => (
-                                            <li key={vehicle.vehicle_license} className="text-sm mb-2">
-                                                {vehicle.vehicle_license} (ID: {vehicle.vehicle_reservation_vehicle_id})
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-
-                            {/* Equipment */}
-                            {selectedReservation.equipment && selectedReservation.equipment.length > 0 && (
-                                <div className="mt-6">
-                                    <h4 className="font-semibold text-green-700 mb-2">Equipment Used:</h4>
-                                    <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
-                                        {selectedReservation.equipment.map((equip) => (
-                                            <li key={equip.equip_name} className="text-sm mb-2">
-                                                {equip.equip_name} (Quantity: {equip.quantity})
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-
-                            {/* Venues */}
-                            {selectedReservation.venues && selectedReservation.venues.length > 0 && (
-                                <div className="mt-6">
-                                    <h4 className="font-semibold text-green-700 mb-2">Venues Used:</h4>
-                                    <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
-                                        {selectedReservation.venues.map((venue) => (
-                                            <li key={venue.ven_name} className="text-sm mb-2">
-                                                {venue.ven_name}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-
-                            <div className="mt-8 flex justify-end space-x-4">
-                                {selectedReservation.reservation?.reservation_status_name === 'reserve' && (
-                                    <button 
-                                        className={`bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600 transition-colors ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                        onClick={() => handleRelease(selectedReservation.reservation.reservation_id)}
-                                        disabled={loading}
-                                    >
-                                        {loading ? 'Releasing...' : 'Release'}
-                                    </button>
-                                )}
-                                <button 
-                                    className="bg-gray-300 text-gray-800 py-2 px-4 rounded hover:bg-gray-400 transition-colors"
-                                    onClick={() => {
-                                        setModalOpen(false);
-                                        setSelectedReservation(null);
-                                    }}
-                                    disabled={loading}
-                                >
-                                    Close
-                                </button>
-                            </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            {/* Modal for Recent Reservation Details */}
-            <AnimatePresence>
-                {recentReservationModalOpen && selectedRecentReservation && (
-                    <motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
-                    >
-                        <motion.div 
-                            initial={{ scale: 0.9, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.9, opacity: 0 }}
-                            className="bg-white rounded-xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-                        >
-                            <h3 className="text-3xl font-bold mb-6 text-green-800 border-b-2 border-green-500 pb-2">Recent Reservation Details</h3>
-                            <div className="grid grid-cols-2 gap-6">
-                                <div>
-                                    <p className="font-medium text-gray-600">Name:</p>
-                                    <p className="text-lg">{selectedRecentReservation.reservation?.reservation_name}</p>
-                                </div>
-                                <div>
-                                    <p className="font-medium text-gray-600">Status:</p>
-                                    <p className={`px-3 py-1 rounded-full text-sm inline-block ${getStatusClass(selectedRecentReservation.reservation?.status_master_name)}`}>
-                                        {selectedRecentReservation.reservation?.status_master_name}
-                                    </p>
-                                </div>
-                                <div className="col-span-2">
-                                    <p className="font-medium text-gray-600">Event Title:</p>
-                                    <p className="text-lg">{selectedRecentReservation.reservation?.reservation_event_title}</p>
-                                </div>
-                                <div className="col-span-2">
-                                    <p className="font-medium text-gray-600">Description:</p>
-                                    <p className="text-sm">{selectedRecentReservation.reservation?.reservation_description}</p>
-                                </div>
-                                <div>
-                                    <p className="font-medium text-gray-600">Start:</p>
-                                    <p>{formatDate(selectedRecentReservation.reservation?.reservation_start_date)}</p>
-                                </div>
-                                <div>
-                                    <p className="font-medium text-gray-600">End:</p>
-                                    <p>{formatDate(selectedRecentReservation.reservation?.reservation_end_date)}</p>
-                                </div>
-                                <div className="col-span-2">
-                                    <p className="font-medium text-gray-600">Created:</p>
-                                    <p>{formatDate(selectedRecentReservation.reservation?.date_created)}</p>
-                                </div>
-                                <div>
-                                    <p className="font-medium text-gray-600">Requested By:</p>
-                                    <p className="text-lg">{selectedRecentReservation.reservation?.users_name}</p>
-                                </div>
-                                <div>
-                                    <p className="font-medium text-gray-600">Contact Number:</p>
-                                    <p className="text-lg">{selectedRecentReservation.reservation?.users_contact_number}</p>
-                                </div>
-                            </div>
-
-                            {/* Vehicles */}
-                            {selectedRecentReservation.vehicles && selectedRecentReservation.vehicles.length > 0 && (
-                                <div className="mt-6">
-                                    <h4 className="font-semibold text-green-700 mb-2">Vehicles Used:</h4>
-                                    <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
-                                        {selectedRecentReservation.vehicles.map((vehicle) => (
-                                            <li key={vehicle.vehicle_license} className="text-sm mb-2">
-                                                {vehicle.vehicle_license} (ID: {vehicle.vehicle_reservation_vehicle_id})
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-
-                            {/* Equipment */}
-                            {selectedRecentReservation.equipment && selectedRecentReservation.equipment.length > 0 && (
-                                <div className="mt-6">
-                                    <h4 className="font-semibold text-green-700 mb-2">Equipment Used:</h4>
-                                    <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
-                                        {selectedRecentReservation.equipment.map((equip) => (
-                                            <li key={equip.equip_name} className="text-sm mb-2">
-                                                {equip.equip_name} (Quantity: {equip.quantity})
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-
-                            {/* Venues */}
-                            {selectedRecentReservation.venues && selectedRecentReservation.venues.length > 0 && (
-                                <div className="mt-6">
-                                    <h4 className="font-semibold text-green-700 mb-2">Venues Used:</h4>
-                                    <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
-                                        {selectedRecentReservation.venues.map((venue) => (
-                                            <li key={venue.ven_name} className="text-sm mb-2">
-                                                {venue.ven_name}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-
-                            <div className="mt-8 flex justify-end space-x-4">
-                                <button 
-                                    className="bg-gray-300 text-gray-800 py-2 px-4 rounded hover:bg-gray-400 transition-colors"
-                                    onClick={() => {
-                                        setRecentReservationModalOpen(false);
-                                        setSelectedRecentReservation(null);
-                                    }}
-                                >
-                                    Close
-                                </button>
-                            </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            {/* Modal for Release Reservation Details */}
-            <AnimatePresence>
-                {releaseModalOpen && selectedReleaseReservation && (
-                    <motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
-                    >
-                        <motion.div 
-                            initial={{ scale: 0.9, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.9, opacity: 0 }}
-                            className="bg-white rounded-xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-                        >
-                            <h3 className="text-3xl font-bold mb-6 text-green-800 border-b-2 border-green-500 pb-2">Release Reservation Details</h3>
-                            <div className="grid grid-cols-2 gap-6">
-                                <div>
-                                    <p className="font-medium text-gray-600">Name:</p>
-                                    <p className="text-lg">{selectedReleaseReservation.reservation?.reservation_name}</p>
-                                </div>
-                                <div>
-                                    <p className="font-medium text-gray-600">Status:</p>
-                                    <p className={`px-3 py-1 rounded-full text-sm inline-block ${getStatusClass(selectedReleaseReservation.reservation?.status_master_name)}`}>
-                                        {selectedReleaseReservation.reservation?.status_master_name}
-                                    </p>
-                                </div>
-                                <div className="col-span-2">
-                                    <p className="font-medium text-gray-600">Event Title:</p>
-                                    <p className="text-lg">{selectedReleaseReservation.reservation?.reservation_event_title}</p>
-                                </div>
-                                <div className="col-span-2">
-                                    <p className="font-medium text-gray-600">Description:</p>
-                                    <p className="text-sm">{selectedReleaseReservation.reservation?.reservation_description}</p>
-                                </div>
-                                <div>
-                                    <p className="font-medium text-gray-600">Start:</p>
-                                    <p>{formatDate(selectedReleaseReservation.reservation?.reservation_start_date)}</p>
-                                </div>
-                                <div>
-                                    <p className="font-medium text-gray-600">End:</p>
-                                    <p>{formatDate(selectedReleaseReservation.reservation?.reservation_end_date)}</p>
-                                </div>
-                                <div className="col-span-2">
-                                    <p className="font-medium text-gray-600">Created:</p>
-                                    <p>{formatDate(selectedReleaseReservation.reservation?.date_created)}</p>
-                                </div>
-                                <div>
-                                    <p className="font-medium text-gray-600">Requested By:</p>
-                                    <p className="text-lg">{selectedReleaseReservation.reservation?.users_name}</p>
-                                </div>
-                                <div>
-                                    <p className="font-medium text-gray-600">Contact Number:</p>
-                                    <p className="text-lg">{selectedReleaseReservation.reservation?.users_contact_number}</p>
-                                </div>
-                            </div>
-
-                            {/* Vehicles */}
-                            {selectedReleaseReservation.vehicles && selectedReleaseReservation.vehicles.length > 0 && (
-                                <div className="mt-6">
-                                    <h4 className="font-semibold text-green-700 mb-2">Vehicles Used:</h4>
-                                    <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
-                                        {selectedReleaseReservation.vehicles.map((vehicle) => (
-                                            <li key={vehicle.vehicle_license} className="text-sm mb-2">
-                                                {vehicle.vehicle_license} (ID: {vehicle.vehicle_reservation_vehicle_id})
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-
-                            {/* Equipment */}
-                            {selectedReleaseReservation.equipment && selectedReleaseReservation.equipment.length > 0 && (
-                                <div className="mt-6">
-                                    <h4 className="font-semibold text-green-700 mb-2">Equipment Used:</h4>
-                                    <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
-                                        {selectedReleaseReservation.equipment.map((equip) => (
-                                            <li key={equip.equip_name} className="text-sm mb-2">
-                                                {equip.equip_name} (Quantity: {equip.quantity})
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-
-                            {/* Venues */}
-                            {selectedReleaseReservation.venues && selectedReleaseReservation.venues.length > 0 && (
-                                <div className="mt-6">
-                                    <h4 className="font-semibold text-green-700 mb-2">Venues Used:</h4>
-                                    <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
-                                        {selectedReleaseReservation.venues.map((venue) => (
-                                            <li key={venue.ven_name} className="text-sm mb-2">
-                                                {venue.ven_name}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-
-                            <div className="mt-8 flex justify-end space-x-4">
-                                <button 
-                                    className="bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600 transition-colors"
-                                    onClick={() => handleRelease(selectedReleaseReservation.reservation.reservation_id)}
-                                    disabled={loading}
-                                >
-                                    {loading ? 'Releasing...' : 'Release'}
-                                </button>
-                                <button 
-                                    className="bg-gray-300 text-gray-800 py-2 px-4 rounded hover:bg-gray-400 transition-colors"
-                                    onClick={() => {
-                                        setReleaseModalOpen(false);
-                                        setSelectedReleaseReservation(null);
-                                    }}
-                                    disabled={loading}
-                                >
-                                    Close
-                                </button>
-                            </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            {/* Modal for Return Reservation Details */}
-            <AnimatePresence>
-                {returnModalOpen && selectedReturnReservation && (
-                    <motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
-                    >
-                        <motion.div 
-                            initial={{ scale: 0.9, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.9, opacity: 0 }}
-                            className="bg-white rounded-xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto"
-                        >
-                            <h3 className="text-3xl font-bold mb-6 text-green-800 border-b-2 border-green-500 pb-2">Return Reservation Details</h3>
-                            
-                            {/* Reservation Details */}
-                            <div className="grid grid-cols-2 gap-4 mb-6">
-                                <div>
-                                    <p className="font-medium text-gray-600">Name:</p>
-                                    <p className="text-lg">{selectedReturnReservation.reservation?.reservation_name}</p>
-                                </div>
-                                <div>
-                                    <p className="font-medium text-gray-600">Event Title:</p>
-                                    <p className="text-lg">{selectedReturnReservation.reservation?.reservation_event_title}</p>
-                                </div>
-                                <div>
-                                    <p className="font-medium text-gray-600">Start Date:</p>
-                                    <p>{formatDate(selectedReturnReservation.reservation?.reservation_start_date)}</p>
-                                </div>
-                                <div>
-                                    <p className="font-medium text-gray-600">End Date:</p>
-                                    <p>{formatDate(selectedReturnReservation.reservation?.reservation_end_date)}</p>
-                                </div>
-                                <div>
-                                    <p className="font-medium text-gray-600">Requested By:</p>
-                                    <p className="text-lg">{selectedReturnReservation.reservation?.requested_by}</p>
-                                </div>
-                            </div>
-
-                            {/* Venues */}
-                            {selectedReturnReservation.venues && selectedReturnReservation.venues.length > 0 && (
-                                <div className="mb-6">
-                                    <h4 className="font-semibold text-green-700 mb-2">Venues:</h4>
-                                    <table className="w-full">
-                                        <thead>
-                                            <tr>
-                                                <th className="text-left">Name</th>
-                                                <th className="text-left">Condition</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {selectedReturnReservation.venues.map((venue) => (
-                                                <tr key={venue.ven_id}>
-                                                    <td className="py-2">{venue.ven_name}</td>
-                                                    <td className="py-2">
-                                                        <select
-                                                            className="w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm rounded-md"
-                                                            onChange={(e) => handleConditionChange('venue', venue.ven_id, e.target.value)}
-                                                            value={itemConditions[`venue_${venue.ven_id}`] || ''}
-                                                        >
-                                                            <option value="">Select condition</option>
-                                                            {conditions.map((condition) => (
-                                                                <option key={condition.condition_id} value={condition.condition_id}>
-                                                                    {condition.condition_name}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-
-                            {/* Vehicles */}
-                            {selectedReturnReservation.vehicles && selectedReturnReservation.vehicles.length > 0 && (
-                                <div className="mb-6">
-                                    <h4 className="font-semibold text-green-700 mb-2">Vehicles:</h4>
-                                    <table className="w-full">
-                                        <thead>
-                                            <tr>
-                                                <th className="text-left">License</th>
-                                                <th className="text-left">Condition</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {selectedReturnReservation.vehicles.map((vehicle) => (
-                                                <tr key={vehicle.vehicle_id}>
-                                                    <td className="py-2">{vehicle.vehicle_license}</td>
-                                                    <td className="py-2">
-                                                        <select
-                                                            className="w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm rounded-md"
-                                                            onChange={(e) => handleConditionChange('vehicle', vehicle.vehicle_id, e.target.value)}
-                                                            value={itemConditions[`vehicle_${vehicle.vehicle_id}`] || ''}
-                                                        >
-                                                            <option value="">Select condition</option>
-                                                            {conditions.map((condition) => (
-                                                                <option key={condition.condition_id} value={condition.condition_id}>
-                                                                    {condition.condition_name}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-
-                            {/* Equipment */}
-                            {selectedReturnReservation.equipment && selectedReturnReservation.equipment.length > 0 && (
-                                <div className="mb-6">
-                                    <h4 className="font-semibold text-green-700 mb-2">Equipment:</h4>
-                                    <table className="w-full">
-                                        <thead>
-                                            <tr>
-                                                <th className="text-left">Name</th>
-                                                <th className="text-left">Quantity</th>
-                                                <th className="text-left">Condition</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {selectedReturnReservation.equipment.map((equip) => (
-                                                <tr key={equip.equip_id}>
-                                                    <td className="py-2">{equip.equip_name}</td>
-                                                    <td className="py-2">{equip.quantity}</td>
-                                                    <td className="py-2">
-                                                        <select
-                                                            className="w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm rounded-md"
-                                                            onChange={(e) => handleConditionChange('equipment', equip.equip_id, e.target.value)}
-                                                            value={itemConditions[`equipment_${equip.equip_id}`] || ''}
-                                                        >
-                                                            <option value="">Select condition</option>
-                                                            {conditions.map((condition) => (
-                                                                <option key={condition.condition_id} value={condition.condition_id}>
-                                                                    {condition.condition_name}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-
-                            <div className="mt-8 flex justify-end space-x-4">
-                                <button 
-                                    className="bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600 transition-colors"
-                                    onClick={() => handleReturn(selectedReturnReservation.reservation.reservation_id)}
-                                    
-                                >
-                                    {loading ? 'Returning...' : 'Return'}
-                                </button>
-                                <button 
-                                    className="bg-gray-300 text-gray-800 py-2 px-4 rounded hover:bg-gray-400 transition-colors"
-                                    onClick={() => {
-                                        setReturnModalOpen(false);
-                                        setSelectedReturnReservation(null);
-                                        setItemConditions({});
-                                    }}
-                                    disabled={loading}
-                                >
-                                    Close
-                                </button>
-                            </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            {/* Return Confirmation Modal */}
-            <AnimatePresence>
-                {returnConfirmation.show && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-                    >
-                        <motion.div
-                            initial={{ scale: 0.9, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.9, opacity: 0 }}
-                            className={`bg-white rounded-lg p-8 max-w-md w-full ${
-                                returnConfirmation.success ? 'border-green-500' : 'border-red-500'
-                            } border-4`}
-                        >
-                            <h3 className={`text-2xl font-bold mb-4 ${
-                                returnConfirmation.success ? 'text-green-600' : 'text-red-600'
-                            }`}>
-                                {returnConfirmation.success ? 'Success' : 'Error'}
-                            </h3>
-                            <p className="text-gray-700 mb-6">{returnConfirmation.message}</p>
-                            <button
-                                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
-                                onClick={() => setReturnConfirmation({ show: false, success: false, message: '' })}
-                            >
-                                Close
-                            </button>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            {/* Release Confirmation Modal */}
-            <AnimatePresence>
-                {releaseConfirmation.show && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-                    >
-                        <motion.div
-                            initial={{ scale: 0.9, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.9, opacity: 0 }}
-                            className={`bg-white rounded-lg p-8 max-w-md w-full ${
-                                releaseConfirmation.success ? 'border-green-500' : 'border-red-500'
-                            } border-4`}
-                        >
-                            <h3 className={`text-2xl font-bold mb-4 ${
-                                releaseConfirmation.success ? 'text-green-600' : 'text-red-600'
-                            }`}>
-                                {releaseConfirmation.success ? 'Success' : 'Error'}
-                            </h3>
-                            <p className="text-gray-700 mb-6">{releaseConfirmation.message}</p>
-                            <button
-                                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
-                                onClick={() => setReleaseConfirmation({ show: false, success: false, message: '' })}
-                            >
-                                Close
-                            </button>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
         </motion.div>
     );
 };

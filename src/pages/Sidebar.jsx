@@ -37,15 +37,16 @@ const Sidebar = () => {
   const canAccessMenu = (menuType) => {
     switch (user_level_id) {
       case '1':
-        return menuType !== 'master'; // All access except masters
+        return true; // User level 1 can access all menus, including 'master'
       case '2':
         return ['calendar', 'viewRequest', 'viewReservation'].includes(menuType); // Limited access
       case '4':
         return true; // Full access
       default:
-        return false;
+        return false; // No access for undefined user levels
     }
   };
+  
 
   useEffect(() => {
     setActiveItem(location.pathname);

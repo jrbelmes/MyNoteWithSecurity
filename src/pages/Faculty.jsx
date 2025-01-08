@@ -584,8 +584,21 @@ const FacultyModal = ({
             return;
         }
 
+        // Determine operation based on user level
+        let operation;
+        switch (formData.users_role) {
+            case '1': // Admin
+                operation = 'saveAdmin';
+                break;
+            case '5': // Dean
+                operation = 'saveDean';
+                break;
+            default: // Regular user
+                operation = 'saveUser';
+        }
+
         const jsonData = {
-            operation: "saveUser",
+            operation: operation,
             data: {
                 fname: formData.users_firstname,
                 mname: formData.users_middlename,
@@ -596,6 +609,7 @@ const FacultyModal = ({
                 userLevelId: formData.users_role,
                 password: formData.users_password,
                 departmentId: selectedDepartment.departments_id,
+                pic: "" // Add pic field if needed
             }
         };
 

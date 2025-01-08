@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Dialog } from '@headlessui/react';
-import Sidebar from './Sidebar';
+
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -42,14 +42,21 @@ const Calendar = () => {
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [reservationDetails, setReservationDetails] = useState(null);
   const user_level_id = localStorage.getItem('user_level_id');
+  const [isVenueModalOpen, setIsVenueModalOpen] = useState(false);
+  const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
+  const [venueDetails, setVenueDetails] = useState(null);
+  const [vehicleDetails, setVehicleDetails] = useState(null);
+  const [equipmentDetails, setEquipmentDetails] = useState(null);
 
   // Status color mapping
   const statusColors = {
-    pending: 'bg-yellow-200',
-    accepted: 'bg-green-200',
-    declined: 'bg-red-200',
-    expired: 'bg-gray-200',
-    cancelled: 'bg-blue-200'
+    Reserved: 'bg-blue-100 text-blue-800'
+  };
+
+  // Add venue and vehicle color mapping
+  const resourceColors = {
+    venue: 'bg-emerald-200 text-emerald-800',
+    vehicle: 'bg-purple-200 text-purple-800'
   };
 
   useEffect(() => {
@@ -65,21 +72,17 @@ const Calendar = () => {
 
   const fetchReservations = async () => {
     try {
-      const formData = new URLSearchParams();
-      formData.append('operation', 'fetchAllReservations'); // Changed from 'action' to 'operation'
-
       const response = await axios({
         method: 'POST',
-        url: 'http://localhost/coc/gsd/fetch_reserve.php',
-        data: formData,
+        url: 'http://localhost/coc/gsd/records&reports.php',
+        data: JSON.stringify({ operation: 'fetchRecord' }),
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
+          'Content-Type': 'application/json'
         }
       });
 
       console.log('Raw API Response:', response);
       console.log('Response Data:', response.data);
-      console.log('Reservations Array:', response.data.data);
 
       if (response.data.status === 'success') {
         // Parse dates before setting state
@@ -87,8 +90,11 @@ const Calendar = () => {
           console.log('Processing reservation:', reservation);
           return {
             ...reservation,
-            reservation_start_date: new Date(reservation.reservation_start_date),
-            reservation_end_date: new Date(reservation.reservation_end_date)
+            reservation_start_date: new Date(reservation.approval_created_at),
+            // For end date, parse the time from details string or default to same day
+            reservation_end_date: reservation.venue_details || reservation.vehicle_details
+              ? new Date(new Date(reservation.approval_created_at).setHours(17, 0, 0))
+              : new Date(reservation.approval_created_at)
           };
         });
         console.log('Parsed reservations:', parsedReservations);
@@ -115,21 +121,38 @@ const Calendar = () => {
 
   const getReservationForDate = (date) => {
     const reservationsForDate = reservations.filter(reservation => {
-      const isInRange = isDateInRange(
-        date,
-        reservation.reservation_start_date,
-        reservation.reservation_end_date
-      );
+      const start = new Date(reservation.approval_created_at);
+      // Create end date by adding hours based on the details string
+      const end = new Date(reservation.approval_created_at);
       
-      // Debug log for specific date
-      if (isInRange) {
-        console.log('Found reservation for date:', date, reservation);
+      // Parse time from details
+      const timeMatch = (reservation.venue_details || reservation.vehicle_details || '').match(/(\d{2}:\d{2}:\d{2}) to (\d{2}:\d{2}:\d{2})/);
+      if (timeMatch) {
+        const [_, startTime, endTime] = timeMatch;
+        const [startHour] = startTime.split(':');
+        const [endHour] = endTime.split(':');
+        
+        start.setHours(parseInt(startHour), 0, 0);
+        end.setHours(parseInt(endHour), 0, 0);
       }
-      
+
+      const isInRange = isDateInRange(date, start, end);
       return isInRange;
     });
-    
-    return reservationsForDate;
+
+    return reservationsForDate.map(reservation => ({
+      ...reservation,
+      formattedResources: [
+        ...(reservation.venue_form_name ? [{
+          type: 'venue',
+          name: reservation.venue_form_name
+        }] : []),
+        ...(reservation.vehicle_form_name ? [{
+          type: 'vehicle',
+          name: reservation.vehicle_form_name
+        }] : [])
+      ]
+    }));
   };
 
   const getStatusColor = (status) => {
@@ -251,15 +274,19 @@ const Calendar = () => {
               </span>
               {dayReservations.map((reservation, idx) => (
                 <div
-                  key={`${reservation.reservation_id}-${idx}`}
-                  className={`
-                    mt-1 p-1 text-xs rounded cursor-pointer
-                    ${getStatusColor(reservation.reservation_status_name)}
-                  `}
+                  key={`${reservation.approval_id}-${idx}`}
+                  className="mt-1 p-1 text-xs rounded cursor-pointer bg-blue-100 text-blue-800"
                   onClick={() => handleReservationClick(reservation)}
-                  title={reservation.reservation_event_title}
                 >
-                  {reservation.reservation_event_title}
+                  <div className="font-medium mb-1">Reserved</div>
+                  {reservation.formattedResources.map((resource, resourceIdx) => (
+                    <div
+                      key={resourceIdx}
+                      className={`mt-1 p-1 text-xs rounded ${resourceColors[resource.type]}`}
+                    >
+                      {resource.name}
+                    </div>
+                  ))}
                 </div>
               ))}
             </motion.div>
@@ -269,15 +296,22 @@ const Calendar = () => {
     );
   };
 
-  const getEventStyles = (startDate, endDate) => {
-    const startHour = startDate.getHours() + (startDate.getMinutes() / 60);
-    const endHour = endDate.getHours() + (endDate.getMinutes() / 60);
-    const duration = endHour - startHour;
-    
-    // Increase from 6rem to 8rem per hour
+  const getEventStyles = (reservation) => {
+    let startHour = 8; // default to 8 AM
+    let endHour = 17; // default to 5 PM
+
+    // Parse time from details
+    const details = reservation.venue_details || reservation.vehicle_details || '';
+    const timeMatch = details.match(/(\d{2}:\d{2}:\d{2}) to (\d{2}:\d{2}:\d{2})/);
+    if (timeMatch) {
+      const [_, startTime, endTime] = timeMatch;
+      startHour = parseInt(startTime.split(':')[0]);
+      endHour = parseInt(endTime.split(':')[0]);
+    }
+
     return {
       top: `${startHour * 8}rem`,
-      height: `${duration * 8}rem`,
+      height: `${(endHour - startHour) * 8}rem`,
       position: 'absolute',
       left: '0',
       right: '0',
@@ -420,27 +454,34 @@ const Calendar = () => {
 
   const handleReservationClick = async (reservation) => {
     try {
-      console.log('Clicked reservation:', reservation);
-      const formData = new URLSearchParams();
-      formData.append('operation', 'getReservationDetailsById'); // Changed from 'getReservationDetails' to 'getReservationDetailsById'
-      formData.append('reservation_id', reservation.reservation_id);
-
-      console.log('Sending request with data:', formData.toString());
-
       const response = await axios({
         method: 'POST',
-        url: 'http://localhost/coc/gsd/fetch_reserve.php',
-        data: formData,
+        url: 'http://localhost/coc/gsd/records&reports.php',
+        data: JSON.stringify({
+          operation: 'getReservationDetailsById',
+          json: {  // Add this nested json object
+            approval_id: reservation.approval_id
+          }
+        }),
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
+          'Content-Type': 'application/json'
         }
       });
 
       console.log('Response from API:', response.data);
 
       if (response.data.status === 'success' && response.data.data) {
-        setReservationDetails(response.data.data);
-        setIsDetailsDialogOpen(true);
+        if (response.data.data.venue && Object.values(response.data.data.venue).some(v => v !== null)) {
+          setVenueDetails(response.data.data.venue);
+          setIsVenueModalOpen(true);
+        }
+        if (response.data.data.vehicle && Object.values(response.data.data.vehicle).some(v => v !== null)) {
+          setVehicleDetails(response.data.data.vehicle);
+          setIsVehicleModalOpen(true);
+        }
+        if (response.data.data.equipment && Object.values(response.data.data.equipment).some(v => v !== null)) {
+          setEquipmentDetails(response.data.data.equipment);
+        }
       } else {
         console.error('Invalid response format:', response.data);
         alert('Could not fetch reservation details');
@@ -451,173 +492,202 @@ const Calendar = () => {
     }
   };
 
-  const ReservationDetailsDialog = () => (
+  const VenueDetailsModal = () => (
     <Dialog
-      open={isDetailsDialogOpen}
-      onClose={() => setIsDetailsDialogOpen(false)}
+      open={isVenueModalOpen}
+      onClose={() => setIsVenueModalOpen(false)}
       className="relative z-50"
     >
       <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" aria-hidden="true" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
-        <Dialog.Panel className="mx-auto max-w-3xl w-full rounded-2xl bg-white shadow-2xl overflow-hidden">
-          {reservationDetails ? (
-            <>
-              {/* Header Section */}
-              <div className="relative h-40 bg-gradient-to-br from-blue-600 to-blue-800 p-6">
-                <button
-                  onClick={() => setIsDetailsDialogOpen(false)}
-                  className="absolute top-4 right-4 p-2 rounded-full hover:bg-white/10 transition-colors"
-                >
-                  <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-                
-                <div className="absolute bottom-6 left-6 space-y-2">
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm 
-                    ${getStatusColor(reservationDetails.reservation.status_master_name)} 
-                    border border-white/20 font-medium`}>
-                    {reservationDetails.reservation.status_master_name.toUpperCase()}
+        <Dialog.Panel className="mx-auto max-w-2xl w-full rounded-2xl bg-white shadow-2xl p-6">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <Dialog.Title className="text-2xl font-bold text-gray-900">
+                Venue Reservation Details
+              </Dialog.Title>
+              {venueDetails && (
+                <div className="mt-2">
+                  <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                    Status: {venueDetails.status_request || 'Reserved'}
                   </span>
-                  <h2 className="text-3xl font-bold text-white">
-                    {reservationDetails.reservation.reservation_event_title}
-                  </h2>
                 </div>
-              </div>
+              )}
+            </div>
+            <button
+              onClick={() => setIsVenueModalOpen(false)}
+              className="p-2 rounded-full hover:bg-gray-100"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
 
-              {/* Content Grid */}
-              <div className="p-6 grid gap-6">
-                {/* Main Details Section */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Left Column - Event Details */}
-                  <div className="space-y-4">
-                    <div className="bg-gray-50 rounded-xl p-4 space-y-3">
-                      <h3 className="font-semibold text-gray-900 flex items-center">
-                        <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Event Information
-                      </h3>
-                      <div className="space-y-2">
-                        <div>
-                          <p className="text-sm text-gray-500">Event Name</p>
-                          <p className="text-gray-900 font-medium">{reservationDetails.reservation.reservation_name}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-500">Description</p>
-                          <p className="text-gray-900">{reservationDetails.reservation.reservation_description || 'No description provided'}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="bg-gray-50 rounded-xl p-4 space-y-3">
-                      <h3 className="font-semibold text-gray-900 flex items-center">
-                        <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Schedule
-                      </h3>
-                      <div className="space-y-2">
-                        <div>
-                          <p className="text-sm text-gray-500">Start Date & Time</p>
-                          <p className="text-gray-900">{new Date(reservationDetails.reservation.reservation_start_date).toLocaleString()}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-500">End Date & Time</p>
-                          <p className="text-gray-900">{new Date(reservationDetails.reservation.reservation_end_date).toLocaleString()}</p>
-                        </div>
-                      </div>
-                    </div>
+          {venueDetails && (
+            <div className="space-y-6">
+              <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                <h3 className="font-semibold">Event Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-500">Venue Name</p>
+                    <p className="font-medium">{venueDetails.venue_name}</p>
                   </div>
-
-                  {/* Right Column - Contact & Resources */}
-                  <div className="space-y-4">
-                    <div className="bg-gray-50 rounded-xl p-4 space-y-3">
-                      <h3 className="font-semibold text-gray-900 flex items-center">
-                        <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                        Contact Information
-                      </h3>
-                      <div className="flex items-center space-x-4">
-                        <div className="h-16 w-16 rounded-full overflow-hidden bg-gray-200">
-                          <img 
-                            src={`http://localhost/coc/gsd/${reservationDetails.reservation.users_pic}`}
-                            alt="Profile"
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">{reservationDetails.reservation.users_full_name}</p>
-                          <p className="text-gray-500">{reservationDetails.reservation.users_contact_number}</p>
-                          <p className="text-sm text-gray-500">Created: {new Date(reservationDetails.reservation.date_created).toLocaleString()}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Resources Section */}
-                    <div className="bg-gray-50 rounded-xl p-4 space-y-4">
-                      <h3 className="font-semibold text-gray-900">Reserved Resources</h3>
-                      
-                      {/* Venues */}
-                      {reservationDetails.venues?.length > 0 && (
-                        <div className="space-y-2">
-                          <h4 className="text-sm font-medium text-gray-700 flex items-center">
-                            <svg className="w-4 h-4 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                            </svg>
-                            Venues
-                          </h4>
-                          <div className="grid grid-cols-1 gap-2">
-                            {reservationDetails.venues.map(venue => (
-                              <div key={venue.ven_id} className="bg-white rounded-lg p-2 text-sm border border-gray-200">
-                                {venue.ven_name}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Equipment - only show if there are items */}
-                      {reservationDetails.equipment?.length > 0 && (
-                        <div className="space-y-2">
-                          <h4 className="text-sm font-medium text-gray-700">Equipment</h4>
-                          <div className="grid grid-cols-1 gap-2">
-                            {reservationDetails.equipment.map(eq => (
-                              <div key={eq.equip_id} className="bg-white rounded-lg p-2 text-sm border border-gray-200">
-                                {eq.equip_name} (Qty: {eq.quantity})
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Vehicles - only show if there are items */}
-                      {reservationDetails.vehicles?.length > 0 && (
-                        <div className="space-y-2">
-                          <h4 className="text-sm font-medium text-gray-700">Vehicles</h4>
-                          <div className="grid grid-cols-1 gap-2">
-                            {reservationDetails.vehicles.map(vehicle => (
-                              <div key={vehicle.vehicle_id} className="bg-white rounded-lg p-2 text-sm border border-gray-200">
-                                {vehicle.vehicle_license}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Event Title</p>
+                    <p className="font-medium">{venueDetails.venue_form_event_title}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Description</p>
+                    <p>{venueDetails.venue_form_description}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Participants</p>
+                    <p>{venueDetails.venue_participants}</p>
                   </div>
                 </div>
               </div>
-            </>
-          ) : (
-            <div className="flex items-center justify-center p-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-              <span className="ml-2">Loading reservation details...</span>
+
+              <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                <h3 className="font-semibold">Schedule</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-500">Start Time</p>
+                    <p>{new Date(venueDetails.venue_form_start_date).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">End Time</p>
+                    <p>{new Date(venueDetails.venue_form_end_date).toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="font-semibold mb-3">Reserved By</h3>
+                <p>{venueDetails.venue_form_user_full_name}</p>
+              </div>
+
+              {equipmentDetails && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="font-semibold mb-3">Equipment</h3>
+                  <div className="flex items-center space-x-2">
+                    <p>{equipmentDetails.equipment_name}</p>
+                    <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                      Quantity: {equipmentDetails.reservation_equipment_quantity}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </Dialog.Panel>
+      </div>
+    </Dialog>
+  );
+
+  const VehicleDetailsModal = () => (
+    <Dialog
+      open={isVehicleModalOpen}
+      onClose={() => setIsVehicleModalOpen(false)}
+      className="relative z-50"
+    >
+      <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" aria-hidden="true" />
+      <div className="fixed inset-0 flex items-center justify-center p-4">
+        <Dialog.Panel className="mx-auto max-w-2xl w-full rounded-2xl bg-white shadow-2xl p-6">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <Dialog.Title className="text-2xl font-bold text-gray-900">
+                Vehicle Reservation Details
+              </Dialog.Title>
+              {vehicleDetails && (
+                <div className="mt-2">
+                  <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                    Status: {vehicleDetails.status_request || 'Reserved'}
+                  </span>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => setIsVehicleModalOpen(false)}
+              className="p-2 rounded-full hover:bg-gray-100"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {vehicleDetails && (
+            <div className="space-y-6">
+              <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                <h3 className="font-semibold">Vehicle Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-500">License Plate</p>
+                    <p className="font-medium">{vehicleDetails.vehicle_license}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Make</p>
+                    <p className="font-medium">{vehicleDetails.vehicle_make}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Model</p>
+                    <p className="font-medium">{vehicleDetails.vehicle_model}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Category</p>
+                    <p className="font-medium">{vehicleDetails.vehicle_category}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                <h3 className="font-semibold">Trip Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-500">Purpose</p>
+                    <p>{vehicleDetails.vehicle_form_purpose}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Destination</p>
+                    <p>{vehicleDetails.vehicle_form_destination}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                <h3 className="font-semibold">Schedule</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-500">Start Time</p>
+                    <p>{vehicleDetails.vehicle_form_start_date && new Date(vehicleDetails.vehicle_form_start_date).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">End Time</p>
+                    <p>{vehicleDetails.vehicle_form_end_date && new Date(vehicleDetails.vehicle_form_end_date).toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="font-semibold mb-3">Reserved By</h3>
+                <p>{vehicleDetails.vehicle_form_user_full_name}</p>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="font-semibold mb-3">Passengers</h3>
+                <div className="space-y-2">
+                  {vehicleDetails.passengers && vehicleDetails.passengers.length > 0 ? (
+                    vehicleDetails.passengers.map((passenger, index) => (
+                      <div key={index} className="px-3 py-2 bg-white rounded-lg shadow-sm">
+                        <p className="text-gray-800">{passenger}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-gray-500 italic">No passengers listed</p>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </Dialog.Panel>
@@ -627,8 +697,7 @@ const Calendar = () => {
 
   return (
     <div className="flex h-screen">
-      <Sidebar />
-      <div className="flex-1 overflow-auto" style={{ backgroundColor: themeColors.light }}>
+      <div className="flex-1 overflow-auto">
         <div className="max-w-[1400px] mx-auto p-4"> {/* decreased from p-8 */}
           <motion.div 
             className="rounded-xl shadow-2xl p-6" /* decreased from p-8 */
@@ -651,7 +720,7 @@ const Calendar = () => {
                 </motion.button>
                 <div className="relative">
                   <h2 
-                    className="text-2xl font-bold cursor-pointer hover:text-blue-500" /* decreased from text-4xl */
+                    className="text-2xl font-bold cursor-pointer hover:text-blue-500" 
                     style={{ color: themeColors.primary }}
                     onClick={() => setIsYearModalOpen(true)}
                   > 
@@ -709,7 +778,8 @@ const Calendar = () => {
             {view === 'week' && renderWeekView()}
             {view === 'day' && renderDayView()}
             {renderYearModal()}
-            {ReservationDetailsDialog()}
+            <VenueDetailsModal />
+            <VehicleDetailsModal />
           </motion.div>
         </div>
       </div>
@@ -717,4 +787,7 @@ const Calendar = () => {
   );
 };
 
+       
 export default Calendar;
+
+

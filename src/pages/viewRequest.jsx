@@ -50,8 +50,12 @@ const ReservationRequests = () => {
     const fetchReservations = async () => {
         setLoading(true);
         try {
-            const response = await axios.post('http://localhost/coc/gsd/fetch_reserve.php', {
-                operation: 'fetchAllPendingReservations',
+            const response = await axios.post('http://localhost/coc/gsd/process_reservation.php', {
+                operation: 'fetchRequestReservation'
+            }, {
+                headers: {
+                    'Content-Type': 'application/json'
+                }
             });
 
             if (response.data?.status === 'success') {
@@ -68,13 +72,22 @@ const ReservationRequests = () => {
 
     const fetchReservationDetails = async (reservationId) => {
         try {
-            const response = await axios.post('http://localhost/coc/gsd/fetch_reserve.php', {
-                operation: 'getReservationDetailsById',
-                reservation_id: reservationId,
+            const response = await axios.post('http://localhost/coc/gsd/process_reservation.php', {
+                operation: 'fetchRequestById',
+                approval_id: reservationId
+            }, {
+                headers: {
+                    'Content-Type': 'application/json'
+                }
             });
 
             if (response.data?.status === 'success') {
-                setReservationDetails(response.data.data);
+                setReservationDetails(response.data.data[0]);
+                // Store both IDs when fetching details
+                setCurrentRequest({
+                    approval_id: response.data.data[0].approval_id,
+                    reservation_id: response.data.data[0].reservation_id
+                });
                 setIsDetailModalOpen(true);
             } else {
                 toast.error('Failed to fetch reservation details.');
@@ -91,17 +104,17 @@ const ReservationRequests = () => {
     const handleAccept = async () => {
         setIsAccepting(true);
         try {
-            const response = await axios.post('http://localhost/coc/gsd/update_master2.php', {
-                operation: 'updateReservationStatus',
-                json: JSON.stringify({ reservation_id: currentRequest })
+            const response = await axios.post('http://localhost/coc/gsd/process_reservation.php', {
+                operation: 'handleRequest',
+                reservation_id: currentRequest.reservation_id,
+                is_accepted: true
             }, {
                 headers: {
                     'Content-Type': 'application/json'
                 }
             });
 
-            // Check if the response exists and doesn't contain an error
-            if (response.data) {
+            if (response.data?.status === 'success') {
                 toast.success('Reservation accepted successfully!', {
                     icon: '✅',
                     duration: 3000,
@@ -121,17 +134,17 @@ const ReservationRequests = () => {
     const handleDecline = async () => {
         setIsDeclining(true);
         try {
-            const response = await axios.post('http://localhost/coc/gsd/update_master2.php', {
-                operation: 'updateReservationStatus1',
-                json: JSON.stringify({ reservation_id: currentRequest })
+            const response = await axios.post('http://localhost/coc/gsd/process_reservation.php', {
+                operation: 'handleRequest',
+                reservation_id: currentRequest.reservation_id,
+                is_accepted: false
             }, {
                 headers: {
                     'Content-Type': 'application/json'
                 }
             });
 
-            // Changed this condition to check for data existence
-            if (response.data) {
+            if (response.data?.status === 'success') {
                 toast.success('Reservation declined successfully!', {
                     icon: '❌',
                     duration: 3000,
@@ -172,6 +185,21 @@ const ReservationRequests = () => {
         (!endDate || new Date(reservation.reservation_end_date) <= endDate)
     );
 
+    // Add this helper function for status styling
+    const getStatusStyle = (status) => {
+        switch (status?.toLowerCase()) {
+            case 'approve':
+                return 'bg-green-100 text-green-800';
+            case 'pending':
+                return 'bg-yellow-100 text-yellow-800';
+            case 'decline':
+                return 'bg-red-100 text-red-800';
+            default:
+                return 'bg-gray-100 text-gray-800';
+        }
+    };
+
+    // Replace the existing card rendering code in the return statement
     return (
         <div className="flex flex-col lg:flex-row bg-gradient-to-br from-white to-green-100">
             <Sidebar />
@@ -247,7 +275,7 @@ const ReservationRequests = () => {
                             {filteredReservations.length > 0 ? (
                                 filteredReservations.map((reservation, index) => (
                                     <motion.div 
-                                        key={reservation.reservation_id}
+                                        key={reservation.approval_id}
                                         initial={{ opacity: 0, y: 20 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         exit={{ opacity: 0, y: -20 }}
@@ -255,37 +283,47 @@ const ReservationRequests = () => {
                                         className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-200 transition-all duration-300 hover:shadow-xl hover:scale-105"
                                     >
                                         <div className="p-6">
-                                            <div className="flex items-center justify-between mb-4">
-                                                <h3 className="text-2xl font-semibold text-gray-800">Request #{reservation.reservation_id}</h3>
-                                                {getIconForType(reservation.equipment_names ? 'Equipment' : reservation.venue_names ? 'Venue' : 'Vehicle')}
+                                            <div className="flex flex-col gap-4">
+                                                {/* Status Badge */}
+                                                <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusStyle(reservation.approval_status)}`}>
+                                                    {reservation.approval_status || 'Unknown Status'}
+                                                </div>
+                                                
+                                                {/* Request ID and Type */}
+                                                <div className="flex items-center justify-between">
+                                                    <h3 className="text-2xl font-semibold text-gray-800">Request #{reservation.approval_id}</h3>
+                                                    {getIconForType(reservation.type)}
+                                                </div>
+
+                                                {/* Request Details */}
+                                                <div className="space-y-2 text-sm">
+                                                    <p className="text-gray-600">
+                                                        <span className="font-medium text-gray-700">Created:</span> {' '}
+                                                        {new Date(reservation.approval_created_at).toLocaleString()}
+                                                    </p>
+                                                    <p className="text-gray-600">
+                                                        <span className="font-medium text-gray-700">Request Type:</span> {' '}
+                                                        {reservation.venue_form_name ? 'Venue' : 'Vehicle'}
+                                                    </p>
+                                                    <p className="text-gray-600">
+                                                        <span className="font-medium text-gray-700">Reservation Status:</span> {' '}
+                                                        <span className="px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">
+                                                            {reservation.reservation_status}
+                                                        </span>
+                                                    </p>
+                                                </div>
+
+                                                {/* View Details Button */}
+                                                <button
+                                                    className="w-full mt-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                                                    onClick={() => {
+                                                        setCurrentRequest(reservation.approval_id);
+                                                        fetchReservationDetails(reservation.approval_id);
+                                                    }}
+                                                >
+                                                    View Details
+                                                </button>
                                             </div>
-                                            <div className="space-y-2 text-sm">
-                                                <p className="text-gray-600"><span className="font-medium text-gray-700">User:</span> {reservation.reservations_users_id}</p>
-                                                <p className="text-gray-600"><span className="font-medium text-gray-700">Type:</span> {reservation.equipment_names ? 'Equipment' : reservation.venue_names ? 'Venue' : 'Vehicle'}</p>
-                                                <p className="text-gray-600"><span className="font-medium text-gray-700">Status:</span> <span className="px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">{reservation.reservation_status_name}</span></p>
-                                                <p className="text-gray-600"><span className="font-medium text-gray-700">Start:</span> {new Date(reservation.reservation_start_date).toLocaleString()}</p>
-                                                <p className="text-gray-600"><span className="font-medium text-gray-700">End:</span> {new Date(reservation.reservation_end_date).toLocaleString()}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex border-t border-gray-200">
-                                            <button
-                                                className="flex-1 px-4 py-3 text-sm font-medium text-white bg-green-500 hover:bg-green-600 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-                                                onClick={() => { 
-                                                    setCurrentRequest(reservation.reservation_id);
-                                                    fetchReservationDetails(reservation.reservation_id);
-                                                }}
-                                            >
-                                                <FaCheck className="inline mr-2" /> Accept
-                                            </button>
-                                            <button
-                                                className="flex-1 px-4 py-3 text-sm font-medium text-white bg-red-500 hover:bg-red-600 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-                                                onClick={() => { 
-                                                    setCurrentRequest(reservation.reservation_id);
-                                                    setIsDeclineModalOpen(true);
-                                                }}
-                                            >
-                                                <FaTimes className="inline mr-2" /> Decline
-                                            </button>
                                         </div>
                                     </motion.div>
                                 ))
@@ -306,7 +344,7 @@ const ReservationRequests = () => {
                 {/* Detail Modal for Accepting */}
                 <Dialog open={isDetailModalOpen} onOpenChange={setIsDetailModalOpen}>
                     <DialogContent className="sm:max-w-[600px]">
-                        <DialogTitle>Reservation Details</DialogTitle>
+                        <DialogTitle>Request Details #{currentRequest?.approval_id || ''}</DialogTitle>
                         {reservationDetails && (
                             <motion.div 
                                 initial={{ opacity: 0 }}
@@ -314,125 +352,156 @@ const ReservationRequests = () => {
                                 transition={{ duration: 0.3 }}
                                 className="space-y-6"
                             >
-                                <div className="grid grid-cols-2 gap-6">
-                                    <div className="bg-gray-50 p-4 rounded-lg">
-                                        <p className="text-sm text-gray-500">Reservation ID</p>
-                                        <p className="font-medium text-lg">{reservationDetails.reservation.reservation_id}</p>
-                                    </div>
-                                    <div className="bg-gray-50 p-4 rounded-lg">
-                                        <p className="text-sm text-gray-500">Requested by</p>
-                                        <p className="font-medium text-lg">{reservationDetails.reservation.users_name}</p>
-                                    </div>
-                                    <div className="bg-gray-50 p-4 rounded-lg">
-                                        <p className="text-sm text-gray-500">Reservation Name</p>
-                                        <p className="font-medium text-lg">{reservationDetails.reservation.reservation_name}</p>
-                                    </div>
-                                    <div className="bg-gray-50 p-4 rounded-lg">
-                                        <p className="text-sm text-gray-500">Event Title</p>
-                                        <p className="font-medium text-lg">{reservationDetails.reservation.reservation_event_title}</p>
-                                    </div>
-                                </div>
                                 <div className="bg-gray-50 p-4 rounded-lg">
-                                    <p className="text-sm text-gray-500">Description</p>
-                                    <p className="font-medium">{reservationDetails.reservation.reservation_description}</p>
+                                    <p className="text-sm text-gray-500">Status</p>
+                                    <p className="font-medium text-lg">{reservationDetails.status_request}</p>
                                 </div>
-                                <div className="grid grid-cols-2 gap-6">
-                                    <div className="bg-gray-50 p-4 rounded-lg">
-                                        <p className="text-sm text-gray-500">Start Date</p>
-                                        <p className="font-medium text-lg">{reservationDetails.reservation.reservation_start_date}</p>
+
+                                {/* Vehicle Details */}
+                                {reservationDetails.vehicle?.vehicle_form_name && (
+                                    <div className="space-y-4">
+                                        <h4 className="font-semibold flex items-center">
+                                            <FaCar className="mr-2 text-blue-500" /> Vehicle Request Details
+                                        </h4>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="bg-gray-50 p-4 rounded-lg">
+                                                <p className="text-sm text-gray-500">Requester</p>
+                                                <p className="font-medium">{reservationDetails.vehicle.vehicle_form_user_id}</p>
+                                            </div>
+                                            <div className="bg-gray-50 p-4 rounded-lg">
+                                                <p className="text-sm text-gray-500">Form Name</p>
+                                                <p className="font-medium">{reservationDetails.vehicle.vehicle_form_name}</p>
+                                            </div>
+                                            <div className="bg-gray-50 p-4 rounded-lg">
+                                                <p className="text-sm text-gray-500">Purpose</p>
+                                                <p className="font-medium">{reservationDetails.vehicle.vehicle_form_purpose}</p>
+                                            </div>
+                                            <div className="bg-gray-50 p-4 rounded-lg">
+                                                <p className="text-sm text-gray-500">Destination</p>
+                                                <p className="font-medium">{reservationDetails.vehicle.vehicle_form_destination}</p>
+                                            </div>
+                                            <div className="bg-gray-50 p-4 rounded-lg col-span-2">
+                                                <p className="text-sm text-gray-500">Schedule</p>
+                                                <p className="font-medium">
+                                                    {new Date(reservationDetails.vehicle.vehicle_form_start_date).toLocaleString()} - 
+                                                    {new Date(reservationDetails.vehicle.vehicle_form_end_date).toLocaleString()}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Passengers */}
+                                        {reservationDetails.passengers && (
+                                            <div className="bg-gray-50 p-4 rounded-lg">
+                                                <p className="text-sm text-gray-500 mb-2">Passengers</p>
+                                                <ul className="list-disc pl-5">
+                                                    {reservationDetails.passengers.map((passenger, idx) => (
+                                                        <li key={passenger.passenger_id} className="font-medium">
+                                                            {passenger.passenger_name}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
                                     </div>
-                                    <div className="bg-gray-50 p-4 rounded-lg">
-                                        <p className="text-sm text-gray-500">End Date</p>
-                                        <p className="font-medium text-lg">{reservationDetails.reservation.reservation_end_date}</p>
-                                    </div>
-                                </div>
-                                <div className="bg-gray-50 p-4 rounded-lg">
-                                    <p className="text-sm text-gray-500">Contact Number</p>
-                                    <p className="font-medium text-lg">{reservationDetails.reservation.users_contact_number}</p>
-                                </div>
+                                )}
 
-                                {/* Equipment Section */}
-                                {reservationDetails.equipment && reservationDetails.equipment.length > 0 && (
-                                    <motion.div 
-                                        initial={{ opacity: 0, y: 20 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: 0.2, duration: 0.3 }}
-                                    >
-                                        <h4 className="font-semibold mb-2 flex items-center">
-                                            <FaTools className="mr-2 text-blue-500" /> Equipment Used
+                                {/* Venue Details */}
+                                {reservationDetails.venue?.venue_form_name && (
+                                    <div className="space-y-4">
+                                        <h4 className="font-semibold flex items-center">
+                                            <FaBuilding className="mr-2 text-green-500" /> Venue Request Details
                                         </h4>
-                                        <ul className="list-disc pl-5">
-                                            {reservationDetails.equipment.map((equip, index) => (
-                                                <li key={index} className="text-sm">
-                                                    {equip.equip_name} (Quantity: {equip.quantity})
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </motion.div>
-                                )}
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="bg-gray-50 p-4 rounded-lg">
+                                                <p className="text-sm text-gray-500">Requester</p>
+                                                <p className="font-medium">{reservationDetails.venue.venue_form_user_id}</p>
+                                            </div>
+                                            <div className="bg-gray-50 p-4 rounded-lg">
+                                                <p className="text-sm text-gray-500">Venue Name</p>
+                                                <p className="font-medium">{reservationDetails.venue.venue_name}</p>
+                                            </div>
+                                            <div className="bg-gray-50 p-4 rounded-lg">
+                                                <p className="text-sm text-gray-500">Event Title</p>
+                                                <p className="font-medium">{reservationDetails.venue.venue_form_event_title}</p>
+                                            </div>
+                                            <div className="bg-gray-50 p-4 rounded-lg">
+                                                <p className="text-sm text-gray-500">Description</p>
+                                                <p className="font-medium">{reservationDetails.venue.venue_form_description}</p>
+                                            </div>
+                                            <div className="bg-gray-50 p-4 rounded-lg">
+                                                <p className="text-sm text-gray-500">Participants</p>
+                                                <p className="font-medium">{reservationDetails.venue.venue_participants}</p>
+                                            </div>
+                                            <div className="bg-gray-50 p-4 rounded-lg">
+                                                <p className="text-sm text-gray-500">Schedule</p>
+                                                <p className="font-medium">
+                                                    {new Date(reservationDetails.venue.venue_form_start_date).toLocaleString()} - 
+                                                    {new Date(reservationDetails.venue.venue_form_end_date).toLocaleString()}
+                                                </p>
+                                            </div>
+                                        </div>
 
-                                {/* Vehicles Section */}
-                                {reservationDetails.vehicles && reservationDetails.vehicles.length > 0 && (
-                                    <motion.div 
-                                        initial={{ opacity: 0, y: 20 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: 0.3, duration: 0.3 }}
-                                    >
-                                        <h4 className="font-semibold mb-2 flex items-center">
-                                            <FaCar className="mr-2 text-green-500" /> Vehicles Used
-                                        </h4>
-                                        <ul className="list-disc pl-5">
-                                            {reservationDetails.vehicles.map((vehicle, index) => (
-                                                <li key={index} className="text-sm">
-                                                    {vehicle.vehicle_license} (ID: {vehicle.vehicle_reservation_vehicle_id})
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </motion.div>
-                                )}
+                                    
+                                                                                {reservationDetails.equipment && (
+                                                                                    <div className="bg-gray-50 p-4 rounded-lg mt-4">
+                                                                                        <h4 className="font-semibold flex items-center mb-3">
+                                                                                            <FaTools className="mr-2 text-orange-500" /> Equipment Requested
+                                                                                        </h4>
+                                                                                        <div className="flex items-center gap-4">
+                                                                                            <p className="text-sm text-gray-500">
+                                                                                                <span className="font-medium">{reservationDetails.equipment.equipment_name}</span>
+                                                                                                <span className="mx-2">-</span>
+                                                                                                <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full">
+                                                                                                    Quantity: {reservationDetails.equipment.reservation_equipment_quantity}
+                                                                                                </span>
+                                                                                            </p>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        )}
 
-                                {/* Venues Section */}
-                                {reservationDetails.venues && reservationDetails.venues.length > 0 && (
-                                    <motion.div 
-                                        initial={{ opacity: 0, y: 20 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: 0.4, duration: 0.3 }}
-                                    >
-                                        <h4 className="font-semibold mb-2 flex items-center">
-                                            <FaBuilding className="mr-2 text-yellow-500" /> Venues Used
-                                        </h4>
-                                        <ul className="list-disc pl-5">
-                                            {reservationDetails.venues.map((venue, index) => (
-                                                <li key={index} className="text-sm">
-                                                    {venue.ven_name}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </motion.div>
-                                )}
-                            </motion.div>
-                        )}
-                        <div className="flex justify-end gap-3 mt-6">
-                            <DialogClose asChild>
-                                <button className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
-                                    Close
-                                </button>
-                            </DialogClose>
-                            <button
-                                onClick={handleAccept}
-                                disabled={isAccepting}
-                                className="px-4 py-2 rounded-lg bg-green-500 text-white hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                            >
-                                {isAccepting && (
-                                    <Loader2 className="animate-spin h-4 w-4" />
-                                )}
-                                {isAccepting ? 'Accepting...' : 'Accept'}
-                            </button>
-                        </div>
-                    </DialogContent>
-                </Dialog>
+<div className="flex justify-end gap-3 mt-6">
+  <DialogClose asChild>
+    <button className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
+      Close
+    </button>
+  </DialogClose>
 
-                {/* Confirmation Modal for Declining */}
+  {/* When approval status is 'declined' */}
+  {reservationDetails?.approval_status === 'declined' ? (
+    <>
+      <button
+        onClick={handleAccept}
+        disabled={isAccepting}
+        className="px-4 py-2 rounded-lg bg-green-500 text-white hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {isAccepting ? 'Accepting...' : 'Reserve'}
+      </button>
+      <button
+        onClick={() => setIsDeclineModalOpen(true)}
+        className="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors"
+      >
+        Decline
+      </button>
+    </>
+  ) : (
+    // Default buttons if not 'declined'
+    <button
+      onClick={() => setIsDeclineModalOpen(true)}
+      className="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors"
+    >
+      Decline
+    </button>
+  )}
+</div>
+
+                                                                    </motion.div>
+                                                                )}
+                                                            </DialogContent>
+                                                        </Dialog>
+
+                                                        {/* Confirmation Modal for Declining */}
                 <Dialog open={isDeclineModalOpen} onOpenChange={setIsDeclineModalOpen}>
                     <DialogContent className="sm:max-w-[400px]">
                         <DialogTitle>Confirm Decline</DialogTitle>

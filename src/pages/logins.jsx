@@ -146,6 +146,9 @@ function Logins() {
                     } else if (userData.user_level_name === "Admin") {
                         notify("Personnel Login Successful");
                         navigateTo("/adminDashboard");
+                    }else if (userData.user_level_name === "Department Head") {
+                        notify("Dean Login Successful");
+                        navigateTo("/deanDashboard");
                     }else {
                         notify("User Login Successful");
                         navigateTo("/dashboard");
