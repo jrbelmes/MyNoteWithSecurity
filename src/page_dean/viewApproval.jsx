@@ -259,7 +259,44 @@ const App = () => {
                   </div>
                 )}
               </div>
-            ) : null}
+            ) : (
+              // Venue Request Details
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-6">
+                  {/* Venue Information */}
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h4 className="text-lg font-semibold mb-4 text-blue-800">Venue Information</h4>
+                    <div className="space-y-2">
+                      <p><span className="font-medium">Venue Name:</span> {selectedRequest.venue.name}</p>
+                      <p><span className="font-medium">Event Title:</span> {selectedRequest.venue.event_title}</p>
+                      <p><span className="font-medium">Description:</span> {selectedRequest.venue.description}</p>
+                      <p><span className="font-medium">Participants:</span> {selectedRequest.venue.participants}</p>
+                      <p><span className="font-medium">Requester:</span> {selectedRequest.venue.requester}</p>
+                    </div>
+                  </div>
+
+                  {/* Schedule */}
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h4 className="text-lg font-semibold mb-4 text-blue-800">Schedule</h4>
+                    <div className="space-y-2">
+                      <p><span className="font-medium">Start Date:</span> {selectedRequest.venue.start_date}</p>
+                      <p><span className="font-medium">End Date:</span> {selectedRequest.venue.end_date}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Equipment */}
+                {selectedRequest.equipment && (
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h4 className="text-lg font-semibold mb-4 text-blue-800">Equipment</h4>
+                    <div className="space-y-2">
+                      <p><span className="font-medium">Name:</span> {selectedRequest.equipment.name}</p>
+                      <p><span className="font-medium">Quantity:</span> {selectedRequest.equipment.quantity}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Action Buttons */}
             <div className="flex justify-end space-x-4 mt-8 pt-4 border-t">

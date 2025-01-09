@@ -105,7 +105,6 @@ const AddReservation = () => {
   const [formData, setFormData] = useState({
     resourceType: '',
     // Common fields
-    reservationName: '',
     startDate: null,
     endDate: null,
     selectedTime: null,
@@ -341,7 +340,6 @@ const handleNext = async (e) => {
     console.log('Missing Fields:', missing);
     const missingLabels = missing.map(field => {
       const labels = {
-        reservationName: 'Reservation Name',
         eventTitle: 'Event Title',
         description: 'Description',
         startDate: 'Start Date',
@@ -369,8 +367,8 @@ const handleNext = async (e) => {
 };
 
 const getMissingFields = () => {
-  const vehicleRequiredFields = ['reservationName', 'purpose', 'destination'];
-  const venueRequiredFields = ['reservationName', 'eventTitle', 'description', 'participants', 'startDate', 'endDate'];
+  const vehicleRequiredFields = ['purpose', 'destination']; // removed reservationName
+  const venueRequiredFields = ['eventTitle', 'description', 'participants', 'startDate', 'endDate']; // removed reservationName
   
   const currentRequiredFields = {
     0: ['resourceType'],
@@ -401,14 +399,12 @@ const isStepValid = () => {
     case 1:
       if (formData.resourceType === 'vehicle') {
         return !!(
-          formData.reservationName?.trim() &&
-          formData.purpose?.trim() &&
+          formData.purpose?.trim() && // removed reservationName check
           formData.destination?.trim()
         );
       } else {
         return !!(
-          formData.reservationName?.trim() &&
-          formData.eventTitle?.trim() &&
+          formData.eventTitle?.trim() && // removed reservationName check
           formData.description?.trim() &&
           formData.participants &&
           formData.startDate &&
@@ -448,7 +444,7 @@ const validateSubmission = () => {
       return false;
     }
     if (!formData.purpose || !formData.destination || 
-        !formData.startDate || !formData.endDate) {
+        !formData.startDate || !formData.endDate) { // removed reservationName check
       Modal.error({
         title: 'Validation Error',
         content: 'Please make sure all vehicle reservation fields are filled out properly.'
@@ -1011,20 +1007,6 @@ const renderBasicInformation = () => {
 
           <Form layout="vertical" className="space-y-4">
             {/* Common field */}
-            <Form.Item
-              label="Reservation Name"
-              required
-              tooltip="This will be the main identifier for your reservation"
-            >
-              <Input
-                prefix={<UserOutlined />}
-                name="reservationName"
-                value={formData.reservationName}
-                onChange={handleInputChange}
-                className="rounded-lg"
-                placeholder="Enter reservation name"
-              />
-            </Form.Item>
 
             {formData.resourceType === 'venue' ? (
               // Venue specific fields
@@ -1293,8 +1275,9 @@ const handleAddReservation = async (e) => {
   try {
     const userId = localStorage.getItem('user_id');
     const deptId = localStorage.getItem('department_id');
+    const storedName = localStorage.getItem('name'); // Get name from localStorage
     
-    if (!userId || !deptId) {
+    if (!userId || !deptId || !storedName) {
       toast.error('User session invalid. Please log in again.');
       return;
     }
@@ -1314,7 +1297,7 @@ const handleAddReservation = async (e) => {
         dept_id: parseInt(deptId),
         venue_id: parseInt(formData.venue),
         form_data: {
-          name: formData.reservationName.trim(),
+          name: storedName, // Use stored name instead of formData.reservationName
           event_title: formData.eventTitle.trim(),
           description: formData.description.trim(),
           participants: formData.participants.toString(),
@@ -1367,7 +1350,7 @@ const handleAddReservation = async (e) => {
         dept_id: parseInt(deptId),
         vehicles: selectedModels.map(id => id.toString()), // Convert to string array
         form_data: {
-          name: formData.reservationName,
+          name: storedName, // Use stored name instead of formData.reservationName
           purpose: formData.purpose,
           destination: formData.destination,
           start_date: format(new Date(formData.startDate), 'yyyy-MM-dd HH:mm:ss'),
@@ -1483,6 +1466,7 @@ const handleBack = () => {
 const renderReviewSection = () => {
   const selectedVenue = venues.find(v => v.ven_id.toString() === formData.venue.toString());
   const selectedVehicleDetails = vehicles.filter(v => selectedModels.includes(v.vehicle_id));
+  const storedName = localStorage.getItem('name');
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -1496,7 +1480,7 @@ const renderReviewSection = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-6">
               <div>
                 <p className="text-sm text-gray-500">Reservation Name</p>
-                <p className="font-medium text-gray-900">{formData.reservationName || 'Not provided'}</p>
+                <p className="font-medium text-gray-900">{storedName || 'Not provided'}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">Resource Type</p>

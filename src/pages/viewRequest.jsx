@@ -120,7 +120,7 @@ const ReservationRequests = () => {
                     duration: 3000,
                 });
                 await fetchReservations();
-                setIsDetailModalOpen(false);
+                setIsDetailModalOpen(false); // Close the detail modal
             } else {
                 toast.error('Failed to accept reservation.');
             }
@@ -150,7 +150,8 @@ const ReservationRequests = () => {
                     duration: 3000,
                 });
                 await fetchReservations();
-                setIsDeclineModalOpen(false);
+                setIsDeclineModalOpen(false); // Close the decline modal
+                setIsDetailModalOpen(false);  // Also close the detail modal
             } else {
                 toast.error('Failed to decline reservation.');
             }
@@ -462,38 +463,38 @@ const ReservationRequests = () => {
                                                                         )}
 
 <div className="flex justify-end gap-3 mt-6">
-  <DialogClose asChild>
-    <button className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
-      Close
-    </button>
-  </DialogClose>
+    <DialogClose asChild>
+        <button className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
+            Close
+        </button>
+    </DialogClose>
 
-  {/* When approval status is 'declined' */}
-  {reservationDetails?.approval_status === 'declined' ? (
-    <>
-      <button
-        onClick={handleAccept}
-        disabled={isAccepting}
-        className="px-4 py-2 rounded-lg bg-green-500 text-white hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {isAccepting ? 'Accepting...' : 'Reserve'}
-      </button>
-      <button
-        onClick={() => setIsDeclineModalOpen(true)}
-        className="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors"
-      >
-        Decline
-      </button>
-    </>
-  ) : (
-    // Default buttons if not 'declined'
-    <button
-      onClick={() => setIsDeclineModalOpen(true)}
-      className="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors"
-    >
-      Decline
-    </button>
-  )}
+    {reservationDetails?.status_approval_name === 'declined' ? (
+        // Show only decline button if status is declined
+        <button
+            onClick={() => setIsDeclineModalOpen(true)}
+            className="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors"
+        >
+            Decline
+        </button>
+    ) : (
+        // Show both buttons for other statuses
+        <>
+            <button
+                onClick={handleAccept}
+                disabled={isAccepting}
+                className="px-4 py-2 rounded-lg bg-green-500 text-white hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                {isAccepting ? 'Accepting...' : 'Reserve'}
+            </button>
+            <button
+                onClick={() => setIsDeclineModalOpen(true)}
+                className="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors"
+            >
+                Decline
+            </button>
+        </>
+    )}
 </div>
 
                                                                     </motion.div>

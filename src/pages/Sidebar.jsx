@@ -129,10 +129,7 @@ const Sidebar = () => {
                 <SidebarItem icon={FaTachometerAlt} text="Dashboard" link="/adminDashboard" active={activeItem === '/adminDashboard'} />
               )}
               
-              {canAccessMenu('calendar') && (
-                <SidebarItem icon={FaCalendarAlt} text="Calendar" link="/landCalendar" active={activeItem === '/landCalendar'} />
-              )}
-              
+             
               {(user_level_id === '1' || user_level_id === '4') && (
                 <SidebarDropdown icon={FaFileAlt} text="Manage Resources" active={['/Venue', '/VehicleEntry', '/Equipment'].includes(activeItem)}>
                   <SidebarSubItem icon={FaHome} text="Venue" link="/Venue" active={activeItem === '/Venue'} />
@@ -141,7 +138,7 @@ const Sidebar = () => {
                 </SidebarDropdown>
               )}
 
-              {user_level_id === '4' && (
+              {user_level_id === '1' && (
                 <SidebarItem icon={FaFolder} text="Master" link="/Master" active={activeItem === '/Master'} />
               )}
 
