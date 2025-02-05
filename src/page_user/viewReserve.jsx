@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { FaTrash, FaPlus, FaClock, FaCalendar, FaUser, FaEye, FaEdit } from 'react-icons/fa';
+import { FaTrash, FaPlus, FaClock, FaCalendar, FaUser, FaEye, FaEdit, FaBuilding, FaTools, FaUsers, FaCheckCircle, FaUserShield, FaCar, FaMapMarkedAlt, FaFileAlt, FaIdCard, FaTags } from 'react-icons/fa';
 import { FiCalendar, FiList, FiHelpCircle, FiBell, FiSettings, FiUser, FiLogOut } from 'react-icons/fi';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
@@ -42,6 +42,7 @@ const ViewReserve = () => {
     // Add these new state variables with the other useState declarations
     const [notifications, setNotifications] = useState(0);
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+    const [detailedReservation, setDetailedReservation] = useState(null);
 
     const statusColors = {
         confirmed: 'bg-green-100 text-green-800',
@@ -169,49 +170,128 @@ const ViewReserve = () => {
         setEditModalOpen(false);
     };
 
+    const formatTimeRange = (dateTimeString) => {
+        if (!dateTimeString) return '';
+        
+        const [info, timeRange] = dateTimeString.split(' - ');
+        const [startDateTime, endDateTime] = timeRange.split(' to ');
+        
+        const startDate = new Date(startDateTime);
+        const endDate = new Date(endDateTime);
+        
+        // Format the date
+        const dateStr = startDate.getDate() === endDate.getDate() && 
+                       startDate.getMonth() === endDate.getMonth() &&
+                       startDate.getFullYear() === endDate.getFullYear()
+            ? format(startDate, 'MMM d')
+            : `${format(startDate, 'MMM d')} to ${format(endDate, 'MMM d')}`;
+
+        // Format the time
+        const startTimeStr = format(startDate, 'ha').toLowerCase();
+        const endTimeStr = format(endDate, 'ha').toLowerCase();
+        
+        return {
+            date: dateStr,
+            time: `${startTimeStr} to ${endTimeStr}`
+        };
+    };
+
     const fetchReservations = async () => {
         try {
-            const response = await fetch('http://localhost/coc/gsd/fetch_reserve.php', {
+            const userId = localStorage.getItem('user_id');
+            console.log('Fetching reservations for user:', userId); // Debug log
+            
+            if (!userId) {
+                toast.error('User session expired');
+                navigate('/gsd');
+                return;
+            }
+
+            const response = await fetch('http://localhost/coc/gsd/user1.php', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Content-Type': 'application/json',
                 },
-                body: 'operation=fetchAllReservations'
+                body: JSON.stringify({
+                    operation: 'getUserReservations',
+                    userId: userId
+                })
             });
+
             const result = await response.json();
-            if (result.status === 'success') {
-                const transformedReservations = result.data.map(reservation => ({
-                    id: reservation.reservation_id,
-                    name: reservation.reservation_name,
-                    date: reservation.reservation_start_date.split(' ')[0],
-                    time: reservation.reservation_start_date.split(' ')[1],
-                    endDate: reservation.reservation_end_date.split(' ')[0],
-                    endTime: reservation.reservation_end_date.split(' ')[1],
-                    venue: reservation.venue_names || 'No venue specified',
-                    status: reservation.reservation_status_name.toLowerCase(),
-                    description: reservation.reservation_description,
-                    equipment: reservation.equipment_names,
-                    vehicles: reservation.vehicle_ids
-                }));
+            console.log('API response:', result); // Debug log
+            
+            if (result.status === 'success' && result.data) {
+                const transformedReservations = result.data.map(reservation => {
+                    const details = reservation.venue_details || reservation.vehicle_details || '';
+                    const formattedTime = formatTimeRange(details);
+                    
+                    return {
+                        id: reservation.approval_id,
+                        name: reservation.venue_form_name || reservation.vehicle_form_name,
+                        date: formattedTime.date,
+                        time: formattedTime.time,
+                        status: reservation.reservation_status.toLowerCase(),
+                        createdAt: reservation.approval_created_at,
+                        type: reservation.approval_form_venue_id ? 'venue' : 'vehicle'
+                    };
+                });
                 setReservations(transformedReservations);
+            } else {
+                throw new Error(result.message || 'Failed to fetch reservations');
             }
         } catch (error) {
             console.error('Error fetching reservations:', error);
+            toast.error('Failed to fetch reservations');
         }
     };
 
     useEffect(() => {
+        const userId = localStorage.getItem('user_id');
+        const isLoggedIn = localStorage.getItem('loggedIn');
+        
+        if (!userId || !isLoggedIn) {
+            toast.error('Please login first');
+            navigate('/gsd'); // or wherever your login page is
+            return;
+        }
+        
+        console.log('User ID:', userId); // Debug log
         fetchReservations();
-    }, []);
+    }, [navigate]);
 
     const filteredReservations = reservations.filter(reservation => 
         activeFilter === 'all' ? true : reservation.status === activeFilter
     );
 
-    const handleViewReservation = (reservation) => {
-        setSelectedReservation(reservation);
-        setShowViewModal(true);
+    const handleViewReservation = async (reservation) => {
+        try {
+            const response = await fetch('http://localhost/coc/gsd/user1.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    operation: 'getUserReservationDetailsById',
+                    approvalId: reservation.id
+                })
+            });
+
+            const result = await response.json();
+            
+            if (result.status === 'success' && result.data) {
+                setDetailedReservation(result.data[0]);
+                setSelectedReservation(reservation);
+                setShowViewModal(true);
+            } else {
+                toast.error('Failed to fetch reservation details');
+            }
+        } catch (error) {
+            console.error('Error fetching reservation details:', error);
+            toast.error('Failed to fetch reservation details');
+        }
     };
+
     const handleNavigation = () => {
         navigate('/dashboard'); // Navigate to /dashboard on click
       };
@@ -381,25 +461,33 @@ const ViewReserve = () => {
                             >
                                 <div className="flex justify-between items-start">
                                     <div className="space-y-2">
-                                        <h3 className="text-xl font-semibold text-gray-800">{reservation.name}</h3>
+                                        {/* Add type indicator */}
+                                        <div className="flex items-center gap-2">
+                                            <span className={`px-2 py-1 rounded-md text-xs font-medium ${
+                                                reservation.type === 'venue' 
+                                                    ? 'bg-purple-100 text-purple-700' 
+                                                    : 'bg-orange-100 text-orange-700'
+                                            }`}>
+                                                {reservation.type === 'venue' ? 'Venue' : 'Vehicle'}
+                                            </span>
+                                            <h3 className="text-xl font-semibold text-gray-800">{reservation.name}</h3>
+                                        </div>
+                                        
                                         <div className="flex gap-4 text-gray-600">
                                             <span className="flex items-center gap-2">
                                                 <FaCalendar className="text-blue-500" />
-                                                {format(new Date(reservation.date), 'MMM dd, yyyy')}
+                                                {reservation.date}
                                             </span>
                                             <span className="flex items-center gap-2">
                                                 <FaClock className="text-blue-500" />
-                                                {reservation.time} - {reservation.endTime}
-                                            </span>
-                                            <span className="flex items-center gap-2">
-                                                <FaUser className="text-blue-500" />
-                                                {reservation.guests || 'N/A'} guests
+                                                {reservation.time}
                                             </span>
                                         </div>
-                                        {reservation.description && (
-                                            <p className="text-gray-500 text-sm">Description: {reservation.description}</p>
-                                        )}
+
+                                        
                                     </div>
+
+                                    {/* Status and action buttons */}
                                     <div className="flex flex-col items-end gap-2">
                                         <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[reservation.status]}`}>
                                             {reservation.status}
@@ -437,66 +525,266 @@ const ViewReserve = () => {
                         ))}
                     </div>
 
-                    {/* View Reservation Modal */}
-                    {showViewModal && selectedReservation && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+                    {/* View Reservation Modal - VENUE */}
+                    {showViewModal && selectedReservation && detailedReservation && selectedReservation.type === 'venue' && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
                             <motion.div
                                 initial={{ scale: 0.8, opacity: 0 }}
                                 animate={{ scale: 1, opacity: 1 }}
                                 transition={{ duration: 0.3 }}
-                                className="bg-white rounded-2xl p-8 w-full max-w-2xl transform transition-all duration-300 ease-in-out"
+                                className="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden"
                             >
-                                <div className="flex justify-between items-center mb-6">
-                                    <h2 className="text-2xl font-bold text-gray-800">Reservation Details</h2>
-                                    <button onClick={() => setShowViewModal(false)} className="text-gray-400 hover:text-gray-600">
-                                        &times;
-                                    </button>
-                                </div>
-                                <div className="space-y-4">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <h3 className="text-sm font-medium text-gray-500">Reservation Name</h3>
-                                            <p className="mt-1 text-lg">{selectedReservation.name}</p>
-                                        </div>
-                                        <div>
-                                            <h3 className="text-sm font-medium text-gray-500">Status</h3>
-                                            <span className={`inline-block mt-1 px-3 py-1 rounded-full text-sm font-medium ${statusColors[selectedReservation.status]}`}>
-                                                {selectedReservation.status}
-                                            </span>
-                                        </div>
-                                        <div>
-                                            <h3 className="text-sm font-medium text-gray-500">Date</h3>
-                                            <p className="mt-1">{format(new Date(selectedReservation.date), 'MMM dd, yyyy')}</p>
-                                        </div>
-                                        <div>
-                                            <h3 className="text-sm font-medium text-gray-500">Time</h3>
-                                            <p className="mt-1">{selectedReservation.time} - {selectedReservation.endTime}</p>
-                                        </div>
-                                        <div>
-                                            <h3 className="text-sm font-medium text-gray-500">Venue</h3>
-                                            <p className="mt-1">{selectedReservation.venue}</p>
-                                        </div>
-                                        {selectedReservation.equipment && (
-                                            <div>
-                                                <h3 className="text-sm font-medium text-gray-500">Equipment</h3>
-                                                <p className="mt-1">{selectedReservation.equipment}</p>
-                                            </div>
-                                        )}
+                                {/* Header */}
+                                <div className="bg-gradient-to-r from-green-600 to-green-400 px-8 py-4">
+                                    <div className="flex justify-between items-center">
+                                        <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                                            <FaCalendar />
+                                            Venue Reservation Details
+                                        </h2>
+                                        <button 
+                                            onClick={() => setShowViewModal(false)} 
+                                            className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
+                                        >
+                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
                                     </div>
-                                    {selectedReservation.description && (
-                                        <div>
-                                            <h3 className="text-sm font-medium text-gray-500">Description</h3>
-                                            <p className="mt-1 text-gray-700">{selectedReservation.description}</p>
+                                </div>
+
+                                {/* Content */}
+                                <div className="p-8">
+                                    <div className="grid grid-cols-2 gap-8">
+                                        {/* Left Column */}
+                                        <div className="space-y-6">
+                                            <div className="bg-gray-50 p-4 rounded-lg">
+                                                <h3 className="text-lg font-semibold text-gray-800 mb-4">Event Information</h3>
+                                                <div className="space-y-4">
+                                                    <InfoField 
+                                                        icon={<FaCalendar className="text-green-500"/>}
+                                                        label="Event Title" 
+                                                        value={detailedReservation.venue_form_event_title || 'N/A'} 
+                                                    />
+                                                    <InfoField 
+                                                        icon={<FaUser className="text-green-500"/>}
+                                                        label="Department" 
+                                                        value={detailedReservation.departments_name} 
+                                                    />
+                                                    <InfoField 
+                                                        icon={<FaUsers className="text-green-500"/>}
+                                                        label="Participants" 
+                                                        value={detailedReservation.venue_participants || 'N/A'} 
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="bg-gray-50 p-4 rounded-lg">
+                                                <h3 className="text-lg font-semibold text-gray-800 mb-4">Venue & Equipment</h3>
+                                                <div className="space-y-4">
+                                                    <InfoField 
+                                                        icon={<FaBuilding className="text-green-500"/>}
+                                                        label="Venue" 
+                                                        value={detailedReservation.venue_name || 'N/A'} 
+                                                    />
+                                                    <InfoField 
+                                                        icon={<FaTools className="text-green-500"/>}
+                                                        label="Equipment" 
+                                                        value={
+                                                            detailedReservation.equipment_name 
+                                                                ? `${detailedReservation.equipment_name} (${detailedReservation.reservation_equipment_quantity})`
+                                                                : 'No equipment requested'
+                                                        } 
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Right Column */}
+                                        <div className="space-y-6">
+                                            <div className="bg-gray-50 p-4 rounded-lg">
+                                                <h3 className="text-lg font-semibold text-gray-800 mb-4">Schedule</h3>
+                                                <div className="space-y-4">
+                                                    <InfoField 
+                                                        icon={<FaClock className="text-green-500"/>}
+                                                        label="Start Date & Time" 
+                                                        value={format(new Date(detailedReservation.venue_form_start_date), 'MMM dd, yyyy HH:mm')} 
+                                                    />
+                                                    <InfoField 
+                                                        icon={<FaClock className="text-green-500"/>}
+                                                        label="End Date & Time" 
+                                                        value={format(new Date(detailedReservation.venue_form_end_date), 'MMM dd, yyyy HH:mm')} 
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="bg-gray-50 p-4 rounded-lg">
+                                                <h3 className="text-lg font-semibold text-gray-800 mb-4">Status Information</h3>
+                                                <div className="space-y-4">
+                                                    <InfoField 
+                                                        icon={<FaCheckCircle className="text-green-500"/>}
+                                                        label="GSD Status" 
+                                                        value={detailedReservation.current_reservation_status || 'Pending'} 
+                                                        className={`px-3 py-1 rounded-full text-sm font-medium inline-block ${
+                                                            statusColors[detailedReservation.current_reservation_status?.toLowerCase() || 'pending']
+                                                        }`}
+                                                    />
+                                                    <InfoField 
+                                                        icon={<FaUserShield className="text-green-500"/>}
+                                                        label="Dean Status" 
+                                                        value={detailedReservation.status_approval_name || 'Pending'} 
+                                                        className={`px-3 py-1 rounded-full text-sm font-medium inline-block ${
+                                                            detailedReservation.status_approval_name?.toLowerCase() === 'approve' 
+                                                                ? 'bg-green-100 text-green-800'
+                                                                : 'bg-yellow-100 text-yellow-800'
+                                                        }`}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                   
+                                </div>
+
+                                {/* Footer */}
+                                <div className="border-t border-gray-200 px-8 py-4">
+                                    <div className="flex justify-end">
+                                        <button 
+                                            onClick={() => setShowViewModal(false)} 
+                                            className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+                                        >
+                                            Close
+                                        </button>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        </div>
+                    )}
+
+                    {/* View Reservation Modal - VEHICLE */}
+                    {showViewModal && selectedReservation && detailedReservation && selectedReservation.type === 'vehicle' && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
+                            <motion.div
+                                initial={{ scale: 0.8, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                transition={{ duration: 0.3 }}
+                                className="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden"
+                            >
+                                {/* Header */}
+                                <div className="bg-gradient-to-r from-blue-600 to-blue-400 px-8 py-4">
+                                    <div className="flex justify-between items-center">
+                                        <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                                            <FaCar />
+                                            Vehicle Reservation Details
+                                        </h2>
+                                        <button 
+                                            onClick={() => setShowViewModal(false)} 
+                                            className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
+                                        >
+                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Content */}
+                                <div className="p-8">
+                                    <div className="grid grid-cols-2 gap-8">
+                                        {/* Left Column */}
+                                        <div className="space-y-6">
+                                            <div className="bg-gray-50 p-4 rounded-lg">
+                                                <h3 className="text-lg font-semibold text-gray-800 mb-4">Reservation Details</h3>
+                                                <div className="space-y-4">
+                                                    <InfoField 
+                                                        icon={<FaUser className="text-blue-500"/>}
+                                                        label="Reserved By" 
+                                                        value={detailedReservation.vehicle_form_user_full_name} 
+                                                    />
+                                                    <InfoField 
+                                                        icon={<FaBuilding className="text-blue-500"/>}
+                                                        label="Department" 
+                                                        value={detailedReservation.departments_name} 
+                                                    />
+                                                    <InfoField 
+                                                        icon={<FaMapMarkedAlt className="text-blue-500"/>}
+                                                        label="Destination" 
+                                                        value={detailedReservation.vehicle_form_destination} 
+                                                    />
+                                                    <InfoField 
+                                                        icon={<FaFileAlt className="text-blue-500"/>}
+                                                        label="Purpose" 
+                                                        value={detailedReservation.vehicle_form_purpose} 
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Right Column */}
+                                        <div className="space-y-6">
+                                            <div className="bg-gray-50 p-4 rounded-lg">
+                                                <h3 className="text-lg font-semibold text-gray-800 mb-4">Vehicle Information</h3>
+                                                <div className="space-y-4">
+                                                    <InfoField 
+                                                        icon={<FaCar className="text-blue-500"/>}
+                                                        label="Vehicle" 
+                                                        value={`${detailedReservation.vehicle_make} ${detailedReservation.vehicle_model}`} 
+                                                    />
+                                                    <InfoField 
+                                                        icon={<FaIdCard className="text-blue-500"/>}
+                                                        label="License Plate" 
+                                                        value={detailedReservation.vehicle_license} 
+                                                    />
+                                                    <InfoField 
+                                                        icon={<FaTags className="text-blue-500"/>}
+                                                        label="Category" 
+                                                        value={detailedReservation.vehicle_category} 
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="bg-gray-50 p-4 rounded-lg">
+                                                <h3 className="text-lg font-semibold text-gray-800 mb-4">Schedule</h3>
+                                                <div className="space-y-4">
+                                                    <InfoField 
+                                                        icon={<FaClock className="text-blue-500"/>}
+                                                        label="Start Date & Time" 
+                                                        value={format(new Date(detailedReservation.vehicle_form_start_date), 'MMM dd, yyyy HH:mm')} 
+                                                    />
+                                                    <InfoField 
+                                                        icon={<FaClock className="text-blue-500"/>}
+                                                        label="End Date & Time" 
+                                                        value={format(new Date(detailedReservation.vehicle_form_end_date), 'MMM dd, yyyy HH:mm')} 
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {detailedReservation.passenger_names && (
+                                        <div className="mt-6 bg-gray-50 p-4 rounded-lg">
+                                            <h3 className="text-lg font-semibold text-gray-800 mb-2">Passengers</h3>
+                                            <div className="flex flex-wrap gap-2">
+                                                {detailedReservation.passenger_names.split(',').map((passenger, index) => (
+                                                    <span key={index} className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
+                                                        {passenger.trim()}
+                                                    </span>
+                                                ))}
+                                            </div>
                                         </div>
                                     )}
                                 </div>
-                                <div className="mt-8 flex justify-end">
-                                    <button
-                                        onClick={() => setShowViewModal(false)}
-                                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
-                                    >
-                                        Close
-                                    </button>
+
+                                {/* Footer */}
+                                <div className="border-t border-gray-200 px-8 py-4">
+                                    <div className="flex justify-end">
+                                        <button 
+                                            onClick={() => setShowViewModal(false)} 
+                                            className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+                                        >
+                                            Close
+                                        </button>
+                                    </div>
                                 </div>
                             </motion.div>
                         </div>
@@ -672,5 +960,15 @@ const ViewReserve = () => {
         </>
     );
 };
+
+const InfoField = ({ label, value, className, icon }) => (
+    <div>
+        <div className="flex items-center gap-2 mb-1">
+            {icon}
+            <h3 className="text-sm font-medium text-gray-500">{label}</h3>
+        </div>
+        <p className={`mt-1 ${className || 'text-gray-900'}`}>{value}</p>
+    </div>
+);
 
 export default ViewReserve;
