@@ -26,16 +26,21 @@ import VehicleModel from './pages/vehiclemodel';
 import PersonnelDashboard from './pages/PersonelDashboard';
 import ReleaseAndReturn from './pages/release&return';
 import ViewReserve from './page_user/viewReserve';
-import Profile from './page_user/profile'
 import Calendar from './pages/calendar';
 import Calendars from './pages/landCalendar';
 import Pofiles from './pages/profile';
 import Settings from './pages/Settings';
 import Record from './pages/Record';
 import Admin from './pages/Admin';
-import DeanDashboard from './page_dean/dashboard';
 import ViewApproval from './page_dean/viewApproval';
-
+import UsersProfile from './page_user/component/user_profile';
+import UsersSidebar from './page_user/component/user_sidebar';
+import UsersDashboard from './page_user/dashboard';
+import DeanProfile from './page_dean/component/dean_profile';
+import DeanSidebar from './page_dean/component/dean_sidebar';
+import DeanViewReserve from './page_dean/viewReserve';
+import DeanAddReservation from './page_dean/AddReservation';
+import DeanDashboard from './page_dean/dashboard';
 import Chat from './components/chat';
 
 // Create a new context for the theme
@@ -78,7 +83,6 @@ const App = () => {
                         <Route path="/chat" element={<Chat />} />
                         <Route path="/landCalendar" element={<Calendars />} />
                         <Route path="/calendar" element={<Calendar />} />
-                        <Route path="/profile" element={<Profile />} />
                         <Route path="/viewReserve" element={<ViewReserve />} />                      
                         <Route path="/gsd" element={<Logins />} />
                         <Route path="/release&return" element={<ReleaseAndReturn />} />
@@ -101,6 +105,14 @@ const App = () => {
                         <Route path="/Register" element={<Register />} />
                         <Route path="/viewRequest" element={<ViewRequest />} />
                         <Route path="/Master" element={<Master />} />
+                        <Route path="/usersProfile" element={<UsersProfile />} />
+                        <Route path="/usersSidebar" element={<UsersSidebar />} />
+                        <Route path="/usersDashboard" element={<UsersDashboard />} />
+                        <Route path="/deanProfile" element={<DeanProfile />} />
+                        <Route path="/deanSidebar" element={<DeanSidebar />} />
+                        <Route path="/deanViewReserve" element={<DeanViewReserve />} />
+                        <Route path="/deanAddReservation" element={<DeanAddReservation />} />
+                        <Route path="/deanDashboard" element={<DeanDashboard />} />
                         <Route path="*" element={<div>404 Not Found</div>} /> 
                     </Routes>
                 </main>

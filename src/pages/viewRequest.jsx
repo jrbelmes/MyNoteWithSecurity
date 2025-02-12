@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Sidebar from './Sidebar';
 import Sidebar1 from './sidebarpersonel';
-import { Modal, Button, Spinner } from 'react-bootstrap';
+import {Spinner } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -20,6 +20,19 @@ import {
   DialogContainer,
 } from '../components/core/dialog';
 import { Loader2 } from 'lucide-react';
+import { Modal, Tabs, Badge, Descriptions, Space, Tag, Timeline, Button } from 'antd';
+import { 
+    CarOutlined, 
+    BuildOutlined, 
+    ToolOutlined,
+    UserOutlined,
+    CalendarOutlined,
+    EnvironmentOutlined,
+    TeamOutlined,
+    CheckCircleOutlined,
+    CloseCircleOutlined,
+    LoadingOutlined
+} from '@ant-design/icons';
 
 const ReservationRequests = () => {
     const [reservations, setReservations] = useState([]);
@@ -343,193 +356,207 @@ const ReservationRequests = () => {
                 )}
 
                 {/* Detail Modal for Accepting */}
-                <Dialog open={isDetailModalOpen} onOpenChange={setIsDetailModalOpen}>
-                    <DialogContent className="sm:max-w-[600px]">
-                        <DialogTitle>Request Details #{currentRequest?.approval_id || ''}</DialogTitle>
-                        {reservationDetails && (
-                            <motion.div 
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                transition={{ duration: 0.3 }}
-                                className="space-y-6"
-                            >
-                                <div className="bg-gray-50 p-4 rounded-lg">
-                                    <p className="text-sm text-gray-500">Status</p>
-                                    <p className="font-medium text-lg">{reservationDetails.status_request}</p>
-                                </div>
+                <DetailModal 
+                    visible={isDetailModalOpen}
+                    onClose={() => setIsDetailModalOpen(false)}
+                    reservationDetails={reservationDetails}
+                    onAccept={handleAccept}
+                    onDecline={() => setIsDeclineModalOpen(true)}
+                    isAccepting={isAccepting}
+                    isDeclining={isDeclining}
+                />
 
-                                {/* Vehicle Details */}
-                                {reservationDetails.vehicle?.vehicle_form_name && (
-                                    <div className="space-y-4">
-                                        <h4 className="font-semibold flex items-center">
-                                            <FaCar className="mr-2 text-blue-500" /> Vehicle Request Details
-                                        </h4>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="bg-gray-50 p-4 rounded-lg">
-                                                <p className="text-sm text-gray-500">Requester</p>
-                                                <p className="font-medium">{reservationDetails.vehicle.vehicle_form_user_id}</p>
-                                            </div>
-                                            <div className="bg-gray-50 p-4 rounded-lg">
-                                                <p className="text-sm text-gray-500">Form Name</p>
-                                                <p className="font-medium">{reservationDetails.vehicle.vehicle_form_name}</p>
-                                            </div>
-                                            <div className="bg-gray-50 p-4 rounded-lg">
-                                                <p className="text-sm text-gray-500">Purpose</p>
-                                                <p className="font-medium">{reservationDetails.vehicle.vehicle_form_purpose}</p>
-                                            </div>
-                                            <div className="bg-gray-50 p-4 rounded-lg">
-                                                <p className="text-sm text-gray-500">Destination</p>
-                                                <p className="font-medium">{reservationDetails.vehicle.vehicle_form_destination}</p>
-                                            </div>
-                                            <div className="bg-gray-50 p-4 rounded-lg col-span-2">
-                                                <p className="text-sm text-gray-500">Schedule</p>
-                                                <p className="font-medium">
-                                                    {new Date(reservationDetails.vehicle.vehicle_form_start_date).toLocaleString()} - 
-                                                    {new Date(reservationDetails.vehicle.vehicle_form_end_date).toLocaleString()}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        
-                                        {/* Passengers */}
-                                        {reservationDetails.passengers && (
-                                            <div className="bg-gray-50 p-4 rounded-lg">
-                                                <p className="text-sm text-gray-500 mb-2">Passengers</p>
-                                                <ul className="list-disc pl-5">
-                                                    {reservationDetails.passengers.map((passenger, idx) => (
-                                                        <li key={passenger.passenger_id} className="font-medium">
-                                                            {passenger.passenger_name}
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-
-                                {/* Venue Details */}
-                                {reservationDetails.venue?.venue_form_name && (
-                                    <div className="space-y-4">
-                                        <h4 className="font-semibold flex items-center">
-                                            <FaBuilding className="mr-2 text-green-500" /> Venue Request Details
-                                        </h4>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="bg-gray-50 p-4 rounded-lg">
-                                                <p className="text-sm text-gray-500">Requester</p>
-                                                <p className="font-medium">{reservationDetails.venue.venue_form_user_id}</p>
-                                            </div>
-                                            <div className="bg-gray-50 p-4 rounded-lg">
-                                                <p className="text-sm text-gray-500">Venue Name</p>
-                                                <p className="font-medium">{reservationDetails.venue.venue_name}</p>
-                                            </div>
-                                            <div className="bg-gray-50 p-4 rounded-lg">
-                                                <p className="text-sm text-gray-500">Event Title</p>
-                                                <p className="font-medium">{reservationDetails.venue.venue_form_event_title}</p>
-                                            </div>
-                                            <div className="bg-gray-50 p-4 rounded-lg">
-                                                <p className="text-sm text-gray-500">Description</p>
-                                                <p className="font-medium">{reservationDetails.venue.venue_form_description}</p>
-                                            </div>
-                                            <div className="bg-gray-50 p-4 rounded-lg">
-                                                <p className="text-sm text-gray-500">Participants</p>
-                                                <p className="font-medium">{reservationDetails.venue.venue_participants}</p>
-                                            </div>
-                                            <div className="bg-gray-50 p-4 rounded-lg">
-                                                <p className="text-sm text-gray-500">Schedule</p>
-                                                <p className="font-medium">
-                                                    {new Date(reservationDetails.venue.venue_form_start_date).toLocaleString()} - 
-                                                    {new Date(reservationDetails.venue.venue_form_end_date).toLocaleString()}
-                                                </p>
-                                            </div>
-                                        </div>
-
-                                    
-                                                                                {reservationDetails.equipment && (
-                                                                                    <div className="bg-gray-50 p-4 rounded-lg mt-4">
-                                                                                        <h4 className="font-semibold flex items-center mb-3">
-                                                                                            <FaTools className="mr-2 text-orange-500" /> Equipment Requested
-                                                                                        </h4>
-                                                                                        <div className="flex items-center gap-4">
-                                                                                            <p className="text-sm text-gray-500">
-                                                                                                <span className="font-medium">{reservationDetails.equipment.equipment_name}</span>
-                                                                                                <span className="mx-2">-</span>
-                                                                                                <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full">
-                                                                                                    Quantity: {reservationDetails.equipment.reservation_equipment_quantity}
-                                                                                                </span>
-                                                                                            </p>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                )}
-                                                                            </div>
-                                                                        )}
-
-<div className="flex justify-end gap-3 mt-6">
-    <DialogClose asChild>
-        <button className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
-            Close
-        </button>
-    </DialogClose>
-
-    {reservationDetails?.status_approval_name === 'declined' ? (
-        // Show only decline button if status is declined
-        <button
-            onClick={() => setIsDeclineModalOpen(true)}
-            className="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors"
-        >
-            Decline
-        </button>
-    ) : (
-        // Show both buttons for other statuses
-        <>
-            <button
-                onClick={handleAccept}
-                disabled={isAccepting}
-                className="px-4 py-2 rounded-lg bg-green-500 text-white hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-                {isAccepting ? 'Accepting...' : 'Reserve'}
-            </button>
-            <button
-                onClick={() => setIsDeclineModalOpen(true)}
-                className="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors"
-            >
-                Decline
-            </button>
-        </>
-    )}
-</div>
-
-                                                                    </motion.div>
-                                                                )}
-                                                            </DialogContent>
-                                                        </Dialog>
-
-                                                        {/* Confirmation Modal for Declining */}
-                <Dialog open={isDeclineModalOpen} onOpenChange={setIsDeclineModalOpen}>
-                    <DialogContent className="sm:max-w-[400px]">
-                        <DialogTitle>Confirm Decline</DialogTitle>
-                        <DialogDescription>
-                            Are you sure you want to decline this reservation? This action cannot be undone.
-                        </DialogDescription>
-                        <div className="flex justify-end gap-3 mt-6">
-                            <DialogClose asChild>
-                                <button className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
-                                    Cancel
-                                </button>
-                            </DialogClose>
-                            <button
-                                onClick={handleDecline}
-                                disabled={isDeclining}
-                                className="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                            >
-                                {isDeclining && (
-                                    <Loader2 className="animate-spin h-4 w-4" />
-                                )}
-                                {isDeclining ? 'Declining...' : 'Decline'}
-                            </button>
-                        </div>
-                    </DialogContent>
-                </Dialog>
+                {/* Confirmation Modal for Declining */}
+                <Modal
+                    title="Confirm Decline"
+                    visible={isDeclineModalOpen}
+                    onCancel={() => setIsDeclineModalOpen(false)}
+                    footer={[
+                        <Button key="back" onClick={() => setIsDeclineModalOpen(false)}>
+                            Cancel
+                        </Button>,
+                        <Button 
+                            key="submit" 
+                            type="primary" 
+                            danger
+                            loading={isDeclining}
+                            onClick={handleDecline}
+                        >
+                            Decline
+                        </Button>,
+                    ]}
+                >
+                    <p>Are you sure you want to decline this reservation? This action cannot be undone.</p>
+                </Modal>
             </div>
         </div>
+    );
+};
+
+const DetailModal = ({ visible, onClose, reservationDetails, onAccept, onDecline, isAccepting, isDeclining }) => {
+    const { TabPane } = Tabs;
+
+    if (!reservationDetails) return null;
+
+    return (
+        <Modal
+            visible={visible}
+            onCancel={onClose}
+            width={800}
+            footer={[
+                <Button key="close" onClick={onClose}>
+                    Close
+                </Button>,
+                <Button 
+                    key="decline" 
+                    danger 
+                    loading={isDeclining}
+                    onClick={onDecline}
+                >
+                    Decline
+                </Button>,
+                <Button 
+                    key="accept" 
+                    type="primary" 
+                    loading={isAccepting}
+                    onClick={onAccept}
+                    style={{ backgroundColor: '#52c41a' }}
+                >
+                    Reserve
+                </Button>,
+            ]}
+            title={
+                <Space>
+                    <span>Request Details #{reservationDetails.approval_id}</span>
+                    <Badge 
+                        status={reservationDetails.status_request === 'pending' ? 'processing' : 'success'} 
+                        text={reservationDetails.status_request}
+                    />
+                </Space>
+            }
+        >
+            <Tabs defaultActiveKey="1">
+                {reservationDetails.vehicle?.vehicle_form_name && (
+                    <TabPane
+                        tab={
+                            <span>
+                                <CarOutlined />
+                                Vehicle Details
+                            </span>
+                        }
+                        key="1"
+                    >
+                        <Descriptions bordered column={2}>
+                            <Descriptions.Item label="License Plate" span={2}>
+                                {reservationDetails.vehicle.license}
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Model">
+                                {reservationDetails.vehicle.model}
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Make">
+                                {reservationDetails.vehicle.make}
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Category" span={2}>
+                                <Tag color="blue">{reservationDetails.vehicle.category}</Tag>
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Requester" span={2}>
+                                <Space>
+                                    <UserOutlined />
+                                    {reservationDetails.vehicle.vehicle_form_user_id}
+                                </Space>
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Purpose" span={2}>
+                                {reservationDetails.vehicle.vehicle_form_purpose}
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Destination" span={2}>
+                                <Space>
+                                    <EnvironmentOutlined />
+                                    {reservationDetails.vehicle.vehicle_form_destination}
+                                </Space>
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Schedule" span={2}>
+                                <Space>
+                                    <CalendarOutlined />
+                                    {new Date(reservationDetails.vehicle.vehicle_form_start_date).toLocaleString()}
+                                    {' - '}
+                                    {new Date(reservationDetails.vehicle.vehicle_form_end_date).toLocaleString()}
+                                </Space>
+                            </Descriptions.Item>
+                        </Descriptions>
+
+                        {reservationDetails.vehicle.drivers && (
+                            <div className="mt-4">
+                                <Timeline>
+                                    {reservationDetails.vehicle.drivers.map((driver, idx) => (
+                                        <Timeline.Item key={idx} dot={<UserOutlined />}>
+                                            Driver: {driver}
+                                        </Timeline.Item>
+                                    ))}
+                                </Timeline>
+                            </div>
+                        )}
+                    </TabPane>
+                )}
+
+                {reservationDetails.venue?.venue_form_name && (
+                    <TabPane
+                        tab={
+                            <span>
+                                <BuildOutlined />
+                                Venue Details
+                            </span>
+                        }
+                        key="2"
+                    >
+                        <Descriptions bordered column={2}>
+                            <Descriptions.Item label="Venue Name" span={2}>
+                                {reservationDetails.venue.venue_name}
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Event Title" span={2}>
+                                {reservationDetails.venue.venue_form_event_title}
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Description" span={2}>
+                                {reservationDetails.venue.venue_form_description}
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Participants">
+                                <Space>
+                                    <TeamOutlined />
+                                    {reservationDetails.venue.venue_participants}
+                                </Space>
+                            </Descriptions.Item>
+                            <Descriptions.Item label="Schedule" span={2}>
+                                <Space>
+                                    <CalendarOutlined />
+                                    {new Date(reservationDetails.venue.venue_form_start_date).toLocaleString()}
+                                    {' - '}
+                                    {new Date(reservationDetails.venue.venue_form_end_date).toLocaleString()}
+                                </Space>
+                            </Descriptions.Item>
+                        </Descriptions>
+
+                        {reservationDetails.equipment && (
+                            <div className="mt-4">
+                                <Descriptions bordered column={1}>
+                                    <Descriptions.Item 
+                                        label={
+                                            <Space>
+                                                <ToolOutlined />
+                                                Equipment Requested
+                                            </Space>
+                                        }
+                                    >
+                                        {reservationDetails.equipment.equipment_name}
+                                        <Tag color="orange" className="ml-2">
+                                            Quantity: {reservationDetails.equipment.reservation_equipment_quantity}
+                                        </Tag>
+                                    </Descriptions.Item>
+                                </Descriptions>
+                            </div>
+                        )}
+                    </TabPane>
+                )}
+            </Tabs>
+        </Modal>
     );
 };
 

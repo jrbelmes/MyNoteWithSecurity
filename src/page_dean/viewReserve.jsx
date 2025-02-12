@@ -24,7 +24,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import ReservationCalendar from '../components/ReservationCalendar';
-import Sidebar from './component/user_sidebar';
+import DeanSidebar from './component/dean_sidebar';
 
 const ViewReserve = () => {
     
@@ -307,7 +307,7 @@ const ViewReserve = () => {
 
     return (
         <div className="flex h-screen bg-gray-50">
-            <Sidebar />
+            <DeanSidebar />
             <div className="flex-1 overflow-auto">
                 <div className="p-8">
                     <div className="max-w-7xl mx-auto">

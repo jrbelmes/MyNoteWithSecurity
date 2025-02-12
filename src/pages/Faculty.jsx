@@ -76,15 +76,34 @@ const Faculty = () => {
         setLoading(true);
         try {
             const response = await axios.post("http://localhost/coc/gsd/user.php", 
-                new URLSearchParams({ operation: "fetchUsers" }),
-                { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+                { operation: "fetchAllUser" },  // Changed to use JSON
+                { 
+                    headers: { 'Content-Type': 'application/json' }
+                }
             );
+
             if (response.data.status === 'success') {
-                setUsers(response.data.data);
+                // Transform the data to ensure all user types are included
+                const allUsers = response.data.data.map(user => ({
+                    users_id: user.id,
+                    users_fname: user.fname,
+                    users_mname: user.mname,
+                    users_lname: user.lname,
+                    users_email: user.email,
+                    users_school_id: user.school_id,
+                    users_contact_number: user.contact_number,
+                    users_pic: user.pic,
+                    departments_name: user.departments_name,
+                    user_level_name: user.user_level_name,
+                    users_user_level_id: user.user_level_desc,
+                    user_type: user.type
+                }));
+                setUsers(allUsers);
             } else {
                 toast.error("Error fetching users: " + response.data.message);
             }
         } catch (error) {
+            console.error('Error fetching users:', error);
             toast.error("An error occurred while fetching users.");
         } finally {
             setLoading(false);
@@ -149,23 +168,126 @@ const Faculty = () => {
 
     const getUserDetails = async (userId) => {
         try {
-            const response = await axios({
-                method: 'post',
-                url: 'http://localhost/coc/gsd/fetchMaster.php',
-                data: new URLSearchParams({
+            // Try fetching driver first
+            const driverResponse = await axios.post(
+                'http://localhost/coc/gsd/fetchMaster.php',
+                JSON.stringify({
+                    operation: 'fetchDriverById',
+                    id: userId
+                }),
+                {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            if (driverResponse.data.status === 'success' && driverResponse.data.data.length > 0) {
+                const driverData = driverResponse.data.data[0];
+                return {
+                    users_id: driverData.driver_id,
+                    users_fname: driverData.driver_full_name.split(' ')[0],
+                    users_mname: driverData.driver_full_name.split(' ')[1] || '',
+                    users_lname: driverData.driver_full_name.split(' ')[2] || '',
+                    users_email: driverData.driver_email,
+                    users_school_id: driverData.driver_school_id,
+                    users_contact_number: driverData.driver_contact_number,
+                    users_user_level_id: driverData.driver_user_level_id,
+                    departments_name: driverData.departments_name,
+                    user_level_name: driverData.user_level_name,
+                    users_pic: driverData.driver_pic,
+                    type: 'driver'
+                };
+            }
+
+            // If no driver found, continue with existing admin, dean/secretary, and user checks
+            // Try fetching admin first
+            const adminResponse = await axios.post(
+                'http://localhost/coc/gsd/fetchMaster.php',
+                JSON.stringify({
+                    operation: 'fetchAdminById',
+                    id: userId
+                }),
+                {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            if (adminResponse.data.status === 'success' && adminResponse.data.data.length > 0) {
+                const adminData = adminResponse.data.data[0];
+                return {
+                    users_id: adminData.admin_id,
+                    users_fname: adminData.admin_fname,
+                    users_mname: adminData.admin_mname,
+                    users_lname: adminData.admin_lname,
+                    users_email: adminData.admin_email,
+                    users_school_id: adminData.admin_school_id,
+                    users_contact_number: adminData.admin_contact_number,
+                    users_user_level_id: adminData.admin_user_level_id,
+                    departments_name: adminData.departments_name,
+                    user_level_name: adminData.user_level_name,
+                    users_pic: adminData.admin_pic,
+                    type: 'admin'
+                };
+            }
+
+            // If no admin found, try fetching dean/secretary
+            const deanSecResponse = await axios.post(
+                'http://localhost/coc/gsd/fetchMaster.php',
+                JSON.stringify({
+                    operation: 'fetchDeanSecById',
+                    id: userId
+                }),
+                {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            if (deanSecResponse.data.status === 'success' && deanSecResponse.data.data.length > 0) {
+                const deanData = deanSecResponse.data.data[0];
+                return {
+                    users_id: deanData.dept_id,
+                    users_fname: deanData.dept_fname,
+                    users_mname: deanData.dept_mname,
+                    users_lname: deanData.dept_lname,
+                    users_email: deanData.dept_email,
+                    users_school_id: deanData.dept_school_id,
+                    users_contact_number: deanData.dept_contact_number,
+                    users_user_level_id: deanData.dept_user_level_id,
+                    departments_name: deanData.departments_name,
+                    user_level_name: deanData.user_level_name,
+                    users_pic: deanData.dept_pic,
+                    type: 'dean'
+                };
+            }
+
+            // If no dean/secretary found, try fetching regular users
+            const userResponse = await axios.post(
+                'http://localhost/coc/gsd/fetchMaster.php',
+                JSON.stringify({
                     operation: 'fetchUsersById',
                     id: userId
-                }).toString(),
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
+                }),
+                {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
                 }
-            });
+            );
 
-            if (response.data.status === 'success') {
-                return response.data.data[0];
-            } else {
-                throw new Error('Failed to fetch user details');
+            if (userResponse.data.status === 'success' && userResponse.data.data.length > 0) {
+                const userData = userResponse.data.data[0];
+                return {
+                    type: 'user',
+                    ...userData
+                };
             }
+
+            throw new Error('User not found');
         } catch (error) {
             console.error('Error fetching user details:', error);
             toast.error("Failed to fetch user details");
@@ -282,7 +404,11 @@ const Faculty = () => {
 
     const actionsBodyTemplate = (rowData) => {
         const handleEditClick = async () => {
+            console.log('Clicked row data:', rowData); // Log initial row data
+
             const userDetails = await getUserDetails(rowData.users_id);
+            console.log('Fetched user details:', userDetails); // Log fetched user details
+            
             if (userDetails) {
                 setModalState({ isOpen: true, type: 'edit', user: userDetails });
             }
@@ -313,9 +439,12 @@ const Faculty = () => {
     const userLevelTemplate = (rowData) => {
         const levelConfig = {
             'Admin': { color: 'bg-purple-500', icon: 'pi pi-star' },
-            'Faculty': { color: 'bg-blue-500', icon: 'pi pi-users' },
-            'Staff': { color: 'bg-green-500', icon: 'pi pi-user' }
+            'Dean': { color: 'bg-orange-500', icon: 'pi pi-briefcase' },
+            'Secretary': { color: 'bg-pink-500', icon: 'pi pi-inbox' },
+            'Personnel': { color: 'bg-blue-500', icon: 'pi pi-user' },
+            'user': { color: 'bg-green-500', icon: 'pi pi-users' }
         };
+        
         const config = levelConfig[rowData.user_level_name] || { color: 'bg-gray-500', icon: 'pi pi-user' };
         
         return (
@@ -493,6 +622,7 @@ const Faculty = () => {
                 userLevels={userLevels} // Pass userLevels to FacultyModal
                 getUserDetails={getUserDetails} // Add this line
                 generateAvatarColor={generateAvatarColor} // Add this prop
+                fetchUsers={fetchUsers} // Add this prop
             />
         </div>
     );
@@ -508,8 +638,11 @@ const FacultyModal = ({
     onDelete, 
     userLevels,
     getUserDetails,
-    generateAvatarColor // Add this to props
+    generateAvatarColor,
+    fetchUsers // Add this to props
 }) => {
+    const timeoutRef = useRef(null); // Add this line at the top with other state declarations
+    const [currentUserData, setCurrentUserData] = useState(null); // Add currentUserData state
     const [formData, setFormData] = useState({
         users_id: '',
         users_firstname: '',
@@ -526,25 +659,155 @@ const FacultyModal = ({
     // Add imageUrl state
     const [imageUrl, setImageUrl] = useState('');
 
+    // Add validation state
+    const [errors, setErrors] = useState({});
+    const [touchedFields, setTouchedFields] = useState({});
+
+    // Password validation regex
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
+
+    // Modified validation rules
+    const validateField = (name, value) => {
+        // Skip email and school ID validation in edit mode
+        if (type === 'edit' && (name === 'users_email' || name === 'users_school_id')) {
+            return '';
+        }
+
+        switch (name) {
+            case 'users_firstname':
+            case 'users_middlename':
+            case 'users_lastname':
+                if (!value.trim()) {
+                    return 'This field is required';
+                }
+                if (/\d/.test(value)) {
+                    return 'Name cannot contain numbers';
+                }
+                if (!/^[a-zA-Z\s]+$/.test(value.trim())) {
+                    return 'Name can only contain letters and spaces';
+                }
+                return '';
+            case 'users_email':
+                return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? '' : 'Invalid email address';
+            case 'users_school_id':
+                if (!value.trim()) {
+                    return 'School ID is required';
+                }
+                if (!/^[0-9-]+$/.test(value)) {
+                    return 'School ID can only contain numbers and minus sign (-)';
+                }
+                return '';
+            case 'users_contact_number':
+                return /^\d{11}$/.test(value) ? '' : 'Contact number must be 11 digits';
+            case 'users_password':
+                if (type === 'add' || (type === 'edit' && value)) {
+                    if (!passwordRegex.test(value)) {
+                        return 'Password must contain at least 8 characters, including 1 uppercase, 1 lowercase, 1 number, and 1 special character';
+                    }
+                }
+                return '';
+            case 'users_role':
+                return value ? '' : 'Please select a role';
+            case 'departments_name':
+                return value ? '' : 'Please select a department';
+            default:
+                return '';
+        }
+    };
+
+    // Handle field blur
+    const handleBlur = (e) => {
+        const { name, value } = e.target;
+        setTouchedFields(prev => ({ ...prev, [name]: true }));
+        const error = validateField(name, value);
+        setErrors(prev => ({ ...prev, [name]: error }));
+
+        // Check duplicates only when field loses focus
+        if ((name === 'users_email' || name === 'users_school_id') && value) {
+            checkDuplicates(name === 'users_email' ? 'email' : 'schoolId', value);
+        }
+    };
+
+    // Modified handleChange to include validation
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+        
+        // Check for duplicates when email or school ID changes
+        if (name === 'users_email') {
+            checkDuplicates('email', value);
+        } else if (name === 'users_school_id') {
+            checkDuplicates('schoolId', value);
+        }
+
+        if (touchedFields[name]) {
+            const error = validateField(name, value);
+            setErrors(prev => ({ ...prev, [name]: error }));
+        }
+    };
+
     useEffect(() => {
         const fetchUserData = async () => {
             if (user && type === 'edit') {
-                const userDetails = await getUserDetails(user.users_id);
-                if (userDetails) {
-                    setFormData({
-                        users_id: userDetails.users_id || '',
-                        users_firstname: userDetails.users_fname || '',
-                        users_middlename: userDetails.users_mname || '',
-                        users_lastname: userDetails.users_lname || '',
-                        users_school_id: userDetails.users_school_id || '',
-                        users_contact_number: userDetails.users_contact_number || '',
-                        users_email: userDetails.users_email || '',
-                        departments_name: userDetails.departments_name || '',
-                        users_password: '',
-                        users_role: userDetails.users_user_level_id || '',
-                    });
-                    // Set the image URL
-                    setImageUrl(`http://localhost/coc/gsd/${userDetails.users_pic || 'uploads/profileni.png'}`);
+                console.log('Modal user prop:', user);
+                
+                let userDetails;
+                if (user.type === 'driver') {
+                    // Fetch driver details
+                    const response = await axios.post(
+                        'http://localhost/coc/gsd/fetchMaster.php',
+                        new URLSearchParams({
+                            operation: 'fetchDriverById',
+                            id: user.users_id
+                        }),
+                        {
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded'
+                            }
+                        }
+                    );
+                    
+                    if (response.data.status === 'success') {
+                        userDetails = response.data.data[0];
+                        // Map driver data to form fields
+                        const nameParts = userDetails.driver_full_name.split(' ');
+                        const formDataToSet = {
+                            users_id: userDetails.driver_id,
+                            users_firstname: nameParts[0] || '',
+                            users_middlename: nameParts[1] || '',
+                            users_lastname: nameParts[2] || '',
+                            users_school_id: userDetails.driver_school_id,
+                            users_contact_number: userDetails.driver_contact_number,
+                            users_email: userDetails.driver_email,
+                            departments_name: userDetails.departments_name,
+                            users_password: '',
+                            users_role: userDetails.driver_user_level_id
+                        };
+                        setFormData(formDataToSet);
+                    }
+                } else {
+                    // Handle regular user data
+                    userDetails = await getUserDetails(user.users_id);
+                    if (userDetails) {
+                        const formDataToSet = {
+                            users_id: userDetails.users_id,
+                            users_firstname: userDetails.users_fname,
+                            users_middlename: userDetails.users_mname,
+                            users_lastname: userDetails.users_lname,
+                            users_school_id: userDetails.users_school_id,
+                            users_contact_number: userDetails.users_contact_number,
+                            users_email: userDetails.users_email,
+                            departments_name: userDetails.departments_name,
+                            users_password: '',
+                            users_role: userDetails.users_user_level_id
+                        };
+                        setFormData(formDataToSet);
+                    }
+                }
+
+                // Set image URL if available
+                if (userDetails && userDetails.driver_pic) {
+                    setImageUrl(`http://localhost/coc/gsd/${userDetails.driver_pic}`);
                 }
             } else {
                 // Reset form for new user
@@ -560,21 +823,86 @@ const FacultyModal = ({
                     users_password: '',
                     users_role: '',
                 });
-                setImageUrl('http://localhost/coc/gsd/uploads/profileni.png');
+                setImageUrl('');
             }
         };
 
         fetchUserData();
     }, [user, type, getUserDetails]);
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData({ ...formData, [name]: value });
+    // Add function to check unique email and school ID
+    const checkUniqueEmailAndSchoolId = async (email, schoolId) => {
+        try {
+            const response = await axios.post(
+                'http://localhost/coc/gsd/user.php',
+                {
+                    operation: 'checkUniqueEmailAndSchoolId',
+                    email: email,
+                    schoolId: schoolId
+                },
+                {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            return response.data;
+        } catch (error) {
+            console.error('Error checking unique email and school ID:', error);
+            throw error;
+        }
     };
 
+    // Modified handleSubmit
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        // Email format validation
+        const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+        if (!emailRegex.test(formData.users_email)) {
+            toast.error('Please enter a valid email address');
+            return;
+        }
+
+        // School ID validation (numbers only)
+        
+
+        // Name validation
+        const nameRegex = /^[a-zA-Z\s]+$/;
+        if (!nameRegex.test(formData.users_firstname) || 
+            (formData.users_middlename && !nameRegex.test(formData.users_middlename)) || 
+            !nameRegex.test(formData.users_lastname)) {
+            toast.error('Names can only contain letters and spaces');
+            return;
+        }
+
+        // Rest of the handleSubmit function remains the same
+        // Check unique email and school ID
+        const uniqueCheckResult = await checkUniqueEmailAndSchoolId(
+            formData.users_email,
+            formData.users_school_id
+        );
+
        
+        // Validate all fields
+        const newErrors = {};
+        Object.keys(formData).forEach(key => {
+            if (key !== 'users_middlename') {
+                const error = validateField(key, formData[key]);
+                if (error) newErrors[key] = error;
+            }
+        });
+
+        if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
+            setTouchedFields(
+                Object.keys(formData).reduce((acc, key) => ({ ...acc, [key]: true }), {})
+            );
+            toast.error('Please fix the validation errors');
+            return;
+        }
+
         const selectedDepartment = departments.find(
             dept => dept.departments_name === formData.departments_name
         );
@@ -584,38 +912,216 @@ const FacultyModal = ({
             return;
         }
 
-        // Determine operation based on user level
-        let operation;
-        switch (formData.users_role) {
-            case '1': // Admin
-                operation = 'saveAdmin';
-                break;
-            case '5': // Dean
-                operation = 'saveDean';
-                break;
-            default: // Regular user
-                operation = 'saveUser';
-        }
+        let jsonData;
+        if (type === 'edit') {
+            // Handle update
+            let userType;
+            switch (formData.users_role) {
+                case '1':
+                    userType = 'admin';
+                    break;
+                case '5':
+                case '6':
+                    userType = 'dean_sec';
+                    break;
+                case '13':
+                    userType = 'driver';
+                    break;
+                default:
+                    userType = 'user';
+            }
 
-        const jsonData = {
-            operation: operation,
-            data: {
+            jsonData = {
+                operation: 'updateUsers',
+                type: userType,
+                id: user.users_id,
                 fname: formData.users_firstname,
-                mname: formData.users_middlename,
+                mname: formData.users_middlename || '',
                 lname: formData.users_lastname,
                 email: formData.users_email,
-                schoolId: formData.users_school_id,
+                school_id: formData.users_school_id,
                 contact: formData.users_contact_number,
-                userLevelId: formData.users_role,
-                password: formData.users_password,
-                departmentId: selectedDepartment.departments_id,
-                pic: "" // Add pic field if needed
+                user_level_id: formData.users_role,
+                department_id: selectedDepartment?.departments_id,
+                pic: user.users_pic || '',
+                is_active: 1
+            };
+
+            if (formData.users_password) {
+                jsonData.password = formData.users_password;
             }
-        };
+        } else {
+            // Handle insert (existing code for new user)
+            let operation;
+            switch (formData.users_role) {
+                case '1':
+                    operation = 'saveAdmin';
+                    break;
+                case '5':
+                    operation = 'saveDean';
+                    break;
+                case '13':
+                    operation = 'saveDriver';
+                    break;
+                default:
+                    operation = 'saveUser';
+            }
+
+            if (formData.users_role === '13') {
+                jsonData = {
+                    operation: operation,
+                    data: {
+                        fullName: `${formData.users_firstname} ${formData.users_middlename} ${formData.users_lastname}`.trim(),
+                        email: formData.users_email,
+                        schoolId: formData.users_school_id,
+                        contact: formData.users_contact_number,
+                        userLevelId: formData.users_role,
+                        password: formData.users_password,
+                        departmentId: selectedDepartment.departments_id,
+                        pic: ""
+                    }
+                };
+            } else {
+                jsonData = {
+                    operation: operation,
+                    data: {
+                        fname: formData.users_firstname,
+                        mname: formData.users_middlename,
+                        lname: formData.users_lastname,
+                        email: formData.users_email,
+                        schoolId: formData.users_school_id,
+                        contact: formData.users_contact_number,
+                        userLevelId: formData.users_role,
+                        password: formData.users_password,
+                        departmentId: selectedDepartment.departments_id
+                    }
+                };
+            }
+        }
 
         console.log('Sending data:', jsonData);
-        onSubmit(jsonData);
+        try {
+            let response;
+            if (type === 'edit') {
+                response = await axios.post(
+                    'http://localhost/coc/gsd/update_master.php',
+                    jsonData,
+                    {
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
+            } else {
+                response = await onSubmit(jsonData);
+            }
+
+            if (response && response.data.status === 'success') {
+                toast.success(response.data.message || 'Operation successful');
+                onHide();
+                fetchUsers(); // Now using the prop
+            } else {
+                throw new Error(response.data.message || 'Unknown error');
+            }
+        } catch (error) {
+            console.error('Error submitting form:', error);
+            toast.error('Failed to save user data: ' + (error.message || 'Unknown error'));
+        }
     };
+
+    // Add new state for duplicate checks
+    const [duplicateFields, setDuplicateFields] = useState({
+        email: false,
+        schoolId: false
+    });
+
+    // Modified checkDuplicates function
+    const checkDuplicates = async (field, value) => {
+        // Skip validation in edit mode
+        if (type === 'edit') {
+            setDuplicateFields(prev => ({
+                ...prev,
+                [field]: false
+            }));
+            return;
+        }
+
+        // Don't check if the field is empty
+        if (!value) {
+            setDuplicateFields(prev => ({
+                ...prev,
+                [field]: false
+            }));
+            return;
+        }
+
+        // Create a timeout to wait for user to finish typing
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+        }
+
+        timeoutRef.current = setTimeout(async () => {
+            try {
+                const response = await axios.post(
+                    'http://localhost/coc/gsd/user.php',
+                    {
+                        operation: 'checkUniqueEmailAndSchoolId',
+                        email: field === 'email' ? value : '',
+                        schoolId: field === 'schoolId' ? value : ''
+                    },
+                    {
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
+
+                if (response.data.status === 'success') {
+                    const isDuplicate = response.data.exists;
+                    setErrors(prev => ({
+                        ...prev,
+                        [field === 'email' ? 'users_email' : 'users_school_id']: 
+                            isDuplicate ? `This ${field} is already in use` : ''
+                    }));
+                    setDuplicateFields(prev => ({
+                        ...prev,
+                        [field]: isDuplicate
+                    }));
+                }
+            } catch (error) {
+                console.error('Error checking duplicates:', error);
+            }
+        }, 500);
+    };
+
+    // Add handleInputChange for better input handling
+    const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+        
+        // Clear any existing errors while typing
+        setErrors(prev => ({
+            ...prev,
+            [name]: ''
+        }));
+        
+        // Reset duplicate fields while typing
+        if (name === 'users_email' || name === 'users_school_id') {
+            setDuplicateFields(prev => ({
+                ...prev,
+                [name === 'users_email' ? 'email' : 'schoolId']: false
+            }));
+        }
+    };
+
+    // Clean up the timeout on component unmount
+    useEffect(() => {
+        return () => {
+            if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current);
+            }
+        };
+    }, []);
 
     return (
         <Modal show={show} onHide={onHide} centered size="lg" className="rounded-xl">
@@ -631,7 +1137,7 @@ const FacultyModal = ({
                 {type === 'delete' ? (
                     <p>Are you sure you want to delete this faculty member?</p>
                 ) : (
-                    <Form onSubmit={handleSubmit}>
+                    <Form onSubmit={handleSubmit} noValidate>
                         {/* Add image preview at the top of the form */}
                         {type === 'edit' && (
                             <div className="flex justify-center mb-6">
@@ -678,38 +1184,100 @@ const FacultyModal = ({
                         {/* Rest of your form groups remain unchanged */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                             <Form.Group>
-                                <Form.Label>First Name</Form.Label>
-                                <Form.Control type="text" name="users_firstname" value={formData.users_firstname} onChange={handleChange} required />
+                                <Form.Label>First Name <span className="text-red-500">*</span></Form.Label>
+                                <Form.Control
+                                    type="text"
+                                    name="users_firstname"
+                                    value={formData.users_firstname}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                    isInvalid={touchedFields.users_firstname && errors.users_firstname}
+                                    required
+                                />
+                                <Form.Control.Feedback type="invalid">
+                                    {errors.users_firstname}
+                                </Form.Control.Feedback>
                             </Form.Group>
                             <Form.Group>
                                 <Form.Label>Middle Name</Form.Label>
                                 <Form.Control type="text" name="users_middlename" value={formData.users_middlename} onChange={handleChange} />
                             </Form.Group>
                             <Form.Group>
-                                <Form.Label>Last Name</Form.Label>
-                                <Form.Control type="text" name="users_lastname" value={formData.users_lastname} onChange={handleChange} required />
+                                <Form.Label>Last Name <span className="text-red-500">*</span></Form.Label>
+                                <Form.Control
+                                    type="text"
+                                    name="users_lastname"
+                                    value={formData.users_lastname}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                    isInvalid={touchedFields.users_lastname && errors.users_lastname}
+                                    required
+                                />
+                                <Form.Control.Feedback type="invalid">
+                                    {errors.users_lastname}
+                                </Form.Control.Feedback>
                             </Form.Group>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <Form.Group>
-                                <Form.Label>School ID</Form.Label>
-                                <Form.Control type="text" name="users_school_id" value={formData.users_school_id} onChange={handleChange} required />
+                                <Form.Label>School ID <span className="text-red-500">*</span></Form.Label>
+                                <Form.Control
+                                    type="text"
+                                    name="users_school_id"
+                                    value={formData.users_school_id}
+                                    onChange={handleInputChange}
+                                    onBlur={(e) => checkDuplicates('schoolId', e.target.value)}
+                                    isInvalid={!!errors.users_school_id}
+                                    required
+                                />
+                                <Form.Control.Feedback type="invalid">
+                                    {errors.users_school_id}
+                                </Form.Control.Feedback>
                             </Form.Group>
                             <Form.Group>
-                                <Form.Label>Phone Number</Form.Label>
-                                <Form.Control type="tel" name="users_contact_number" value={formData.users_contact_number} onChange={handleChange} required />
+                                <Form.Label>Phone Number <span className="text-red-500">*</span></Form.Label>
+                                <Form.Control
+                                    type="tel"
+                                    name="users_contact_number"
+                                    value={formData.users_contact_number}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                    isInvalid={touchedFields.users_contact_number && errors.users_contact_number}
+                                    required
+                                />
+                                <Form.Control.Feedback type="invalid">
+                                    {errors.users_contact_number}
+                                </Form.Control.Feedback>
                             </Form.Group>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                             <Form.Group>
-                                <Form.Label>Email Address</Form.Label>
-                                <Form.Control type="email" name="users_email" value={formData.users_email} onChange={handleChange} required />
+                                <Form.Label>Email Address <span className="text-red-500">*</span></Form.Label>
+                                <Form.Control
+                                    type="email"
+                                    name="users_email"
+                                    value={formData.users_email}
+                                    onChange={handleInputChange}
+                                    onBlur={(e) => checkDuplicates('email', e.target.value)}
+                                    isInvalid={!!errors.users_email}
+                                    required
+                                />
+                                <Form.Control.Feedback type="invalid">
+                                    {errors.users_email}
+                                </Form.Control.Feedback>
                             </Form.Group>
                             <Form.Group>
-                                <Form.Label>Role</Form.Label>
-                                <Form.Select name="users_role" value={formData.users_role} onChange={handleChange} required>
+                                <Form.Label>Role <span className="text-red-500">*</span></Form.Label>
+                                <Form.Select
+                                    name="users_role"
+                                    value={formData.users_role}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                    isInvalid={touchedFields.users_role && errors.users_role}
+                                    required
+                                >
                                     <option value="">Select Role</option>
                                     {userLevels.map((level) => (
                                         <option key={level.user_level_id} value={level.user_level_id}>
@@ -717,13 +1285,23 @@ const FacultyModal = ({
                                         </option>
                                     ))}
                                 </Form.Select>
+                                <Form.Control.Feedback type="invalid">
+                                    {errors.users_role}
+                                </Form.Control.Feedback>
                             </Form.Group>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                             <Form.Group>
-                                <Form.Label>Department</Form.Label>
-                                <Form.Select name="departments_name" value={formData.departments_name} onChange={handleChange} required>
+                                <Form.Label>Department <span className="text-red-500">*</span></Form.Label>
+                                <Form.Select
+                                    name="departments_name"
+                                    value={formData.departments_name}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                    isInvalid={touchedFields.departments_name && errors.departments_name}
+                                    required
+                                >
                                     <option value="">Select Department</option>
                                     {departments && departments.map((department) => (
                                         <option key={department.departments_id} value={department.departments_name}>
@@ -731,10 +1309,28 @@ const FacultyModal = ({
                                         </option>
                                     ))}
                                 </Form.Select>
+                                <Form.Control.Feedback type="invalid">
+                                    {errors.departments_name}
+                                </Form.Control.Feedback>
                             </Form.Group>
                             <Form.Group>
-                                <Form.Label>{type === 'edit' ? 'New Password (leave blank to keep current)' : 'Password'}</Form.Label>
-                                <Form.Control type="password" name="users_password" value={formData.users_password} onChange={handleChange} required={type === 'add'} />
+                                <Form.Label>{type === 'edit' ? 'New Password (leave blank to keep current)' : 'Password'} {type === 'add' && <span className="text-red-500">*</span>}</Form.Label>
+                                <Form.Control
+                                    type="password"
+                                    name="users_password"
+                                    value={formData.users_password}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                    isInvalid={touchedFields.users_password && errors.users_password}
+                                    required={type === 'add'}
+                                />
+                                <Form.Control.Feedback type="invalid">
+                                    {errors.users_password}
+                                </Form.Control.Feedback>
+                                <Form.Text className="text-muted">
+                                    Password must contain at least 8 characters, including 1 uppercase, 1 lowercase, 
+                                    1 number, and 1 special character.
+                                </Form.Text>
                             </Form.Group>
                         </div>
                     </Form>
@@ -749,7 +1345,12 @@ const FacultyModal = ({
                         Delete
                     </Button>
                 ) : (
-                    <Button variant="primary" onClick={handleSubmit} className="bg-green-600 hover:bg-green-700">
+                    <Button 
+                        variant="primary" 
+                        onClick={handleSubmit} 
+                        className="bg-green-600 hover:bg-green-700"
+                        disabled={duplicateFields.email || duplicateFields.schoolId}
+                    >
                         {type === 'add' ? 'Add Faculty' : 'Save Changes'}
                     </Button>
                 )}

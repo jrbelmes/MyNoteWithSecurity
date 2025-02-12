@@ -1,8 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiCalendar, FiList, FiHelpCircle, FiLogOut, FiBell, FiUser, FiSettings, FiClock, FiCheckCircle, FiAlertCircle, FiBarChart2, FiUsers, FiBookmark, FiX, FiCheck, FiTrash2, FiInfo, FiMessageSquare } from 'react-icons/fi';
+import { 
+  FiBell, 
+  FiBarChart2, 
+  FiCalendar, 
+  FiList, 
+  FiHelpCircle,
+  FiCheck,
+  FiAlertCircle,
+  FiInfo,
+  FiTrash2,
+  FiMessageSquare
+} from 'react-icons/fi';
 import ReservationCalendar from '../components/ReservationCalendar';
+import DeanSidebar from './component/dean_sidebar';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -23,10 +35,9 @@ const Dashboard = () => {
   };
 
   const statsData = [
-    { title: "Total Reservations", value: "156", icon: FiBookmark, color: "bg-blue-500" },
-    { title: "Pending Requests", value: "8", icon: FiClock, color: "bg-yellow-500" },
-    { title: "Approved Today", value: "12", icon: FiCheckCircle, color: "bg-green-500" },
-    
+    { title: "Total Reservations", value: "156", icon: FiBarChart2, color: "bg-blue-500" },
+    { title: "Pending Requests", value: "8", icon: FiCalendar, color: "bg-yellow-500" },
+    { title: "Approved Today", value: "12", icon: FiList, color: "bg-green-500" },
   ];
 
   const recentActivities = [
@@ -298,123 +309,11 @@ const Dashboard = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-white relative">
-      {/* Header Navigation */} 
-      <motion.header 
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="bg-white backdrop-blur-sm bg-opacity-80 shadow-lg sticky top-0 z-50"
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
-            {/* Left side - Logo and GSD Reservation title */}
-            <div className="flex items-center space-x-4">
-              <motion.img 
-                src="/images/assets/phinma.png"
-                alt="PHINMA CDO Logo"
-                className="w-12 h-12 object-cover rounded-full shadow-md"
-                whileHover={{ scale: 1.1, rotate: 360 }}
-                transition={{ duration: 0.5 }}
-              />
-              <motion.h1 
-                className="text-2xl font-bold bg-gradient-to-r from-green-600 to-green-400 bg-clip-text text-transparent"
-                whileHover={{ scale: 1.05 }}
-                transition={{ duration: 0.2 }}
-              >
-                GSD Reservation
-              </motion.h1>
-            </div>
-
-            {/* Right side navigation */}
-            <nav className="flex items-center space-x-6">
-              <motion.button 
-                variants={navButtonVariants}
-                whileHover="hover"
-                whileTap="tap"
-                className="flex items-center space-x-2 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition-all"
-                onClick={() => navigate('/addReservation')}
-              >
-                <FiCalendar className="w-5 h-5" />
-                <span>Make Reserve</span>
-              </motion.button>
-
-              <motion.button 
-                variants={navButtonVariants}
-                whileHover="hover"
-                whileTap="tap"
-                className="flex items-center space-x-2 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition-all"
-                onClick={() => setIsCalendarOpen(true)}
-              >
-                <FiCalendar className="w-5 h-5" />
-                <span>Calendar</span>
-              </motion.button>
-
-              <motion.button 
-                variants={navButtonVariants}
-                whileHover="hover"
-                whileTap="tap"
-                className="flex items-center space-x-2 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium"
-                onClick={() => navigate('/viewApproval')}
-              >
-                <FiList className="w-5 h-5" />
-                <span>View Request Approval</span>
-              </motion.button>
-
-              <div className="relative">
-                <motion.button 
-                  variants={navButtonVariants}
-                  whileHover="hover"
-                  whileTap="tap"
-                  className="flex items-center space-x-2 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium"
-                  onClick={() => setShowSupportTicket(!showSupportTicket)}
-                >
-                  <FiHelpCircle className="w-5 h-5" />
-                  <span>Support</span>
-                </motion.button>
-                <AnimatePresence>
-                  {showSupportTicket && <SupportTicketPopup />}
-                </AnimatePresence>
-              </div>
-
-              {/* Notification Bell */}
-              <NotificationBell />
-
-              {/* Settings */}
-             
-
-              {/* Profile */}
-              <motion.button 
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                className="p-2 text-gray-700 hover:text-green-600 transition-colors"
-                onClick={() => navigate('/profile')}
-              >
-                <FiUser className="w-6 h-6" />
-              </motion.button>
-
-              {/* Logout */}
-              <motion.button
-                variants={navButtonVariants}
-                whileHover="hover"
-                whileTap="tap"
-                onClick={() => {
-                  localStorage.clear();
-                  sessionStorage.clear();
-                  navigate('/');
-                }}
-                className="flex items-center space-x-2 text-red-600 px-4 py-2 rounded-lg text-sm font-medium"
-              >
-                <FiLogOut className="w-5 h-5" />
-                <span>Logout</span>
-              </motion.button>
-            </nav>
-          </div>
-        </div>
-      </motion.header>
-
-      {/* Enhanced Main Content Area */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="flex h-screen bg-gradient-to-br from-green-50 to-white">
+      <DeanSidebar />
+      
+      {/* Main Content Area */}
+      <main className="flex-1 overflow-y-auto p-8">
         {/* Welcome Section */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
@@ -431,7 +330,7 @@ const Dashboard = () => {
         </motion.div>
 
         {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           {statsData.map((stat, index) => (
             <motion.div
               key={index}

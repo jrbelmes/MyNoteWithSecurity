@@ -43,7 +43,9 @@ const ProfileModal = ({ visible, onClose }) => {
     lastName: '',
     schoolId: '',
     email: '',
-    phoneNumber: ''
+    phoneNumber: '',
+    department: '',
+    userLevel: ''
   });
 
   useEffect(() => {
@@ -58,7 +60,7 @@ const ProfileModal = ({ visible, onClose }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          operation: 'fetchAdminById',
+          operation: 'fetchUsersById',
           id: localStorage.getItem('user_id')
         })
       });
@@ -66,17 +68,19 @@ const ProfileModal = ({ visible, onClose }) => {
       const result = await response.json();
       
       if (result.status === 'success' && result.data.length > 0) {
-        const adminData = result.data[0];
+        const userData = result.data[0];
         setPersonalInfo({
-          firstName: adminData.admin_fname,
-          middleName: adminData.admin_mname,
-          lastName: adminData.admin_lname,
-          schoolId: adminData.admin_school_id,
-          email: adminData.admin_email,
-          phoneNumber: adminData.admin_contact_number || ''
+          firstName: userData.users_fname,
+          middleName: userData.users_mname,
+          lastName: userData.users_lname,
+          schoolId: userData.users_school_id,
+          email: userData.users_email,
+          phoneNumber: userData.users_contact_number || '',
+          department: userData.departments_name,
+          userLevel: userData.user_level_name
         });
-        if (adminData.admin_pic) {
-          setProfileImage(`data:image/jpeg;base64,${adminData.admin_pic}`);
+        if (userData.users_pic) {
+          setProfileImage(`data:image/jpeg;base64,${userData.users_pic}`);
         }
       }
     } catch (err) {
@@ -146,7 +150,7 @@ const ProfileModal = ({ visible, onClose }) => {
           {`${personalInfo.firstName} ${personalInfo.lastName}`}
         </Typography>
         <Typography variant="body2" className="text-gray-500">
-          Administrator
+          {personalInfo.department} - {personalInfo.userLevel}
         </Typography>
       </div>
 

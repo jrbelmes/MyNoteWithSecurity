@@ -182,7 +182,7 @@ const handleAddEquipment = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        if (user_level_id !== '3') {
+        if (user_level_id !== '5' && user_level_id !== '6') {
           localStorage.clear();
           navigate('/gsd');
           return;
@@ -965,6 +965,7 @@ const renderBasicInformation = () => {
           </Form>
         </div>
       </Card>
+      {formData.resourceType === 'venue' && <EquipmentSelectionModal />}
     </motion.div>
   );
 };
@@ -1039,7 +1040,7 @@ const handleAddReservation = async (e) => {
       const venuePayload = {
         operation: 'venueReservation',
         user_id: parseInt(userId),
-        user_type: 'user',
+        user_type: 'dean', // Add user_type as dean
         dept_id: parseInt(deptId),
         venue_id: parseInt(formData.venue),
         form_data: {
@@ -1093,6 +1094,7 @@ const handleAddReservation = async (e) => {
       const payload = {
         operation: 'vehicleReservation',
         user_id: parseInt(userId),
+        user_type: 'dean', // Add user_type as dean
         dept_id: parseInt(deptId),
         vehicles: selectedModels.map(id => id.toString()), // Convert to string array
         form_data: {
@@ -2066,66 +2068,67 @@ const PassengerModal = ({ visible, onHide }) => {
   );
 };
 
-// Add new Dialog component for equipment modal
-const renderEquipmentDialog = () => {
-  return (
-    <Dialog 
-      visible={showEquipmentModal} 
-      onHide={() => setShowEquipmentModal(false)}
-      header="Select Equipment"
-      modal
-      className="w-[90vw] md:w-[800px]"
-    >
-      <div className="p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {equipment.map((item) => (
-            <div key={item.equipment_id} className="border rounded-lg p-4">
-              <div className="flex flex-col space-y-3">
-                <img
-                  src={`http://localhost/coc/gsd/${item.equipment_pic}`}
-                  alt={item.equipment_name}
-                  className="w-full h-32 object-cover rounded"
-                  onError={(e) => {
-                    e.target.src = '/default-equipment.jpg';
-                  }}
+const EquipmentSelectionModal = () => (
+  <Dialog
+    visible={showEquipmentModal}
+    onHide={() => setShowEquipmentModal(false)}
+    header="Select Equipment"
+    modal
+    className="w-[90vw] md:w-[70vw]"
+    footer={
+      <div className="flex justify-end gap-2">
+        <Button
+          label="Cancel"
+          icon="pi pi-times"
+          onClick={() => setShowEquipmentModal(false)}
+          className="p-button-text"
+        />
+        <Button
+          label="Add Equipment"
+          icon="pi pi-check"
+          onClick={handleAddEquipment}
+          className="p-button-primary"
+        />
+      </div>
+    }
+  >
+    <div className="p-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {equipment.map((item) => (
+          <Card key={item.equipment_id} className="shadow-sm">
+            <div className="flex flex-col gap-3">
+              <img
+                src={`http://localhost/coc/gsd/${item.equipment_pic}`}
+                alt={item.equipment_name}
+                className="w-full h-40 object-cover rounded"
+                onError={(e) => {
+                  e.target.src = '/default-equipment.jpg';
+                  e.target.onerror = null;
+                }}
+              />
+              <div>
+                <h5 className="font-medium">{item.equipment_name}</h5>
+                <p className="text-sm text-gray-600">Available: {item.equipment_quantity}</p>
+              </div>
+              <div className="mt-2">
+                <label className="text-sm font-medium text-gray-700">Quantity:</label>
+                <PrimeInputNumber
+                  value={equipmentQuantities[item.equipment_id] || 0}
+                  onValueChange={(e) => handleEquipmentQuantityChange(item.equipment_id, e.value)}
+                  min={0}
+                  max={item.equipment_quantity}
+                  showButtons
+                  className="w-full mt-1"
+                  disabled={item.status_availability_name !== 'available'}
                 />
-                <div className="space-y-2">
-                  <h6 className="font-medium">{item.equipment_name}</h6>
-                  <p className="text-sm text-gray-600">Available: {item.equipment_quantity}</p>
-                  <div className="flex items-center space-x-2">
-                    <PrimeInputNumber
-                      value={equipmentQuantities[item.equipment_id] || 0}
-                      onValueChange={(e) => handleEquipmentQuantityChange(item.equipment_id, e.value)}
-                      min={0}
-                      max={item.equipment_quantity}
-                      size="small"
-                      showButtons
-                      className="w-24"
-                    />
-                  </div>
-                </div>
               </div>
             </div>
-          ))}
-        </div>
-        <div className="flex justify-end mt-4 space-x-2">
-          <Button
-            label="Cancel"
-            icon="pi pi-times"
-            onClick={() => setShowEquipmentModal(false)}
-            className="p-button-text"
-          />
-          <Button
-            label="Add Selected"
-            icon="pi pi-check"
-            onClick={handleAddEquipment}
-            className="p-button-success"
-          />
-        </div>
+          </Card>
+        ))}
       </div>
-    </Dialog>
-  );
-};
+    </div>
+  </Dialog>
+);
 
 return (
   <div className="min-h-screen bg-gray-50">
@@ -2202,7 +2205,6 @@ return (
         },
       }}
     />
-    {renderEquipmentDialog()}
     <PassengerModal
       visible={showPassengerModal}
       onHide={() => {
@@ -2210,6 +2212,7 @@ return (
         setNewPassenger('');
       }}
     />
+    <EquipmentSelectionModal />
   </div>
 );
 };

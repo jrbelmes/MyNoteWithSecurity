@@ -3,12 +3,13 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   FaSignOutAlt, FaTachometerAlt, FaCar, FaCog, FaFileAlt, FaHeadset,
   FaChevronDown, FaBars, FaHome, FaTools, FaUserCircle, FaFolder,
-  FaCalendarAlt, FaChartBar
+  FaCalendarAlt, FaChartBar,
+  FaThumbsUp
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { Popover } from '@headlessui/react';
-import ProfileModal from './profile';  // Add this import
+import ProfileModal from './dean_profile';  // Add this import
 
 const SidebarContext = createContext();
 
@@ -35,20 +36,6 @@ const Sidebar = () => {
 
   const name = localStorage.getItem('name') || 'Admin User';
   const user_level_id = localStorage.getItem('user_level_id');
-
-  const canAccessMenu = (menuType) => {
-    switch (user_level_id) {
-      case '1':
-        return true; // User level 1 can access all menus, including 'master'
-      case '2':
-        return ['calendar', 'viewRequest', 'viewReservation'].includes(menuType); // Limited access
-      case '4':
-        return true; // Full access
-      default:
-        return false; // No access for undefined user levels
-    }
-  };
-  
 
   useEffect(() => {
     setActiveItem(location.pathname);
@@ -127,39 +114,10 @@ const Sidebar = () => {
 
           <div className="flex-grow overflow-y-auto">
             <nav className="mt-5 px-2">
-              {(user_level_id === '1' || user_level_id === '4') && (
-                <SidebarItem icon={FaTachometerAlt} text="Dashboard" link="/adminDashboard" active={activeItem === '/adminDashboard'} />
-              )}
-              
-             
-              {(user_level_id === '1' || user_level_id === '4') && (
-                <SidebarDropdown icon={FaFileAlt} text="Manage Resources" active={['/Venue', '/VehicleEntry', '/Equipment'].includes(activeItem)}>
-                  <SidebarSubItem icon={FaHome} text="Venue" link="/Venue" active={activeItem === '/Venue'} />
-                  <SidebarSubItem icon={FaCar} text="Vehicle" link="/VehicleEntry" active={activeItem === '/VehicleEntry'} />
-                  <SidebarSubItem icon={FaTools} text="Equipments" link="/Equipment" active={activeItem === '/Equipment'} />
-                </SidebarDropdown>
-              )}
-
-              {user_level_id === '1' && (
-                <SidebarItem icon={FaFolder} text="Master" link="/Master" active={activeItem === '/Master'} />
-              )}
-
-              {(user_level_id === '1' || user_level_id === '4') && (
-                <SidebarItem icon={FaUserCircle} text="Users" link="/Faculty" active={activeItem === '/Faculty'} />
-              )}
-
-              {canAccessMenu('viewRequest') && (
-                <SidebarDropdown icon={FaCar} text="Reservations" active={['/viewReservation', '/ViewRequest', '/AddReservation'].includes(activeItem)}>
-                  <SidebarSubItem icon={FaHeadset} text="View Requests" link="/ViewRequest" active={activeItem === '/ViewRequest'} />
-                  {(user_level_id === '1' || user_level_id === '4') && (
-                    <SidebarSubItem icon={FaCar} text="Add Reservation" link="/AddReservation" active={activeItem === '/AddReservation'} />
-                  )}
-                </SidebarDropdown>
-              )}
-
-              {canAccessMenu('viewReservation') && (
-                <SidebarSubItem icon={FaFileAlt} text="Records" link="/record" active={activeItem === '/record'} />
-              )}
+              <SidebarItem icon={FaTachometerAlt} text="Dashboard" link="/dean" active={activeItem === '/usersDashboard'} />
+              <SidebarItem icon={FaCar} text="Make Reservation" link="/deanAddReservation" active={activeItem === '/deanAddReservation'} />
+              <SidebarItem icon={FaFileAlt} text="View Reservations" link="/deanViewReserve" active={activeItem === '/ViewReserve'} />
+              <SidebarItem icon={FaThumbsUp} text="View Approval" link="/viewApproval" active={activeItem === '/viewApproval'} />
             </nav>
           </div>
 
@@ -170,7 +128,7 @@ const Sidebar = () => {
                 {isSidebarOpen && (
                   <div className="flex-1 text-left">
                     <p className="font-medium text-gray-700">{name}</p>
-                    <p className="text-sm text-gray-500">Admin</p>
+                    <p className="text-sm text-gray-500">Faculty</p>
                   </div>
                 )}
               </Popover.Button>
