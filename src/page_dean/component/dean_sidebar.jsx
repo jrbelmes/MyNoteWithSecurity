@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { Popover } from '@headlessui/react';
 import ProfileModal from './dean_profile';  // Add this import
+import { clearAllExceptLoginAttempts } from '../../utils/loginAttempts';
 
 const SidebarContext = createContext();
 
@@ -63,8 +64,7 @@ const Sidebar = () => {
   const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
 
   const handleLogout = () => {
-    sessionStorage.clear();
-    localStorage.clear();
+    clearAllExceptLoginAttempts();
     navigate('/gsd');
     window.location.reload();
   };
@@ -114,9 +114,9 @@ const Sidebar = () => {
 
           <div className="flex-grow overflow-y-auto">
             <nav className="mt-5 px-2">
-              <SidebarItem icon={FaTachometerAlt} text="Dashboard" link="/dean" active={activeItem === '/usersDashboard'} />
+              <SidebarItem icon={FaTachometerAlt} text="Dashboard" link="/deanDashboard" active={activeItem === '/deanDashboard'} />
               <SidebarItem icon={FaCar} text="Make Reservation" link="/deanAddReservation" active={activeItem === '/deanAddReservation'} />
-              <SidebarItem icon={FaFileAlt} text="View Reservations" link="/deanViewReserve" active={activeItem === '/ViewReserve'} />
+              <SidebarItem icon={FaFileAlt} text="View Reservations" link="/deanViewReserve" active={activeItem === '/deanViewReserve'} />
               <SidebarItem icon={FaThumbsUp} text="View Approval" link="/viewApproval" active={activeItem === '/viewApproval'} />
             </nav>
           </div>

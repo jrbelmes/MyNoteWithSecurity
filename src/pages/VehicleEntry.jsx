@@ -26,6 +26,7 @@ import dayjs from 'dayjs';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEdit, faTrashAlt, faSearch, faPlus } from '@fortawesome/free-solid-svg-icons';
 import { Modal, Form, Input, TimePicker } from 'antd'; // Add this import
+import { sanitizeInput, validateInput } from '../utils/sanitize';
 
 const VehicleEntry = () => {
     const user_level_id = localStorage.getItem('user_level_id');
@@ -179,8 +180,23 @@ const VehicleEntry = () => {
         setSelectedVehicleId(null);
     };
 
+    const sanitizeAndValidateLicense = (value) => {
+        const sanitized = sanitizeInput(value);
+        if (!validateInput(sanitized)) {
+            toast.error('Invalid characters detected in license number');
+            return '';
+        }
+        return sanitized;
+    };
+
     const handleSubmit = async () => {
-        if (!vehicleLicensed || !vehicleModelId || !year || !selectedStatus) {
+        // Sanitize and validate inputs
+        const sanitizedLicense = sanitizeAndValidateLicense(vehicleLicensed);
+        if (!sanitizedLicense) {
+            return;
+        }
+
+        if (!vehicleModelId || !year || !selectedStatus) {
             toast.error("Please fill in all required fields.");
             return;
         }
@@ -196,7 +212,7 @@ const VehicleEntry = () => {
                     vehicleData: {
                         vehicle_id: selectedVehicleId,
                         vehicle_model_id: vehicleModelId,
-                        vehicle_license: vehicleLicensed,
+                        vehicle_license: sanitizedLicense, // Use sanitized value
                         year: dayjs(year).format('YYYY'),
                         status_availability_id: selectedStatus,
                         vehicle_pic: vehicleImage || editingVehicle?.vehicle_pic || ''
@@ -218,7 +234,7 @@ const VehicleEntry = () => {
                     operation: "saveVehicle",
                     data: {
                         vehicle_model_id: vehicleModelId,
-                        vehicle_license: vehicleLicensed,
+                        vehicle_license: sanitizedLicense, // Use sanitized value
                         year: dayjs(year).format('YYYY'),
                         vehicle_pic: vehicleImage,
                         user_admin_id: user_id,  // Add this line
@@ -453,6 +469,11 @@ const VehicleEntry = () => {
         }
     };
 
+    const handleLicenseChange = (e) => {
+        const sanitized = sanitizeAndValidateLicense(e.target.value);
+        setVehicleLicensed(sanitized);
+    };
+
     return (
         <div className="flex h-screen bg-gradient-to-br from-white to-green-500 overflow-hidden">
             <div className="flex-none">
@@ -591,8 +612,9 @@ const VehicleEntry = () => {
                             >
                                 <Input
                                     value={vehicleLicensed}
-                                    onChange={(e) => setVehicleLicensed(e.target.value)}
+                                    onChange={handleLicenseChange}
                                     placeholder="Enter license number"
+                                    maxLength={50} // Add reasonable limit
                                 />
                             </Form.Item>
 

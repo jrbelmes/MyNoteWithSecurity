@@ -4,6 +4,7 @@ import axios from 'axios';
 import Sidebar from './Sidebar';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { sanitizeInput, validateInput } from '../utils/sanitize';
 
 const Master = () => {
   const navigate = useNavigate();
@@ -70,10 +71,21 @@ const Master = () => {
   }, [user_level_id, navigate]);
 
   const handleSaveData = async (operation, data) => {
+    const isValid = Object.values(data).every(value => validateInput(value));
+    if (!isValid) {
+      setMessage('Invalid input detected');
+      setIsSuccess(false);
+      return;
+    }
+
+    const sanitizedData = Object.fromEntries(
+      Object.entries(data).map(([key, value]) => [key, sanitizeInput(value)])
+    );
+
     try {
       const response = await axios.post('http://localhost/coc/gsd/vehicle_master.php', {
         operation,
-        json: JSON.stringify(data),
+        json: JSON.stringify(sanitizedData),
       });
 
       if (response.data.status === 'success') {
@@ -183,6 +195,11 @@ const Master = () => {
     handleSaveData('saveConditionData', { condition_name: conditionName.trim() });
   };
 
+  const handleInputChange = (setter) => (e) => {
+    const sanitizedValue = sanitizeInput(e.target.value);
+    setter(sanitizedValue);
+  };
+
   return (
     <div className="flex h-screen bg-gradient-to-br from-green-100 to-white">
       <Sidebar />
@@ -248,7 +265,7 @@ const Master = () => {
                 <input
                   type="text"
                   value={categoryName}
-                  onChange={(e) => setCategoryName(e.target.value)}
+                  onChange={handleInputChange(setCategoryName)}
                   placeholder="Enter category name"
                   className="border border-gray-300 rounded px-4 py-2 w-full mb-4"
                 />
@@ -270,7 +287,7 @@ const Master = () => {
                 <input
                   type="text"
                   value={makeName}
-                  onChange={(e) => setMakeName(e.target.value)}
+                  onChange={handleInputChange(setMakeName)}
                   placeholder="Enter make name"
                   className="border border-gray-300 rounded px-4 py-2 w-full mb-4"
                 />
@@ -316,7 +333,7 @@ const Master = () => {
                 <input
                   type="text"
                   value={modelName}
-                  onChange={(e) => setModelName(e.target.value)}
+                  onChange={handleInputChange(setModelName)}
                   placeholder="Enter model name"
                   className="border border-gray-300 rounded px-4 py-2 w-full mb-4"
                 />
@@ -338,7 +355,7 @@ const Master = () => {
                 <input
                   type="text"
                   value={equipmentName}
-                  onChange={(e) => setEquipmentName(e.target.value)}
+                  onChange={handleInputChange(setEquipmentName)}
                   placeholder="Enter equipment name"
                   className="border border-gray-300 rounded px-4 py-2 w-full mb-4"
                 />
@@ -360,13 +377,13 @@ const Master = () => {
                 <input
                   type="text"
                   value={userLevelName}
-                  onChange={(e) => setUserLevelName(e.target.value)}
+                  onChange={handleInputChange(setUserLevelName)}
                   placeholder="Enter user level name"
                   className="border border-gray-300 rounded px-4 py-2 w-full mb-4"
                 />
                 <textarea
                   value={userLevelDesc}
-                  onChange={(e) => setUserLevelDesc(e.target.value)}
+                  onChange={handleInputChange(setUserLevelDesc)}
                   placeholder="Enter user level description"
                   className="border border-gray-300 rounded px-4 py-2 w-full mb-4"
                 />
@@ -388,7 +405,7 @@ const Master = () => {
                 <input
                   type="text"
                   value={departmentName}
-                  onChange={(e) => setDepartmentName(e.target.value)}
+                  onChange={handleInputChange(setDepartmentName)}
                   placeholder="Enter department name"
                   className="border border-gray-300 rounded px-4 py-2 w-full mb-4"
                 />
@@ -410,7 +427,7 @@ const Master = () => {
                 <input
                   type="text"
                   value={conditionName}
-                  onChange={(e) => setConditionName(e.target.value)}
+                  onChange={handleInputChange(setConditionName)}
                   placeholder="Enter condition name"
                   className="border border-gray-300 rounded px-4 py-2 w-full mb-4"
                 />

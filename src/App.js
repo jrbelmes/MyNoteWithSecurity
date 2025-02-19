@@ -42,6 +42,7 @@ import DeanViewReserve from './page_dean/viewReserve';
 import DeanAddReservation from './page_dean/AddReservation';
 import DeanDashboard from './page_dean/dashboard';
 import Chat from './components/chat';
+import ProtectedRoute from './components/ProtectedRoute';
 
 // Create a new context for the theme
 export const ThemeContext = createContext();
@@ -74,46 +75,48 @@ const App = () => {
                 <main className="main-content">
                     <Routes>
                         <Route path="/" element={<Navigate to="/gsd" replace />} />
-                        <Route path="/Admin" element={<Admin/>} />
-                        <Route path="/viewApproval" element={<ViewApproval />} />
-                        <Route path="/deanDashboard" element={<DeanDashboard />} />
-                        <Route path="/record" element={<Record />} />
-                        <Route path="/settings" element={<Settings />} />
-                        <Route path="/profile1" element={<Pofiles />} />
-                        <Route path="/chat" element={<Chat />} />
-                        <Route path="/landCalendar" element={<Calendars />} />
-                        <Route path="/calendar" element={<Calendar />} />
-                        <Route path="/viewReserve" element={<ViewReserve />} />                      
                         <Route path="/gsd" element={<Logins />} />
-                        <Route path="/release&return" element={<ReleaseAndReturn />} />
-                        <Route path="/dashboard" element={<Dashboard />} />
-                        <Route path="/departments" element={<Departments />} />
-                        <Route path="/vehiclemodel" element={<VehicleModel />} />
-                        <Route path="/personeldashboard" element={<PersonnelDashboard />} />
-                        <Route path="/condition" element={<Userlevel /> } /> 
-                        <Route path="/position" element={<Position />} />
-                        <Route path="/equipmentCat" element={<Equipmentc />} />
-                        <Route path="/vehiclemake" element={<Vehiclem />} /> 
-                        <Route path="/vehicleCategory" element={<Vehiclec />} /> 
-                        <Route path="/VehicleEntry" element={<VehicleEntry />} /> 
-                        <Route path="/Reports" element={<Reports />} /> 
-                        <Route path="/addReservation" element={<AddReservation />} /> {/* Add new route for AddReservation */}
-                        <Route path="/Venue" element={<Venue />} /> 
-                        <Route path="/adminDashboard" element={<AdminDashboard />} />
-                        <Route path="/Equipment" element={<Equipment />} />
-                        <Route path="/Faculty" element={<Faculty />} />
-                        <Route path="/Register" element={<Register />} />
-                        <Route path="/viewRequest" element={<ViewRequest />} />
-                        <Route path="/Master" element={<Master />} />
-                        <Route path="/usersProfile" element={<UsersProfile />} />
-                        <Route path="/usersSidebar" element={<UsersSidebar />} />
-                        <Route path="/usersDashboard" element={<UsersDashboard />} />
-                        <Route path="/deanProfile" element={<DeanProfile />} />
-                        <Route path="/deanSidebar" element={<DeanSidebar />} />
-                        <Route path="/deanViewReserve" element={<DeanViewReserve />} />
-                        <Route path="/deanAddReservation" element={<DeanAddReservation />} />
-                        <Route path="/deanDashboard" element={<DeanDashboard />} />
-                        <Route path="*" element={<div>404 Not Found</div>} /> 
+                        
+                        {/* Admin Routes */}
+                        <Route path="/Admin" element={<ProtectedRoute allowedRoles={['Admin']}><Admin /></ProtectedRoute>} />
+                        <Route path="/adminDashboard" element={<ProtectedRoute allowedRoles={['Admin']}><AdminDashboard /></ProtectedRoute>} />
+                        <Route path="/VehicleEntry" element={<ProtectedRoute allowedRoles={['Admin']}><VehicleEntry /></ProtectedRoute>} />
+                        <Route path="/Equipment" element={<ProtectedRoute allowedRoles={['Admin']}><Equipment /></ProtectedRoute>} />
+                        <Route path="/Faculty" element={<ProtectedRoute allowedRoles={['Admin']}><Faculty /></ProtectedRoute>} />
+                        <Route path="/departments" element={<ProtectedRoute allowedRoles={['Admin']}><Departments /></ProtectedRoute>} />
+                        <Route path="/master" element={<ProtectedRoute allowedRoles={['Admin']}><Master /></ProtectedRoute>} />
+                        <Route path="/vehiclemake" element={<ProtectedRoute allowedRoles={['Admin']}><Vehiclem /></ProtectedRoute>} />
+                        <Route path="/vehiclecategory" element={<ProtectedRoute allowedRoles={['Admin']}><Vehiclec /></ProtectedRoute>} />
+                        <Route path="/position" element={<ProtectedRoute allowedRoles={['Admin']}><Position /></ProtectedRoute>} />
+                        <Route path="/equipmentCategory" element={<ProtectedRoute allowedRoles={['Admin']}><Equipmentc /></ProtectedRoute>} />
+                        <Route path="/condition" element={<ProtectedRoute allowedRoles={['Admin']}><Userlevel /></ProtectedRoute>} />
+                        <Route path="/vehiclemodel" element={<ProtectedRoute allowedRoles={['Admin']}><VehicleModel /></ProtectedRoute>} />
+                        <Route path="/personelDashboard" element={<ProtectedRoute allowedRoles={['Admin']}><PersonnelDashboard /></ProtectedRoute>} />
+                        <Route path="/release&return" element={<ProtectedRoute allowedRoles={['Admin']}><ReleaseAndReturn /></ProtectedRoute>} />
+                        <Route path="/record" element={<ProtectedRoute allowedRoles={['Admin']}><Record /></ProtectedRoute>} />
+                        <Route path="/ViewRequest" element={<ProtectedRoute allowedRoles={['Admin']}><ViewRequest /></ProtectedRoute>} />
+                        <Route path="/Reports" element={<ProtectedRoute allowedRoles={['Admin']}><Reports /></ProtectedRoute>} />
+                        <Route path="/Venue" element={<ProtectedRoute allowedRoles={['Admin']}><Venue /></ProtectedRoute>} />
+                        <Route path="/equipmentCat" element={<ProtectedRoute allowedRoles={['Admin']}><Equipmentc /></ProtectedRoute>} />
+                        
+                        {/* Dean/Secretary Routes */}
+                        <Route path="/deanDashboard" element={<ProtectedRoute allowedRoles={['Dean', 'Secretary']}><DeanDashboard /></ProtectedRoute>} />
+                        <Route path="/deanViewReserve" element={<ProtectedRoute allowedRoles={['Dean', 'Secretary']}><DeanViewReserve /></ProtectedRoute>} />
+                        <Route path="/deanAddReservation" element={<ProtectedRoute allowedRoles={['Dean', 'Secretary']}><DeanAddReservation /></ProtectedRoute>} />
+                        <Route path="/viewApproval" element={<ProtectedRoute allowedRoles={['Dean', 'Secretary']}><ViewApproval /></ProtectedRoute>} />
+                        
+                        {/* User Routes */}
+                        <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['user']}><Dashboard /></ProtectedRoute>} />
+                        <Route path="/viewReserve" element={<ProtectedRoute allowedRoles={['user']}><ViewReserve /></ProtectedRoute>} />
+                        <Route path="/addReservation" element={<ProtectedRoute allowedRoles={['user']}><AddReservation /></ProtectedRoute>} />
+                        
+                        {/* Shared Routes (accessible by all authenticated users) */}
+                        <Route path="/profile1" element={<ProtectedRoute allowedRoles={['Admin', 'Dean', 'Secretary', 'user']}><Pofiles /></ProtectedRoute>} />
+                        <Route path="/settings" element={<ProtectedRoute allowedRoles={['Admin', 'Dean', 'Secretary', 'user']}><Settings /></ProtectedRoute>} />
+                        <Route path="/calendar" element={<ProtectedRoute allowedRoles={['Admin', 'Dean', 'Secretary', 'user']}><Calendar /></ProtectedRoute>} />
+                        <Route path="/chat" element={<ProtectedRoute allowedRoles={['Admin', 'Dean', 'Secretary', 'user']}><Chat /></ProtectedRoute>} />
+                        
+                        <Route path="*" element={<div>404 Not Found</div>} />
                     </Routes>
                 </main>
             </div>

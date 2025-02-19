@@ -7,6 +7,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
+import { sanitizeInput, validateInput } from '../utils/sanitize';
 
 const EquipmentCategories = () => {
     const navigate = useNavigate();
@@ -94,17 +95,24 @@ const EquipmentCategories = () => {
     };
 
     const handleSave = async () => {
-        if (!formData.name.trim()) {
+        const sanitizedName = sanitizeInput(formData.name);
+        if (!sanitizedName.trim()) {
             toast.error("Please enter a category name.");
             return;
         }
+
+        if (!validateInput(sanitizedName)) {
+            toast.error("Invalid characters in category name.");
+            return;
+        }
+
         setIsSubmitting(true);
         try {
             const requestData = {
                 operation: editMode ? 'updateEquipmentCategory' : 'saveEquipmentCategory',
                 categoryData: {
                     categoryId: formData.categoryId,
-                    name: formData.name.trim()
+                    name: sanitizedName.trim()
                 }
             };
 
@@ -259,7 +267,7 @@ const EquipmentCategories = () => {
                             <Form.Control
                                 type="text"
                                 value={formData.name}
-                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                onChange={(e) => setFormData({ ...formData, name: sanitizeInput(e.target.value) })}
                                 className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                         </Form.Group>

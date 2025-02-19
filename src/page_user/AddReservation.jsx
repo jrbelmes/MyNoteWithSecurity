@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Fragment } from 'react';
+import React, { useState, useEffect, Fragment, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../pages/Sidebar';
 import Sidebar1 from '../pages/sidebarpersonel';
@@ -18,14 +18,15 @@ import { Calendar } from 'primereact/calendar'; // Add this import
 import { Dropdown } from 'primereact/dropdown';
 import { Checkbox } from 'primereact/checkbox';
 import { Tag } from 'primereact/tag';
-import { UserOutlined, InfoCircleOutlined, TeamOutlined, FileTextOutlined, PrinterOutlined } from '@ant-design/icons';
-import { DatePicker, TimePicker, Form, Input, InputNumber, Select, Card, Typography, Row, Col, Divider, Radio, Result, Alert, Modal } from 'antd';
+import { UserOutlined, InfoCircleOutlined, TeamOutlined, FileTextOutlined, PrinterOutlined, DashboardOutlined, PlusOutlined, TagOutlined, BankOutlined, CarOutlined, FormOutlined, FileSearchOutlined, CheckCircleOutlined, CheckCircleFilled } from '@ant-design/icons';
+import { DatePicker, TimePicker, Form, Input, InputNumber, Select, Card, Typography, Row, Col, Divider, Radio, Result, Alert, Modal, Empty, Steps, Spin } from 'antd';
 import moment from 'moment';
 import { CalendarOutlined } from '@ant-design/icons';
 import { format } from 'date-fns';
 import { Dialog } from 'primereact/dialog';
 import { InputNumber as PrimeInputNumber } from 'primereact/inputnumber';
 import ReservationCalendar from './component/reservation_calendar';
+import { Button as AntButton } from 'antd';  // Add this import
 
 const { RangePicker } = DatePicker;
 
@@ -115,6 +116,10 @@ const AddReservation = () => {
   // Add this with other state declarations at the top
   const [viewMode, setViewMode] = useState('grid');
 
+  // Add these two new state declarations
+  const [isLoadingDrivers, setIsLoadingDrivers] = useState(false);
+  const [availableDrivers, setAvailableDrivers] = useState([]);
+
   // Add these new functions
 const handleAddPassenger = (passengerName) => {
   setFormData(prev => ({
@@ -182,7 +187,7 @@ const handleAddEquipment = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        if (user_level_id !== '3') {
+        if (user_level_id !== '5' && user_level_id !== '6') {
           localStorage.clear();
           navigate('/gsd');
           return;
@@ -310,27 +315,44 @@ const handleAddEquipment = () => {
 
 
 
-const handleNext = () => {
+const handleNext = async () => {
   if (!validateCurrentStep()) {
     return;
   }
 
-  // If we're on step 3 (basic information), proceed to review step
-  if (currentStep === 3) {
-    setCurrentStep(4); // Go to review step
+  // For equipment selection, ensure the state is updated before moving to review
+  if (currentStep === 3 && formData.resourceType === 'venue') {
+    // First update the equipment state
+    const newEquipment = {};
+    Object.entries(equipmentQuantities).forEach(([equipId, quantity]) => {
+      if (quantity > 0) {
+        newEquipment[equipId.toString()] = quantity;
+      }
+    });
+    
+    // Update the selected equipment state
+    setSelectedVenueEquipment(newEquipment);
+    
+    // Use a callback to ensure state is updated before moving to next step
+    setTimeout(() => {
+      setCurrentStep(4);
+    }, 0);
     return;
   }
 
-  // If we're on review step (step 4), handle submission
-  if (currentStep === 4) {
-    handleAddReservation();
+  if (currentStep === 4) { // Review step
+    const success = await handleAddReservation();
+    if (success) {
+      setCurrentStep(5); // Move to success state
+      resetForm(); // Optional: reset form after successful submission
+    }
     return;
   }
 
-  // Otherwise, proceed to next step
   setCurrentStep(prev => prev + 1);
 };
 
+// Update validateCurrentStep to check for complete date/time selection
 const validateCurrentStep = () => {
   switch (currentStep) {
     case 0:
@@ -351,11 +373,26 @@ const validateCurrentStep = () => {
       }
       return true;
 
-    case 2:
+    case 2: // Calendar step
       if (!formData.startDate || !formData.endDate) {
         toast.error('Please select both start and end date/time');
         return false;
       }
+      
+      // Validate business hours (8 AM - 5 PM)
+      const startHour = formData.startDate.getHours();
+      const endHour = formData.endDate.getHours();
+      if (startHour < 8 || startHour > 17 || endHour < 8 || endHour > 17) {
+        toast.error('Please select times between 8 AM and 5 PM');
+        return false;
+      }
+
+      // Validate that end time is after start time
+      if (formData.endDate <= formData.startDate) {
+        toast.error('End time must be after start time');
+        return false;
+      }
+      
       return true;
 
     case 3:
@@ -541,12 +578,16 @@ const renderVenues = () => (
             {/* Image container */}
             <div className={viewMode === 'list' ? 'w-48 flex-shrink-0' : ''}>
               <img
-                src={venue.image_url || '/default-venue.jpg'}
+                src={venue.ven_pic ? `http://localhost/coc/gsd/${venue.ven_pic}` : '/default-venue.jpg'}
                 alt={venue.ven_name}
                 className={`
                   object-cover rounded-t-lg
                   ${viewMode === 'grid' ? 'w-full h-48' : 'h-32 w-full'}
                 `}
+                onError={(e) => {
+                  e.target.src = '/default-venue.jpg';
+                  e.target.onerror = null;
+                }}
               />
             </div>
 
@@ -594,79 +635,80 @@ const renderVenues = () => (
 
 // Modify renderResources to only show vehicles without equipment options
 const renderResources = () => (
-  <div className="space-y-4">
-    {/* View toggle buttons */}
-    <div className="flex justify-between items-center mb-6">
-      <h3 className="text-xl font-semibold">
-        {resourceView === 'vehicles' ? 'Select Vehicles' : 'Select Equipment'}
-      </h3>
-      <div className="flex space-x-2 bg-gray-100 p-1 rounded-lg">
-        <button
-          onClick={() => setViewMode('grid')}
-          className={`p-2 rounded-md transition-all duration-200 ${
-            viewMode === 'grid' 
-              ? 'bg-white text-blue-600 shadow-sm' 
-              : 'text-gray-600 hover:text-blue-600'
-          }`}
-          title="Grid View"
-        >
-          <BsFillGridFill size={20} />
-        </button>
-        <button
-          onClick={() => setViewMode('list')}
-          className={`p-2 rounded-md transition-all duration-200 ${
-            viewMode === 'list' 
-              ? 'bg-white text-blue-600 shadow-sm' 
-              : 'text-gray-600 hover:text-blue-600'
-          }`}
-          title="List View"
-        >
-          <BsList size={200} />
-        </button>
+  <div className="space-y-6">
+    {/* Header section with controls */}
+    <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-lg shadow-sm">
+      <div className="flex items-center gap-4">
+        <h3 className="text-lg font-semibold text-gray-800">
+          Select Vehicle{selectedModels.length > 0 ? ` (${selectedModels.length} selected)` : ''}
+        </h3>
+      </div>
+
+      <div className="flex items-center gap-4">
+        {/* Category filter */}
+        <Dropdown
+          value={selectedCategory}
+          options={[
+            { label: 'All Categories', value: 'all' },
+            ...vehicleCategories.map(cat => ({ 
+              label: cat.name, 
+              value: cat.id 
+            }))
+          ]}
+          onChange={(e) => setSelectedCategory(e.value)}
+          className="w-[200px]"
+          placeholder="Filter by category"
+        />
+
+        {/* View toggle buttons - Smaller size */}
+        <div className="flex bg-gray-100 p-1 rounded-md">
+          <button
+            onClick={() => setViewMode('grid')}
+            className={`p-1.5 rounded-md transition-all duration-200 ${
+              viewMode === 'grid' 
+                ? 'bg-white text-blue-600 shadow-sm' 
+                : 'text-gray-600 hover:text-blue-600'
+            }`}
+            title="Grid View"
+          >
+            <BsFillGridFill size={16} />
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={`p-1.5 rounded-md transition-all duration-200 ${
+              viewMode === 'list' 
+                ? 'bg-white text-blue-600 shadow-sm' 
+                : 'text-gray-600 hover:text-blue-600'
+            }`}
+            title="List View"
+          >
+            <BsList size={16} />
+          </button>
+        </div>
       </div>
     </div>
 
-    {/* Resource type and category filters */}
-    <div className="flex flex-wrap gap-4 mb-6">
-      <Dropdown
-        value={selectedCategory}
-        options={[
-          { label: 'All Categories', value: 'all' },
-          ...(resourceView === 'vehicles' 
-            ? vehicleCategories.map(cat => ({ label: cat.name, value: cat.id }))
-            : equipmentCategories.map(cat => ({ label: cat.name, value: cat.id })))
-        ]}
-        onChange={(e) => setSelectedCategory(e.value)}
-        className="w-full sm:w-64"
-        placeholder="Filter by category"
-      />
-    </div>
-
-    {/* Resources grid/list container */}
+    {/* Vehicles grid/list container */}
     <div className={`
       ${viewMode === 'grid' 
         ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'
-        : 'space-y-4'
+        : 'space-y-3'
       }
     `}>
-      {/* Map through resources */}
-      {(resourceView === 'vehicles' ? vehicles : equipment)
-        .filter(item => selectedCategory === 'all' || 
-          (resourceView === 'vehicles' 
-            ? item.vehicle_category_id === selectedCategory
-            : item.equipment_category === selectedCategory)
-        )
-        .map(item => (
+      {vehicles
+        .filter(vehicle => selectedCategory === 'all' || vehicle.vehicle_category_id === selectedCategory)
+        .map((vehicle) => (
           <Card
-            key={resourceView === 'vehicles' ? item.vehicle_id : item.equipment_id}
+            key={vehicle.vehicle_id}
             className={`
               ${viewMode === 'list' ? 'flex' : ''}
-              transition-all duration-300
-              ${resourceView === 'vehicles' && selectedModels.includes(item.vehicle_id) 
+              transition-all duration-300 cursor-pointer
+              ${selectedModels.includes(vehicle.vehicle_id) 
                 ? 'ring-2 ring-blue-500 bg-blue-50' 
-                : 'hover:shadow-lg'
+                : 'hover:shadow-lg hover:border-blue-200'
               }
             `}
+            onClick={() => handleVehicleSelect(vehicle.vehicle_id)}
           >
             <div className={`
               ${viewMode === 'list' ? 'flex items-center w-full' : ''}
@@ -674,84 +716,83 @@ const renderResources = () => (
               {/* Image container */}
               <div className={viewMode === 'list' ? 'w-48 flex-shrink-0' : ''}>
                 <img
-                  src={resourceView === 'vehicles' 
-                    ? `http://localhost/coc/gsd/${item.vehicle_pic}`
-                    : `http://localhost/coc/gsd/${item.equipment_pic}`
-                  }
-                  alt={resourceView === 'vehicles' 
-                    ? `${item.vehicle_make_name} ${item.vehicle_model_name}`
-                    : item.equipment_name
-                  }
+                  src={vehicle.vehicle_pic ? `http://localhost/coc/gsd/${vehicle.vehicle_pic}` : '/default-vehicle.jpg'}
+                  alt={`${vehicle.vehicle_make_name} ${vehicle.vehicle_model_name}`}
                   className={`
-                    object-cover rounded-t-lg
+                    object-cover rounded-lg
                     ${viewMode === 'grid' ? 'w-full h-48' : 'h-32 w-full'}
                   `}
                   onError={(e) => {
-                    e.target.src = resourceView === 'vehicles' 
-                      ? '/default-vehicle.jpg' 
-                      : '/default-equipment.jpg';
+                    e.target.src = '/default-vehicle.jpg';
+                    e.target.onerror = null;
                   }}
                 />
               </div>
 
               {/* Content container */}
-              <div className="p-4 flex-grow">
-                {resourceView === 'vehicles' ? (
-                  <>
-                    <h4 className="font-medium text-lg">
-                      {item.vehicle_make_name} {item.vehicle_model_name}
-                    </h4>
-                    <p className="text-sm text-gray-600">
-                      License: {item.vehicle_license}
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <h4 className="font-medium text-lg">
-                      {item.equipment_name}
-                    </h4>
-                    <p className="text-sm text-gray-600">
-                      Available: {item.equipment_quantity}
-                    </p>
-                  </>
-                )}
-                
-                <Tag
-                  severity={item.status_availability_name === 'available' ? 'success' : 'danger'}
-                  value={item.status_availability_name}
-                  className="mt-2"
-                />
-
-                {/* Selection control */}
-                {resourceView === 'vehicles' && (
-                  <div className={`mt-3 ${viewMode === 'list' ? 'text-right' : ''}`}>
-                    <Checkbox
-                      checked={selectedModels.includes(item.vehicle_id)}
-                      onChange={() => handleVehicleSelect(item.vehicle_id)}
-                      disabled={item.status_availability_name !== 'available'}
-                    />
-                    <span className="ml-2">Select</span>
-                  </div>
-                )}
-
-                {resourceView === 'equipment' && (
-                  <div className="mt-3">
-                    <PrimeInputNumber
-                      value={equipmentQuantities[item.equipment_id] || 0}
-                      onValueChange={(e) => handleEquipmentQuantityChange(item.equipment_id, e.value)}
-                      min={0}
-                      max={item.equipment_quantity}
-                      showButtons
-                      className="w-32"
-                      disabled={item.status_availability_name !== 'available'}
+              <div className={`
+                p-4 flex-grow
+                ${viewMode === 'list' ? 'flex justify-between items-center' : ''}
+              `}>
+                <div>
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="text-lg font-medium text-gray-900">
+                      {vehicle.vehicle_make_name} {vehicle.vehicle_model_name}
+                    </h3>
+                    <Tag
+                      severity={vehicle.status_availability_name === 'available' ? 'success' : 'danger'}
+                      value={vehicle.status_availability_name}
                     />
                   </div>
+                  
+                  <div className="space-y-2 text-sm text-gray-600">
+                    <div className="flex items-center gap-2">
+                      <CarOutlined className="text-gray-400" />
+                      <span>License: {vehicle.vehicle_license}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <BsPeople className="text-gray-400" />
+                      <span>Capacity: {vehicle.vehicle_capacity || 'N/A'}</span>
+                    </div>
+                  </div>
+
+                  {/* Selection indicator */}
+                  {selectedModels.includes(vehicle.vehicle_id) && (
+                    <div className="mt-3 flex items-center gap-2 text-blue-600">
+                      <CheckCircleOutlined />
+                      <span className="text-sm font-medium">Selected</span>
+                    </div>
+                  )}
+                </div>
+
+                {viewMode === 'list' && (
+                  <Checkbox
+                    checked={selectedModels.includes(vehicle.vehicle_id)}
+                    onChange={() => {}}
+                    className="ml-4"
+                    disabled={vehicle.status_availability_name !== 'available'}
+                  />
                 )}
               </div>
             </div>
           </Card>
         ))}
     </div>
+
+    {/* Empty state */}
+    {vehicles.filter(vehicle => 
+      selectedCategory === 'all' || vehicle.vehicle_category_id === selectedCategory
+    ).length === 0 && (
+      <Empty
+        description={
+          <div className="text-gray-500">
+            <p>No vehicles found</p>
+            <p className="text-sm">Try adjusting your filters</p>
+          </div>
+        }
+        className="bg-white p-8 rounded-lg"
+      />
+    )}
   </div>
 );
 
@@ -910,18 +951,36 @@ const renderBasicInformation = () => {
                   label={<span>Driver <span className="text-red-500">*</span></span>}
                   required
                 >
-                  <Dropdown
-                    value={formData.driverName}
-                    onChange={(e) => handleInputChange({
-                      target: { name: 'driverName', value: e.value }
-                    })}
-                    options={drivers.map(driver => ({
-                      label: driver.driver_full_name,
-                      value: driver.driver_id // Use driver_id instead of driver_full_name
-                    }))}
-                    placeholder="Select a driver"
-                    className="w-full"
-                  />
+                  {isLoadingDrivers ? (
+                    <div className="flex items-center gap-2">
+                      <Spin size="small" />
+                      <span className="text-gray-500">Loading drivers...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <Dropdown
+                        value={formData.driverName}
+                        onChange={(e) => handleInputChange({
+                          target: { name: 'driverName', value: e.value }
+                        })}
+                        options={availableDrivers.length > 0 ? 
+                          availableDrivers.map(driver => ({
+                            label: driver.driver_full_name,
+                            value: driver.driver_id
+                          })) : 
+                          [{ label: 'No drivers available', value: null }]
+                        }
+                        placeholder="Select a driver"
+                        className="w-full"
+                        disabled={availableDrivers.length === 0}
+                      />
+                      {availableDrivers.length === 0 && (
+                        <div className="mt-1 text-sm text-red-500">
+                          No drivers available
+                        </div>
+                      )}
+                    </>
+                  )}
                 </Form.Item>
 
                 <Form.Item
@@ -965,6 +1024,7 @@ const renderBasicInformation = () => {
           </Form>
         </div>
       </Card>
+      {formData.resourceType === 'venue' && <EquipmentSelectionModal />}
     </motion.div>
   );
 };
@@ -1014,25 +1074,23 @@ const renderResourceTypeSelection = () => (
 );
 
 // Modify handleAddReservation to handle vehicle-only or venue-only reservations
-const handleAddReservation = async (e) => {
-  e.preventDefault();
-
+const handleAddReservation = async () => {
   try {
     const userId = localStorage.getItem('user_id');
     const deptId = localStorage.getItem('department_id');
-    const storedName = localStorage.getItem('name'); // Get name from localStorage
+    const storedName = localStorage.getItem('name');
     
     if (!userId || !deptId || !storedName) {
       toast.error('User session invalid. Please log in again.');
-      return;
+      return false;
     }
 
     // Validate required fields based on resource type
     if (formData.resourceType === 'venue') {
       if (!formData.venue || !formData.eventTitle || !formData.description || 
-          !formData.participants || !formData.startDate || !formData.endDate) {
+          !formData.startDate || !formData.endDate) {
         toast.error('Please fill in all required venue reservation fields');
-        return;
+        return false;
       }
 
       // Create the venue reservation payload
@@ -1043,20 +1101,18 @@ const handleAddReservation = async (e) => {
         dept_id: parseInt(deptId),
         venue_id: parseInt(formData.venue),
         form_data: {
-          name: storedName, // Use stored name instead of formData.reservationName
+          name: storedName,
           event_title: formData.eventTitle.trim(),
           description: formData.description.trim(),
-          participants: formData.participants.toString(),
+          participants: formData.participants ? formData.participants.toString() : "0",
           start_date: format(new Date(formData.startDate), 'yyyy-MM-dd HH:mm:ss'),
           end_date: format(new Date(formData.endDate), 'yyyy-MM-dd HH:mm:ss'),
           equipment: Object.entries(selectedVenueEquipment).map(([equipId, quantity]) => ({
             equipment_id: parseInt(equipId),
             quantity: parseInt(quantity)
-          })).filter(item => item.quantity > 0) // Only include equipment with quantity > 0
+          })).filter(item => item.quantity > 0)
         }
       };
-
-      console.log('Submitting venue payload:', venuePayload);
 
       const response = await axios.post(
         'http://localhost/coc/gsd/insert_reservation.php',
@@ -1068,49 +1124,46 @@ const handleAddReservation = async (e) => {
         }
       );
 
-      console.log('Server response:', response.data);
-
       if (response.data.status === 'success') {
         toast.success('Venue reservation submitted successfully!');
-        setCurrentStep(4);
-        resetForm();
+        setCurrentStep(5); // Move to success state
+        return true;
       } else {
         throw new Error(response.data.message || 'Failed to submit venue reservation');
       }
     } else {
-      // Handle vehicle reservation (existing vehicle code)
+      // Vehicle reservation validation
       if (!selectedModels || selectedModels.length === 0) {
         toast.error('Please select at least one vehicle');
-        return;
+        return false;
       }
       if (!formData.purpose || !formData.destination || 
           !formData.startDate || !formData.endDate || 
           !formData.passengers || formData.passengers.length === 0) {
         toast.error('Please fill in all required vehicle reservation fields');
-        return;
+        return false;
       }
 
-      const payload = {
+      const vehiclePayload = {
         operation: 'vehicleReservation',
         user_id: parseInt(userId),
+        user_type: 'user',
         dept_id: parseInt(deptId),
-        vehicles: selectedModels.map(id => id.toString()), // Convert to string array
+        vehicles: selectedModels.map(id => id.toString()),
         form_data: {
-          name: storedName, // Use stored name instead of formData.reservationName
+          name: storedName,
           purpose: formData.purpose,
           destination: formData.destination,
           start_date: format(new Date(formData.startDate), 'yyyy-MM-dd HH:mm:ss'),
           end_date: format(new Date(formData.endDate), 'yyyy-MM-dd HH:mm:ss'),
-          driver_id: formData.driverName || "1", // Default to "1" if not provided
-          passengers: formData.passengers.map(p => p.name) // Extract just the names as strings
+          driver_id: formData.driverName || "1",
+          passengers: formData.passengers.map(p => p.name)
         }
       };
 
-      console.log('Submitting payload:', payload);
-
       const response = await axios.post(
         'http://localhost/coc/gsd/insert_reservation.php',
-        payload,
+        vehiclePayload,
         {
           headers: {
             'Content-Type': 'application/json'
@@ -1118,20 +1171,18 @@ const handleAddReservation = async (e) => {
         }
       );
 
-      console.log('Server response:', response.data);
-
       if (response.data.status === 'success') {
-        toast.success('Reservation submitted successfully!');
-        setCurrentStep(4);
-        resetForm();
+        toast.success('Vehicle reservation submitted successfully!');   
+        setCurrentStep(5); // Move to success state
+        return true;
       } else {
         throw new Error(response.data.message || 'Failed to submit reservation');
       }
     }
-
   } catch (error) {
     console.error('Submission error:', error);
     toast.error(error.message || 'An error occurred while submitting the reservation');
+    return false;
   }
 };
 
@@ -1176,18 +1227,18 @@ const validatePayload = (payload) => {
 
 const resetForm = () => {
   setFormData({
-    reservationName: '',
-    eventTitle: '',
-    description: '',
-    message: '',
-    venue: '',
+    resourceType: '',
     startDate: null,
     endDate: null,
+    selectedTime: null,
+    eventTitle: '',
+    description: '',
     participants: '',
-    selectedUserId: localStorage.getItem('user_id') || '',
-    selectedUserName: '',
-    customStartTime: '',
-    customEndTime: ''
+    venue: '',
+    purpose: '',
+    destination: '',
+    passengers: [], // Reset passengers to empty array
+    driverName: '',
   });
   setSelectedModels([]);
   setSelectedEquipment({});
@@ -1209,6 +1260,8 @@ const renderReviewSection = () => {
   const selectedVenue = venues.find(v => v.ven_id.toString() === formData.venue.toString());
   const selectedVehicleDetails = vehicles.filter(v => selectedModels.includes(v.vehicle_id));
   const storedName = localStorage.getItem('name');
+  // Add this line to find the selected driver's details
+  const selectedDriver = drivers.find(d => d.driver_id.toString() === formData.driverName?.toString());
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -1319,7 +1372,7 @@ const renderReviewSection = () => {
                         </div>
                         <div>
                           <p className="text-sm text-gray-500">Driver's Name</p>
-                          <p className="font-medium text-gray-900">{formData.driverName || 'Not provided'}</p>
+                          <p className="font-medium text-gray-900">{selectedDriver?.driver_full_name || 'Not provided'}</p>
                         </div>
                       </div>
                     </div>
@@ -1476,39 +1529,61 @@ const formatTime = (time) => {
 };
 
 const renderSuccessState = () => (
-  <Result
-    status="success"
-    title="Successfully Submit Request!"
-    subTitle="Your reservation request will be reviewed by GSD staff. You will receive a notification once the status has been updated."
-    extra={[
-      <Button
-        type="primary"
-        key="print"
-        icon={<PrinterOutlined />}
-        onClick={handlePrintRequest}
-        className="bg-blue-600 hover:bg-blue-700"
-      >
-        Print Request
-      </Button>,
-      <Button
-        type="primary"
-        key="dashboard"
-        onClick={() => navigate('/dashboard')}
-        className="bg-green-600 hover:bg-green-700"
-      >
-        Go Back To Dashboard
-      </Button>,
-      <Button
-        key="create"
-        onClick={() => {
-          resetForm();
-          setCurrentStep(0);
-        }}
-      >
-        Request Again
-      </Button>,
-    ]}
-  />
+  <motion.div
+    initial={{ opacity: 0, scale: 0.95 }}
+    animate={{ opacity: 1, scale: 1 }}
+    transition={{ duration: 0.5 }}
+  >
+    <Result
+      status="success"
+      title={
+        <span className="text-2xl font-semibold text-green-600">
+          Reservation Request Submitted Successfully!
+        </span>
+      }
+      subTitle={
+        <div className="text-gray-600 mt-2">
+          <p>Your reservation request has been submitted and is pending approval.</p>
+          <p>You will receive a notification once the status has been updated.</p>
+        </div>
+      }
+      extra={[
+        <Button
+          key="print"
+          type="default"
+          icon={<PrinterOutlined />}
+          onClick={handlePrintRequest}
+          size="large"
+          className="mr-4"
+        >
+          Print Request
+        </Button>,
+        <Button
+          key="dashboard"
+          type="primary"
+          icon={<DashboardOutlined />}
+          onClick={() => navigate('/dashboard')}
+          size="large"
+          className="mr-4 bg-blue-500 hover:bg-blue-600"
+        >
+          Go to Dashboard
+        </Button>,
+        <Button
+          key="newRequest"
+          type="default"
+          icon={<PlusOutlined />}
+          onClick={() => {
+            resetForm();
+            setCurrentStep(0);
+          }}
+          size="large"
+          className="border-green-500 text-green-500 hover:text-green-600 hover:border-green-600"
+        >
+          New Request
+        </Button>,
+      ]}
+    />
+  </motion.div>
 );
 
 const TimeSlotVisualizer = ({ selectedTime, unavailableSlots, isChecking, conflicts }) => {
@@ -1898,34 +1973,55 @@ const handleDateChange = (type, newDate) => {
 
 
 
-const StepIndicator = ({ currentStep }) => (
-  <div className="relative">
-    <div className="flex justify-between items-center">
-      {['Select Type', 'Select Resource', 'Choose Date', 'Fill Details', 'Review', 'Complete'].map((step, index) => (
-        <div key={index} className="flex flex-col items-center flex-1">
-          <div className={`
-            w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center 
-            text-xs md:text-sm font-semibold transition-all duration-300
-            ${index === currentStep ? 'bg-blue-600 text-white' :
-              index < currentStep ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}
-          `}>
-            {index < currentStep ? '✓' : index + 1}
-          </div>
-          <span className="mt-2 text-[10px] md:text-xs text-gray-600 text-center hidden sm:block">
-            {step}
-          </span>
-          {index < 4 && (
-            <div className={`h-1 w-full mt-2 
-              ${index < currentStep ? 'bg-green-500' : 'bg-gray-200'}
-            `} />
-          )}
-        </div>
+const StepIndicator = ({ currentStep }) => {
+  const steps = [
+    { title: 'Select Type', icon: <TagOutlined /> },
+    { title: 'Select Resource', icon: resourceType === 'venue' ? <BankOutlined /> : <CarOutlined /> },
+    { title: 'Choose Date', icon: <CalendarOutlined /> },
+    { title: 'Fill Details', icon: <FormOutlined /> },
+    { title: 'Review', icon: <FileSearchOutlined /> },
+    { title: 'Complete', icon: <CheckCircleOutlined /> }
+  ];
+
+  return (
+    <Steps
+      current={currentStep}
+      className="custom-steps"
+      responsive={false}
+      size="small"
+    >
+      {steps.map((step, index) => (
+        <Steps.Step
+          key={index}
+          title={<span className="hidden sm:inline">{step.title}</span>}
+          icon={
+            index < currentStep ? (
+              <CheckCircleFilled className="text-green-500" />
+            ) : (
+              <div className={`
+                ${currentStep === index ? 'text-blue-500' : 'text-gray-400'}
+              `}>
+                {step.icon}
+              </div>
+            )
+          }
+          status={
+            index === currentStep 
+              ? 'process'
+              : index < currentStep 
+                ? 'finish' 
+                : 'wait'
+          }
+        />
       ))}
-    </div>
-  </div>
-);
+    </Steps>
+  );
+};
 
 const handlePrintRequest = () => {
+  // Find the selected driver using formData.driverName
+  const selectedDriver = drivers.find(d => d.driver_id.toString() === formData.driverName?.toString());
+  
   const printContent = document.createElement('div');
   printContent.innerHTML = `
     <div style="padding: 20px;">
@@ -1940,19 +2036,13 @@ const handlePrintRequest = () => {
       </div>
 
       ${formData.resourceType === 'venue' ? `
-        <div style="margin-bottom: 20px;">
-          <h3>Venue Details</h3>
-          <p><strong>Event Title:</strong> ${formData.eventTitle}</p>
-          <p><strong>Description:</strong> ${formData.description}</p>
-          <p><strong>Participants:</strong> ${formData.participants}</p>
-          <p><strong>Venue:</strong> ${venues.find(v => v.ven_id.toString() === formData.venue.toString())?.ven_name}</p>
-        </div>
+        // ...existing venue details code...
       ` : `
         <div style="margin-bottom: 20px;">
           <h3>Vehicle Details</h3>
           <p><strong>Purpose:</strong> ${formData.purpose}</p>
           <p><strong>Destination:</strong> ${formData.destination}</p>
-          <p><strong>Driver:</strong> ${formData.driverName || 'Not specified'}</p>
+          <p><strong>Driver:</strong> ${selectedDriver?.driver_full_name || 'Not specified'}</p>
           <p><strong>Passengers:</strong></p>
           <ul>
             ${formData.passengers.map(p => `<li>${p.name}</li>`).join('')}
@@ -1962,26 +2052,7 @@ const handlePrintRequest = () => {
     </div>
   `;
 
-  const printWindow = window.open('', '_blank');
-  printWindow.document.write(`
-    <html>
-      <head>
-        <title>Reservation Request</title>
-      </head>
-      <body>
-        ${printContent.innerHTML}
-        <script>
-          window.onload = function() {
-            window.print();
-            window.onafterprint = function() {
-              window.close();
-            }
-          }
-        </script>
-      </body>
-    </html>
-  `);
-  printWindow.document.close();
+  // ...rest of the print function code...
 };
 
 // Add new state for drivers
@@ -1990,11 +2061,16 @@ const [showPassengerModal, setShowPassengerModal] = useState(false);
 const [newPassenger, setNewPassenger] = useState('');
 
 // Add fetchDrivers function
-const fetchDrivers = async () => {
+const fetchDrivers = async (startDate, endDate) => {
+  setIsLoadingDrivers(true);
   try {
     const response = await axios.post(
       'http://localhost/coc/gsd/user.php',
-      { operation: 'fetchDriver' },
+      {
+        operation: 'fetchDriver',
+        startDateTime: format(startDate, 'yyyy-MM-dd HH:mm:ss'),
+        endDateTime: format(endDate, 'yyyy-MM-dd HH:mm:ss')
+      },
       {
         headers: {
           'Content-Type': 'application/json'
@@ -2003,29 +2079,46 @@ const fetchDrivers = async () => {
     );
 
     if (response.data.status === 'success') {
-      setDrivers(response.data.data);
+      setAvailableDrivers(response.data.data || []);
+      if (response.data.data.length === 0) {
+        toast.warning('No drivers available for the selected time slot');
+      }
     } else {
       console.error('Failed to fetch drivers:', response.data.message);
+      setAvailableDrivers([]);
     }
   } catch (error) {
     console.error('Error fetching drivers:', error);
-    toast.error('Failed to load drivers');
+    setAvailableDrivers([]);
+  } finally {
+    setIsLoadingDrivers(false);
   }
 };
 
 // Add useEffect to fetch drivers
 useEffect(() => {
-  fetchDrivers();
-}, []);
+  if (formData.startDate && formData.endDate && formData.resourceType === 'vehicle') {
+    fetchDrivers(formData.startDate, formData.endDate);
+  }
+}, [formData.startDate, formData.endDate, formData.resourceType]);
 
 // Add PassengerModal component
 const PassengerModal = ({ visible, onHide }) => {
   const [localPassengerName, setLocalPassengerName] = useState('');
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (visible) {
+      // Focus input when modal opens
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  }, [visible]);
 
   const handleSubmit = () => {
     if (localPassengerName.trim()) {
       handleAddPassenger(localPassengerName.trim());
-      setLocalPassengerName(''); // Clear local state // Close modal
+      setLocalPassengerName('');
+      inputRef.current?.focus(); // Refocus input for adding multiple passengers
     }
   };
 
@@ -2033,176 +2126,424 @@ const PassengerModal = ({ visible, onHide }) => {
     <Dialog
       visible={visible}
       onHide={onHide}
-      header="Add Passenger"
+      header={
+        <div className="flex items-center gap-3 px-4 py-2">
+          <UserOutlined className="text-blue-500 text-xl" />
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800">Add Passenger</h3>
+            <p className="text-sm text-gray-500">Enter passenger details below</p>
+          </div>
+        </div>
+      }
       modal
       className="w-[90vw] md:w-[500px]"
       closeOnEscape
       dismissableMask
-    >
-      <div className="p-4">
-        <div className="mb-4">
-          <InputText
-            value={localPassengerName}
-            onChange={(e) => setLocalPassengerName(e.target.value)}
-            placeholder="Enter passenger name"
-            className="w-full"
-            onKeyPress={(e) => {
-              if (e.key === 'Enter') {
-                handleSubmit();
-              }
-            }}
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button
+            label="Cancel"
+            icon="pi pi-times"
+            onClick={onHide}
+            className="p-button-text"
           />
-        </div>
-        <div className="flex justify-end">
           <Button
             label="Add Passenger"
             icon="pi pi-plus"
             onClick={handleSubmit}
             className="p-button-primary"
+            disabled={!localPassengerName.trim()}
           />
+        </div>
+      }
+    >
+      <div className="p-4 space-y-4">
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700">
+            Passenger Name <span className="text-red-500">*</span>
+          </label>
+          <div className="relative">
+            <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <UserOutlined className="text-gray-400" />
+            </span>
+            <InputText
+              ref={inputRef}
+              value={localPassengerName}
+              onChange={(e) => setLocalPassengerName(e.target.value)}
+              placeholder="Enter passenger name"
+              className="w-full pl-10"
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  handleSubmit();
+                }
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Show current passengers list if any */}
+        {formData.passengers.length > 0 && (
+          <div className="mt-4">
+            <div className="text-sm font-medium text-gray-700 mb-2">
+              Current Passengers ({formData.passengers.length})
+            </div>
+            <div className="max-h-48 overflow-y-auto">
+              <div className="bg-gray-50 rounded-lg divide-y divide-gray-200">
+                {formData.passengers.map((passenger, index) => (
+                  <div 
+                    key={passenger.id}
+                    className="flex items-center justify-between p-3 hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-gray-500">{index + 1}.</span>
+                      <UserOutlined className="text-gray-400" />
+                      <span className="font-medium text-gray-700">{passenger.name}</span>
+                    </div>
+                    <Button
+                      icon="pi pi-trash"
+                      onClick={() => handleRemovePassenger(passenger.id)}
+                      className="p-button-text p-button-danger p-button-sm"
+                      tooltip="Remove passenger"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Quick tips */}
+        <div className="mt-4 bg-blue-50 text-blue-700 p-3 rounded-lg text-sm">
+          <div className="flex items-center gap-2">
+            <InfoCircleOutlined />
+            <span className="font-medium">Quick Tips:</span>
+          </div>
+          <ul className="list-disc ml-5 mt-1 text-blue-600">
+            <li>Press Enter to quickly add multiple passengers</li>
+            <li>Click the trash icon to remove a passenger</li>
+          </ul>
         </div>
       </div>
     </Dialog>
   );
 };
 
-// Add new Dialog component for equipment modal
-const renderEquipmentDialog = () => {
+const EquipmentSelectionModal = () => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [viewMode, setViewMode] = useState('grid');
+  const [localEquipmentQuantities, setLocalEquipmentQuantities] = useState({});
+
+  // Initialize local quantities when modal opens
+  useEffect(() => {
+    if (showEquipmentModal) {
+      setLocalEquipmentQuantities({ ...equipmentQuantities });
+    }
+  }, [showEquipmentModal]);
+
+  // Get unique equipment categories
+  const categories = ['all', ...new Set(equipment.map(item => item.equipment_category))];
+
+  // Filter equipment based on search and category
+  const filteredEquipment = equipment.filter(item => {
+    const matchesSearch = item.equipment_name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = categoryFilter === 'all' || item.equipment_category === categoryFilter;
+    return matchesSearch && matchesCategory;
+  });
+
+  // Handler for quantity changes
+  const handleLocalQuantityChange = (equipId, value) => {
+    if (value === undefined || value === null || value < 0) return;
+    
+    const equip = equipment.find(e => e.equipment_id === equipId);
+    if (!equip) return;
+
+    if (value > equip.equipment_quantity) {
+      toast.error(`Maximum available quantity is ${equip.equipment_quantity}`);
+      return;
+    }
+
+    setLocalEquipmentQuantities(prev => ({
+      ...prev,
+      [equipId]: value
+    }));
+  };
+
+  // Handler for confirming selections
+  const handleConfirm = () => {
+    // Update both local and parent state
+    setEquipmentQuantities(localEquipmentQuantities);
+    // Update selected equipment immediately
+    const newEquipment = {};
+    Object.entries(localEquipmentQuantities).forEach(([equipId, quantity]) => {
+      if (quantity > 0) {
+        newEquipment[equipId.toString()] = quantity;
+      }
+    });
+    setSelectedVenueEquipment(newEquipment);
+    setShowEquipmentModal(false);
+  };
+
   return (
-    <Dialog 
-      visible={showEquipmentModal} 
-      onHide={() => setShowEquipmentModal(false)}
-      header="Select Equipment"
-      modal
-      className="w-[90vw] md:w-[800px]"
+    <Modal
+      open={showEquipmentModal}
+      onCancel={() => setShowEquipmentModal(false)}
+      title={
+        <div className="flex items-center gap-2">
+          <FaTools className="text-blue-500" />
+          <span className="font-semibold">Equipment Selection</span>
+        </div>
+      }
+      width={1000}
+      footer={[
+        <Button key="cancel" onClick={() => setShowEquipmentModal(false)}>
+          Cancel
+        </Button>,
+        <Button
+          key="submit"
+          type="primary"
+          onClick={handleConfirm}
+          icon={<FaCheck />}
+        >
+          Confirm Selection
+        </Button>
+      ]}
+      className="equipment-modal"
     >
-      <div className="p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {equipment.map((item) => (
-            <div key={item.equipment_id} className="border rounded-lg p-4">
-              <div className="flex flex-col space-y-3">
+      {/* Search and Filter Controls */}
+      <div className="mb-6 space-y-4">
+        <div className="flex flex-wrap gap-4 items-center justify-between">
+          <Input.Search
+            placeholder="Search equipment..."
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full md:w-64"
+            allowClear
+          />
+          <div className="flex items-center gap-2">
+            <Select
+              value={categoryFilter}
+              onChange={setCategoryFilter}
+              className="w-48"
+              placeholder="Filter by category"
+            >
+              {categories.map(category => (
+                <Select.Option key={category} value={category}>
+                  {category === 'all' ? 'All Categories' : category}
+                </Select.Option>
+              ))}
+            </Select>
+            <Radio.Group
+              value={viewMode}
+              onChange={(e) => setViewMode(e.target.value)}
+              buttonStyle="solid"
+            >
+              <Radio.Button value="grid"><BsFillGridFill /></Radio.Button>
+              <Radio.Button value="list"><BsList /></Radio.Button>
+            </Radio.Group>
+          </div>
+        </div>
+      </div>
+
+      {/* Equipment List */}
+      <div className={`
+        ${viewMode === 'grid' 
+          ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'
+          : 'space-y-4'
+        }
+      `}>
+        {filteredEquipment.map((item) => (
+          <Card
+            key={item.equipment_id}
+            className={`
+              transition-all duration-300 hover:shadow-md
+              ${viewMode === 'list' ? 'flex items-center w-full' : ''}
+              ${equipmentQuantities[item.equipment_id] > 0 ? 'ring-2 ring-blue-500' : ''}
+            `}
+            bodyStyle={viewMode === 'list' ? { width: '100%', display: 'flex' } : {}}
+          >
+            <div className={viewMode === 'list' ? 'flex items-center gap-4 w-full' : ''}>
+              {/* Image */}
+              <div className={viewMode === 'list' ? 'w-32 flex-shrink-0' : ''}>
                 <img
                   src={`http://localhost/coc/gsd/${item.equipment_pic}`}
                   alt={item.equipment_name}
-                  className="w-full h-32 object-cover rounded"
+                  className={`
+                    object-cover rounded-lg
+                    ${viewMode === 'grid' ? 'w-full h-48' : 'h-32 w-32'}
+                  `}
                   onError={(e) => {
                     e.target.src = '/default-equipment.jpg';
+                    e.target.onerror = null;
                   }}
                 />
-                <div className="space-y-2">
-                  <h6 className="font-medium">{item.equipment_name}</h6>
-                  <p className="text-sm text-gray-600">Available: {item.equipment_quantity}</p>
-                  <div className="flex items-center space-x-2">
-                    <PrimeInputNumber
-                      value={equipmentQuantities[item.equipment_id] || 0}
-                      onValueChange={(e) => handleEquipmentQuantityChange(item.equipment_id, e.value)}
-                      min={0}
-                      max={item.equipment_quantity}
-                      size="small"
-                      showButtons
-                      className="w-24"
-                    />
+              </div>
+
+              {/* Content */}
+              <div className={`
+                ${viewMode === 'list' ? 'flex-grow flex justify-between items-center' : 'mt-4'}
+              `}>
+                <div>
+                  <h4 className="font-medium text-lg text-gray-900">{item.equipment_name}</h4>
+                  <p className="text-sm text-gray-500">{item.equipment_category}</p>
+                  <Tag 
+                    color={item.status_availability_name === 'available' ? 'green' : 'red'}
+                    className="mt-2"
+                  >
+                    {item.status_availability_name}
+                  </Tag>
+                  <div className="mt-3">
+                    <span className="text-sm text-gray-600">
+                      Available: {item.equipment_quantity}
+                    </span>
                   </div>
+                </div>
+
+                {/* Quantity Input */}
+                <div className={viewMode === 'list' ? 'ml-4' : 'mt-4'}>
+                  <InputNumber
+                    min={0}
+                    max={item.equipment_quantity}
+                    value={localEquipmentQuantities[item.equipment_id] || 0}
+                    onChange={(value) => handleLocalQuantityChange(item.equipment_id, value)}
+                    disabled={item.status_availability_name !== 'available'}
+                    className="w-full"
+                    addonBefore="Qty"
+                  />
                 </div>
               </div>
             </div>
-          ))}
-        </div>
-        <div className="flex justify-end mt-4 space-x-2">
-          <Button
-            label="Cancel"
-            icon="pi pi-times"
-            onClick={() => setShowEquipmentModal(false)}
-            className="p-button-text"
-          />
-          <Button
-            label="Add Selected"
-            icon="pi pi-check"
-            onClick={handleAddEquipment}
-            className="p-button-success"
-          />
-        </div>
+          </Card>
+        ))}
       </div>
-    </Dialog>
+
+      {filteredEquipment.length === 0 && (
+        <Empty
+          description="No equipment found"
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          className="my-8"
+        />
+      )}
+    </Modal>
   );
 };
 
 return (
-  <div className="min-h-screen bg-gray-50">
-    {/* Responsive sidebar handling */}
+  <div className="min-h-screen bg-gradient-to-br">
+    {/* Sidebar handling */}
     <div className="hidden md:block">
       {userLevel === '100' && <Sidebar />}
       {userLevel === '1' && <Sidebar1 />}
     </div>
 
-    {/* Main content area - Adjust margins and max-width */}
-    <div className="w-full md:ml-50 p-4 transition-all duration-300">
-      <div className="max-w-5xl mx-auto"> {/* Reduced max-width from 7xl to 5xl */}
-        {/* Responsive header */}
-        <div className="mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Create Reservation</h1>
-          <p className="mt-2 text-sm md:text-base text-gray-600">Fill in the details to make your reservation</p>
-        </div>
-
-        {/* Responsive step indicator - Adjust for mobile */}
-        <div className="mb-6 overflow-x-auto md:overflow-visible">
-          <div className="min-w-[500px] md:min-w-0"> {/* Reduced min-width */}
-            <StepIndicator currentStep={currentStep} />
+    {/* Enhanced main content area */}
+    <div className="w-full p-6 transition-all duration-300">
+      <div className="max-w-6xl mx-auto space-y-8">
+        {/* Enhanced header section with back button */}
+        <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
+          <div className="flex justify-between items-center mb-4">
+            <Button
+              onClick={() => navigate('/dashboard')}
+              className="p-button-text flex items-center gap-2 hover:bg-blue-50 transition-colors"
+              icon={<i className="pi pi-arrow-left text-blue-500" />}
+            >
+              <span className="font-medium text-blue-600">Back to Dashboard</span>
+            </Button>
           </div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2"></h1>
+            Create Reservation
+          
+          <p className="text-gray-600">
+            Complete the steps below to make your reservation
+          </p>
         </div>
 
-        {/* Main content card - Adjust padding and width */}
-        <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
-          <div className="p-3 md:p-6"> {/* Reduced padding */}
-            {/* Content grid - Adjust column layout */}
-            <div className="grid grid-cols-1 gap-4">
+        {/* Enhanced steps indicator */}
+        <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 mb-6">
+          <StepIndicator 
+            currentStep={currentStep} 
+            resourceType={formData.resourceType} 
+          />
+        </div>
+
+        {/* Main content card with enhanced styling */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          {/* Content header */}
+          <div className="px-6 py-4 bg-gray-50 border-b border-gray-100">
+            <h2 className="text-xl font-semibold text-gray-800">
+              {currentStep === 0 && "Select Resource Type"}
+              {currentStep === 1 && `Select ${formData.resourceType === 'venue' ? 'Venue' : 'Vehicle'}`}
+              {currentStep === 2 && "Choose Date & Time"}
+              {currentStep === 3 && "Enter Details"}
+              {currentStep === 4 && "Review Reservation"}
+              {currentStep === 5 && "Reservation Complete"}
+            </h2>
+          </div>
+
+          {/* Main content area with enhanced padding */}
+          <div className="p-6">
+            <div className="max-w-4xl mx-auto">
               {renderStepContent()}
             </div>
-
-            {/* Button layout - Keep at bottom */}
-            {currentStep !== 5 && ( // Changed from 4 to 5 since 4 is review step
-              <div className="mt-6 flex flex-col sm:flex-row justify-between gap-3 pt-4 border-t border-gray-100">
-                <Button
-                  label="Previous"
-                  icon="pi pi-arrow-left"
-                  className="p-button-outlined w-full sm:w-auto"
-                  onClick={handleBack}
-                  disabled={currentStep === 0}
-                />
-                {currentStep === 4 ? ( // Changed from 3 to 4
-                  <Button
-                    label="Submit Request"
-                    icon="pi pi-check"
-                    className="p-button-success w-full sm:w-auto"
-                    onClick={handleAddReservation}
-                  />
-                ) : (
-                  <Button
-                    label="Next"
-                    icon="pi pi-arrow-right"
-                    className="p-button-primary w-full sm:w-auto"
-                    onClick={handleNext}
-                  />
-                )}
-              </div>
-            )}
           </div>
+
+          {/* Enhanced footer with better positioned buttons */}
+          {currentStep !== 5 && (
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
+              <div className="flex justify-between items-center">
+               
+                
+                <div className="flex justify-end gap-3">
+                  <AntButton
+                    type="default"
+                    icon={<i className="pi pi-arrow-left" />}
+                    onClick={handleBack}
+                    size="large"
+                  >
+                    Previous
+                  </AntButton>
+                  {currentStep === 4 ? (
+                    <AntButton
+                      type="primary"
+                      icon={<CheckCircleOutlined />}
+                      onClick={handleAddReservation}
+                      size="large"
+                      className="bg-green-500 hover:bg-green-600"
+                    >
+                      Submit Reservation
+                    </AntButton>
+                  ) : (
+                    <AntButton
+                      type="primary"
+                      icon={<i className="pi pi-arrow-right" />}
+                      onClick={handleNext}
+                      size="large"
+                    >
+                      Next
+                    </AntButton>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
 
+    {/* Enhanced toast styling */}
     <Toaster 
-      position="top-center"
+      position="top-right"
       toastOptions={{
-        className: 'text-sm md:text-base',
+        className: 'text-sm',
         duration: 3000,
         style: {
-          background: '#363636',
+          background: '#333',
           color: '#fff',
+          borderRadius: '8px',
         },
       }}
     />
-    {renderEquipmentDialog()}
+
+    {/* Enhanced modal styling */}
     <PassengerModal
       visible={showPassengerModal}
       onHide={() => {
@@ -2210,9 +2551,95 @@ return (
         setNewPassenger('');
       }}
     />
+    <EquipmentSelectionModal />
   </div>
 );
 };
 
+// Update the StepIndicator component with enhanced styling
+const StepIndicator = ({ currentStep, resourceType }) => {
+  const steps = [
+    { title: 'Select Type', icon: <TagOutlined className="text-lg" /> },
+    { 
+      title: 'Select Resource', 
+      icon: resourceType === 'venue' 
+        ? <BankOutlined className="text-lg" /> 
+        : <CarOutlined className="text-lg" /> 
+    },
+    { title: 'Schedule', icon: <CalendarOutlined className="text-lg" /> },
+    { title: 'Details', icon: <FormOutlined className="text-lg" /> },
+    { title: 'Review', icon: <FileSearchOutlined className="text-lg" /> },
+    { title: 'Complete', icon: <CheckCircleOutlined className="text-lg" /> }
+  ];
+
+  return (
+    <Steps
+      current={currentStep}
+      className="custom-steps site-navigation-steps"
+      responsive={false}
+    >
+      {steps.map((step, index) => (
+        <Steps.Step
+          key={index}
+          title={
+            <span className={`
+              hidden sm:inline
+              ${currentStep === index ? 'font-medium' : ''}
+            `}>
+              {step.title}
+            </span>
+          }
+          icon={
+            index < currentStep ? (
+              <CheckCircleFilled className="text-green-500 text-lg" />
+            ) : (
+              <div className={`
+                transition-colors duration-200
+                ${currentStep === index ? 'text-blue-500' : 'text-gray-400'}
+              `}>
+                {step.icon}
+              </div>
+            )
+          }
+          status={
+            index === currentStep 
+              ? 'process'
+              : index < currentStep 
+                ? 'finish' 
+                : 'wait'
+          }
+        />
+      ))}
+    </Steps>
+  );
+};
+
+// Update modal components with enhanced styling
+const PassengerModal = ({ visible, onHide }) => {
+  // ...existing code...
+
+  return (
+    <Dialog
+      visible={visible}
+      onHide={onHide}
+      header={
+        <div className="flex items-center gap-2 px-4 py-2">
+          <UserOutlined className="text-blue-500" />
+          <span className="text-lg font-semibold">Add Passenger</span>
+        </div>
+      }
+      modal
+      className="w-[90vw] md:w-[500px]"
+      closeOnEscape
+      dismissableMask
+      contentClassName="p-6"
+    >
+      {/* ...existing modal content... */}
+    </Dialog>
+  );
+};
+
 export default AddReservation;
+
+
 

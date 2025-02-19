@@ -18,6 +18,7 @@ import { DataView } from 'primereact/dataview';
 import { Tag } from 'primereact/tag';
 import { Card } from 'primereact/card';
 import { Divider } from 'primereact/divider';
+import { sanitizeInput, validateInput } from '../utils/sanitize';
 
 const VenueEntry = () => {
     const adminId = localStorage.getItem('adminId') || '';
@@ -241,21 +242,47 @@ const VenueEntry = () => {
         setOperatingHoursEnd(null);
     };
 
+    const validateVenueData = () => {
+        const sanitizedName = sanitizeInput(venueName);
+        const sanitizedOccupancy = sanitizeInput(maxOccupancy);
+        const sanitizedHours = sanitizeInput(operatingHours);
+
+        if (!validateInput(sanitizedName) || !validateInput(sanitizedOccupancy)) {
+            toast.error("Invalid input detected. Please check your entries.");
+            return false;
+        }
+
+        if (!sanitizedName || !sanitizedOccupancy || !sanitizedHours) {
+            toast.error("Please fill in all required fields!");
+            return false;
+        }
+
+        // Validate occupancy
+        if (parseInt(sanitizedOccupancy) <= 0) {
+            toast.error("Maximum occupancy must be greater than zero!");
+            return false;
+        }
+
+        return {
+            name: sanitizedName,
+            occupancy: sanitizedOccupancy,
+            hours: sanitizedHours
+        };
+    };
+
     const handleSubmit = async () => {
         if (editMode) {
             await handleUpdateVenue();
         } else {
-            if (!venueName || !maxOccupancy || !operatingHours) {
-                toast.error("Please fill in all required fields!");
-                return;
-            }
+            const validatedData = validateVenueData();
+            if (!validatedData) return;
 
             setLoading(true);
             try {
                 let imageBase64 = null;
                 if (venuePic) {
-                    const reader = new FileReader();
                     imageBase64 = await new Promise((resolve) => {
+                        const reader = new FileReader();
                         reader.onload = (e) => resolve(e.target.result);
                         reader.readAsDataURL(venuePic);
                     });
@@ -264,9 +291,9 @@ const VenueEntry = () => {
                 const requestData = {
                     operation: 'saveVenue',
                     data: {
-                        name: venueName,
-                        occupancy: maxOccupancy,
-                        operating_hours: operatingHours,
+                        name: validatedData.name,
+                        occupancy: validatedData.occupancy,
+                        operating_hours: validatedData.hours,
                         user_admin_id: parseInt(user_id),
                         status_availability_id: parseInt(selectedStatus),
                         ven_pic: imageBase64
@@ -301,9 +328,17 @@ const VenueEntry = () => {
     };
 
     const handleVenueNameChange = (e) => {
-        setVenueName(e.target.value);
+        const sanitizedValue = sanitizeInput(e.target.value);
+        setVenueName(sanitizedValue);
         if (!editMode) {
             checkVenueExists();
+        }
+    };
+
+    const handleOccupancyChange = (e) => {
+        const sanitizedValue = sanitizeInput(e.target.value);
+        if (/^\d*$/.test(sanitizedValue)) { // Only allow digits
+            setMaxOccupancy(sanitizedValue);
         }
     };
 
@@ -625,8 +660,9 @@ const VenueEntry = () => {
                         <Input
                             type="number"
                             value={maxOccupancy}
-                            onChange={(e) => setMaxOccupancy(e.target.value)}
+                            onChange={handleOccupancyChange}
                             placeholder="Enter maximum occupancy"
+                            min="1"
                         />
                     </Form.Item>
                     <Form.Item 

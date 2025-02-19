@@ -1,0 +1,31 @@
+
+/* Enhanced Steps styling */
+.site-navigation-steps .ant-steps-item-icon {
+  width: 36px;
+  height: 36px;
+  line-height: 36px;
+  font-size: 16px;
+}
+
+.site-navigation-steps .ant-steps-item-title {
+  font-size: 14px;
+}
+
+/* Enhanced Button transitions */
+.p-button {
+  transition: all 0.2s ease;
+}
+
+.p-button:hover {
+  transform: translateY(-1px);
+}
+
+/* Enhanced card hover effects */
+.hover-card-effect {
+  transition: all 0.2s ease;
+}
+
+.hover-card-effect:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}

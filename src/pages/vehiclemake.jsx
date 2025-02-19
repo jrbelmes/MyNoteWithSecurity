@@ -7,6 +7,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
+import { sanitizeInput, validateInput } from '../utils/sanitize';
 
 const VehicleMakes = () => {
   const navigate = useNavigate();
@@ -108,6 +109,18 @@ const VehicleMakes = () => {
   };
 
   const handleSave = async () => {
+    const sanitizedName = sanitizeInput(formData.name);
+    
+    if (!sanitizedName.trim()) {
+      toast.error("Please enter a make name.");
+      return;
+    }
+
+    if (!validateInput(sanitizedName)) {
+      toast.error("Input contains invalid characters.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const response = await fetch('http://localhost/coc/gsd/update_master1.php', {
@@ -115,7 +128,7 @@ const VehicleMakes = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ operation: 'updateVehicleMake', id: formData.id, name: formData.name }),
+        body: JSON.stringify({ operation: 'updateVehicleMake', id: formData.id, name: sanitizedName }),
       });
 
       const data = await response.json();

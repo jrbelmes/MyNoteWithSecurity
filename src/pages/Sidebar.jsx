@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { Popover } from '@headlessui/react';
 import ProfileModal from './profile';  // Add this import
+import { clearAllExceptLoginAttempts } from '../utils/loginAttempts';
 
 const SidebarContext = createContext();
 
@@ -76,8 +77,23 @@ const Sidebar = () => {
   const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
 
   const handleLogout = () => {
+    // Save loginAttempts
+    const loginAttempts = localStorage.getItem('loginAttempts');
+    const url = localStorage.getItem('url');
+  
+    // Clear everything
     sessionStorage.clear();
     localStorage.clear();
+  
+    // Restore critical data
+    if (loginAttempts) {
+      localStorage.setItem('loginAttempts', loginAttempts);
+    }
+    if (url) {
+      localStorage.setItem('url', url);
+    }
+  
+    // Navigate to login
     navigate('/gsd');
     window.location.reload();
   };

@@ -21,6 +21,7 @@ import { Divider } from 'primereact/divider';
 import { Chip } from 'primereact/chip';
 import { IconField } from 'primereact/iconfield';
 import { InputIcon } from 'primereact/inputicon';
+import { sanitizeInput, validateInput } from '../utils/sanitize';
 
 const generateAvatarColor = (str) => {
     let hash = 0;
@@ -628,6 +629,10 @@ const Faculty = () => {
     );
 };
 
+
+
+
+
 const FacultyModal = ({ 
     show, 
     onHide, 
@@ -664,7 +669,8 @@ const FacultyModal = ({
     const [touchedFields, setTouchedFields] = useState({});
 
     // Password validation regex
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]*$/;
+    const passwordSingleSpecialCharRegex = /[!@#$%^&*]/g;
 
     // Modified validation rules
     const validateField = (name, value) => {
@@ -702,7 +708,15 @@ const FacultyModal = ({
             case 'users_password':
                 if (type === 'add' || (type === 'edit' && value)) {
                     if (!passwordRegex.test(value)) {
-                        return 'Password must contain at least 8 characters, including 1 uppercase, 1 lowercase, 1 number, and 1 special character';
+                        return 'Password must contain at least 8 characters, including 1 uppercase, 1 lowercase, and 1 number';
+                    }
+                    // Check for exactly one special character
+                    const specialCharCount = (value.match(passwordSingleSpecialCharRegex) || []).length;
+                    if (specialCharCount !== 1) {
+                        return 'Password must contain exactly 1 special character (!@#$%^&*)';
+                    }
+                    if (value.length < 8) {
+                        return 'Password must be at least 8 characters long';
                     }
                 }
                 return '';
@@ -728,21 +742,38 @@ const FacultyModal = ({
         }
     };
 
-    // Modified handleChange to include validation
+    // Modified handleChange to skip sanitization for password
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
         
-        // Check for duplicates when email or school ID changes
-        if (name === 'users_email') {
-            checkDuplicates('email', value);
-        } else if (name === 'users_school_id') {
-            checkDuplicates('schoolId', value);
+        if (name === 'users_password') {
+            // Don't sanitize password input
+            setFormData(prev => ({ ...prev, [name]: value }));
+        } else {
+            // Sanitize other inputs while allowing spaces
+            const sanitizedValue = sanitizeInput(value);
+            
+            // Only validate non-empty values
+            if (sanitizedValue && !validateInput(sanitizedValue)) {
+                toast.error('Invalid input detected');
+                return;
+            }
+            
+            setFormData(prev => ({ ...prev, [name]: sanitizedValue }));
         }
-
-        if (touchedFields[name]) {
-            const error = validateField(name, value);
-            setErrors(prev => ({ ...prev, [name]: error }));
+        
+        // Clear any existing errors while typing
+        setErrors(prev => ({
+            ...prev,
+            [name]: ''
+        }));
+        
+        // Reset duplicate fields while typing
+        if (name === 'users_email' || name === 'users_school_id') {
+            setDuplicateFields(prev => ({
+                ...prev,
+                [name === 'users_email' ? 'email' : 'schoolId']: false
+            }));
         }
     };
 
@@ -857,6 +888,17 @@ const FacultyModal = ({
     // Modified handleSubmit
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        // Validate all form inputs before submission (except password)
+        const isValid = Object.entries(formData).every(([key, value]) => {
+            if (key === 'users_middlename' || key === 'users_password') return true; // Skip password and optional fields
+            return validateInput(value);
+        });
+
+        if (!isValid) {
+            toast.error('Please check your inputs for invalid characters or patterns.');
+            return;
+        }
 
         // Email format validation
         const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
@@ -1329,7 +1371,7 @@ const FacultyModal = ({
                                 </Form.Control.Feedback>
                                 <Form.Text className="text-muted">
                                     Password must contain at least 8 characters, including 1 uppercase, 1 lowercase, 
-                                    1 number, and 1 special character.
+                                    1 number, and exactly 1 special character (!@#$%^&*).
                                 </Form.Text>
                             </Form.Group>
                         </div>

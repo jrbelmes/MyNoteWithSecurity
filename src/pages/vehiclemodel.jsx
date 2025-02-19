@@ -7,6 +7,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
+import { sanitizeInput, validateInput } from '../utils/sanitize';
 
 const VehicleModels = () => {
   const navigate = useNavigate();
@@ -168,17 +169,25 @@ const VehicleModels = () => {
   };
 
   const handleSave = async () => {
-    if (!formData.name.trim() || !formData.makeId || !formData.categoryId) {
+    const sanitizedName = sanitizeInput(formData.name);
+    
+    if (!sanitizedName.trim() || !formData.makeId || !formData.categoryId) {
       toast.error("Please fill in all fields.");
       return;
     }
+
+    if (!validateInput(sanitizedName)) {
+      toast.error("Input contains invalid characters.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const requestData = {
         operation: 'updateVehicleModel',
         modelData: {
           id: formData.id,
-          name: formData.name.trim(),
+          name: sanitizedName,
           make_id: parseInt(formData.makeId),
           category_id: parseInt(formData.categoryId)
         }
@@ -216,7 +225,7 @@ const VehicleModels = () => {
   };
 
   const handleSearchChange = (e) => {
-    const searchTerm = e.target.value.toLowerCase();
+    const searchTerm = sanitizeInput(e.target.value.toLowerCase());
     const results = models.filter(model =>
       model.vehicle_model_name.toLowerCase().includes(searchTerm) ||
       model.vehicle_make_name.toLowerCase().includes(searchTerm) ||

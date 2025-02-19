@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { Popover } from '@headlessui/react';
 import ProfileModal from './user_profile';  // Add this import
+import { clearAllExceptLoginAttempts } from '../../utils/loginAttempts';
 
 const SidebarContext = createContext();
 
@@ -62,8 +63,7 @@ const Sidebar = () => {
   const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
 
   const handleLogout = () => {
-    sessionStorage.clear();
-    localStorage.clear();
+    clearAllExceptLoginAttempts();
     navigate('/gsd');
     window.location.reload();
   };
@@ -113,9 +113,9 @@ const Sidebar = () => {
 
           <div className="flex-grow overflow-y-auto">
             <nav className="mt-5 px-2">
-              <SidebarItem icon={FaTachometerAlt} text="Dashboard" link="/adminDashboard" active={activeItem === '/usersDashboard'} />
+              <SidebarItem icon={FaTachometerAlt} text="Dashboard" link="/dashboard" active={activeItem === '/dashboard'} />
               <SidebarItem icon={FaCar} text="Make Reservation" link="/addReservation" active={activeItem === '/addReservation'} />
-              <SidebarItem icon={FaFileAlt} text="View Reservations" link="/ViewReserve" active={activeItem === '/ViewReserve'} />
+              <SidebarItem icon={FaFileAlt} text="View Reservations" link="/viewReserve" active={activeItem === '/viewReserve'} />
             </nav>
           </div>
 

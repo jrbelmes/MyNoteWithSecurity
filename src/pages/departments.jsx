@@ -7,6 +7,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
+import { sanitizeInput, validateInput } from '../utils/sanitize';
 
 const Departments = () => {
     const navigate = useNavigate();
@@ -82,17 +83,24 @@ const Departments = () => {
     };
 
     const handleSave = async () => {
-        if (!formData.name.trim()) {
+        const sanitizedName = sanitizeInput(formData.name);
+        if (!sanitizedName.trim()) {
             toast.error("Please enter a department name.");
             return;
         }
+        
+        if (!validateInput(sanitizedName)) {
+            toast.error("Invalid characters in department name.");
+            return;
+        }
+
         setIsSubmitting(true);
         try {
             const response = await axios.post('http://localhost/coc/gsd/update_master1.php', 
                 {
                     operation: 'updateDepartment',
                     id: formData.id,
-                    name: formData.name.trim()
+                    name: sanitizedName.trim()
                 },
                 {
                     headers: {
@@ -103,10 +111,10 @@ const Departments = () => {
 
             if (response.data.status === 'success') {
                 setDepartments(departments.map(dept => 
-                    dept.departments_id === formData.id ? { ...dept, departments_name: formData.name.trim() } : dept
+                    dept.departments_id === formData.id ? { ...dept, departments_name: sanitizedName.trim() } : dept
                 ));
                 setFilteredDepartments(filteredDepartments.map(dept => 
-                    dept.departments_id === formData.id ? { ...dept, departments_name: formData.name.trim() } : dept
+                    dept.departments_id === formData.id ? { ...dept, departments_name: sanitizedName.trim() } : dept
                 ));
                 toast.success('Department updated successfully!');
                 closeModal();
@@ -248,7 +256,7 @@ const Departments = () => {
                             <Form.Control
                                 type="text"
                                 value={formData.name}
-                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                onChange={(e) => setFormData({ ...formData, name: sanitizeInput(e.target.value) })}
                                 className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                         </Form.Group>

@@ -14,6 +14,7 @@ import { Tag } from 'primereact/tag';
 import { Divider } from 'primereact/divider';
 import { Modal, Form, Input, Upload } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
+import { sanitizeInput, validateInput } from '../utils/sanitize';
 
 const EquipmentEntry = () => {
     const adminId = localStorage.getItem('adminId') || '';
@@ -122,7 +123,32 @@ const EquipmentEntry = () => {
         }
     };
 
+    const handleEquipmentNameChange = (e) => {
+        const sanitized = sanitizeInput(e.target.value);
+        if (!validateInput(sanitized)) {
+            toast.error('Invalid input detected. Please avoid special characters and scripts.');
+            return;
+        }
+        setNewEquipmentName(sanitized);
+        form.setFieldsValue({ equipmentName: sanitized });
+    };
+
+    const handleEquipmentQuantityChange = (e) => {
+        const sanitized = sanitizeInput(e.target.value);
+        if (!/^\d*$/.test(sanitized)) {
+            toast.error('Please enter only numbers for quantity.');
+            return;
+        }
+        setNewEquipmentQuantity(sanitized);
+        form.setFieldsValue({ equipmentQuantity: sanitized });
+    };
+
     const handleSubmit = async () => {
+        if (!validateInput(newEquipmentName)) {
+            toast.error('Equipment name contains invalid characters.');
+            return;
+        }
+
         if (!newEquipmentName || !newEquipmentQuantity || !selectedCategory || !selectedStatus) {
             toast.error("All fields are required!");
             return;
@@ -483,7 +509,7 @@ const EquipmentEntry = () => {
                             >
                                 <Input
                                     value={newEquipmentName}
-                                    onChange={(e) => setNewEquipmentName(e.target.value)}
+                                    onChange={handleEquipmentNameChange}
                                     placeholder="Enter equipment name"
                                 />
                             </Form.Item>
@@ -496,7 +522,7 @@ const EquipmentEntry = () => {
                                 <Input
                                     type="number"
                                     value={newEquipmentQuantity}
-                                    onChange={(e) => setNewEquipmentQuantity(e.target.value)}
+                                    onChange={handleEquipmentQuantityChange}
                                     placeholder="Enter quantity"
                                 />
                             </Form.Item>

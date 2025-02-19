@@ -4,14 +4,19 @@ import axios from 'axios';
 import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 import { FaEye, FaEyeSlash, FaLock, FaUser, FaCalculator, FaCalendarCheck, FaChartLine, FaClock } from 'react-icons/fa';
 import toast, { Toaster } from 'react-hot-toast';
+import { 
+    getLoginAttempts, 
+    setLoginAttempts, 
+    clearAllExceptLoginAttempts, 
+    isAccountLocked,
+    incrementLoginAttempts,
+    resetLoginAttempts 
+} from '../utils/loginAttempts';
 
 function Logins() {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
-    const [captchaNum1, setCaptchaNum1] = useState(Math.floor(Math.random() * 10));
-    const [captchaNum2, setCaptchaNum2] = useState(Math.floor(Math.random() * 10));
-    const [captchaAnswer, setCaptchaAnswer] = useState("");
     const [isCaptchaCorrect, setIsCaptchaCorrect] = useState(null);
     const [showPassword, setShowPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
@@ -20,6 +25,12 @@ function Logins() {
     const [isHovering, setIsHovering] = useState(false);
     const controls = useAnimation();
     const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [isLocked, setIsLocked] = useState(false);
+    const [lockoutTime, setLockoutTime] = useState(0);
+    const [blockedUsername, setBlockedUsername] = useState('');
+    const [captchaText, setCaptchaText] = useState('');
+    const [userCaptchaInput, setUserCaptchaInput] = useState('');
+    const [captchaCanvasRef] = useState(React.createRef());
 
     useEffect(() => {
         if (localStorage.getItem('loggedIn') === 'true') {
@@ -44,16 +55,65 @@ function Logins() {
     }, [controls, navigateTo]);
 
     const generateCaptcha = () => {
-        setCaptchaNum1(Math.floor(Math.random() * 10));
-        setCaptchaNum2(Math.floor(Math.random() * 10));
-        setCaptchaAnswer("");
+        const canvas = captchaCanvasRef.current;
+        const ctx = canvas.getContext('2d');
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+        let captcha = '';
+
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Set gradient background
+        const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+        gradient.addColorStop(0, '#f0fdf4');
+        gradient.addColorStop(1, '#dcfce7');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Set fixed font properties
+        ctx.font = '36px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        // Calculate character spacing
+        const charWidth = canvas.width / 8;
+        const startX = charWidth;
+        const centerY = canvas.height / 2;
+
+        // Generate and draw characters
+        for (let i = 0; i < 6; i++) {
+            const char = chars.charAt(Math.floor(Math.random() * chars.length));
+            captcha += char;
+            
+            // Slightly randomize color for each character
+            const hue = Math.floor(Math.random() * 360);
+            ctx.fillStyle = `hsl(${hue}, 50%, 30%)`; // Using HSL for better contrast
+
+            // Draw character at fixed position with slight vertical variation
+            const x = startX + (i * charWidth);
+            const y = centerY + (Math.random() * 6 - 3); // Small vertical variation (-3 to +3 pixels)
+            ctx.fillText(char, x, y);
+        }
+
+        // Add subtle noise/lines in background (optional)
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 10; i++) {
+            ctx.beginPath();
+            ctx.moveTo(Math.random() * canvas.width, 0);
+            ctx.lineTo(Math.random() * canvas.width, canvas.height);
+            ctx.stroke();
+        }
+
+        setCaptchaText(captcha);
+        setUserCaptchaInput('');
         setIsCaptchaCorrect(null);
     };
 
-    const handleCaptchaChange = (e) => {
-        const userAnswer = e.target.value;
-        setCaptchaAnswer(userAnswer);
-        setIsCaptchaCorrect(userAnswer == (captchaNum1 + captchaNum2));
+    const handleCaptchaInput = (e) => {
+        const input = e.target.value;
+        setUserCaptchaInput(input);
+        setIsCaptchaCorrect(input === captchaText);
     };
 
     const notify = (message, type = 'success') => {
@@ -72,112 +132,196 @@ function Logins() {
         });
     };
 
-    const handleLogin = async (e) => {
-        e.preventDefault();
-        if (!username || !password || isCaptchaCorrect === null) {
-            toast.error("Please fill in all fields and solve the CAPTCHA.");
+    const checkLoginAttempts = (username) => {
+        const attempts = getLoginAttempts();
+        const userAttempts = attempts[username] || { count: 0, timestamp: null };
+        
+        if (userAttempts.count >= 3 && userAttempts.timestamp) {
+            const lockoutEndTime = new Date(userAttempts.timestamp).getTime() + (10 * 60 * 1000);
+            const currentTime = new Date().getTime();
+            
+            if (currentTime < lockoutEndTime) {
+                const remainingTime = Math.ceil((lockoutEndTime - currentTime) / 1000);
+                setLockoutTime(remainingTime);
+                setBlockedUsername(username);
+                return false;
+            } else {
+                // Reset attempts after lockout period
+                attempts[username] = { count: 0, timestamp: null };
+                setLoginAttempts(attempts);
+            }
+        }
+        return true;
+    };
+
+    const updateLoginAttempts = (username, isSuccessful) => {
+        const attempts = getLoginAttempts();
+        
+        if (isSuccessful) {
+            attempts[username] = { count: 0, timestamp: null };
+        } else {
+            const userAttempts = attempts[username] || { count: 0, timestamp: null };
+            userAttempts.count += 1;
+            if (userAttempts.count >= 3) {
+                userAttempts.timestamp = new Date().toISOString();
+            }
+            attempts[username] = userAttempts;
+        }
+        
+        setLoginAttempts(attempts);
+    };
+
+    const handleUsernameChange = (e) => {
+        const input = e.target.value;
+        
+        if (isAccountLocked(input)) {
+            const attempts = getLoginAttempts();
+            const userAttempts = attempts[input];
+            const lockoutEndTime = new Date(userAttempts.timestamp).getTime() + (10 * 60 * 1000);
+            const currentTime = new Date().getTime();
+            const remainingTime = Math.ceil((lockoutEndTime - currentTime) / 1000);
+            const minutes = Math.floor(remainingTime / 60);
+            const seconds = remainingTime % 60;
+            notify(`This account is locked. Please try again in ${minutes}:${seconds.toString().padStart(2, '0')} minutes`, 'error');
             return;
         }
-        if (!isCaptchaCorrect) {
-            toast.error("Incorrect CAPTCHA. Please try again.");
-            generateCaptcha();
+        setUsername(input);
+    };
+
+    const handlePasswordChange = (e) => {
+        setPassword(e.target.value);
+    };
+
+    const handleLogin = async (e) => {
+        e.preventDefault();
+
+        if (isAccountLocked(username)) {
+            const attempts = getLoginAttempts();
+            const userAttempts = attempts[username];
+            const lockoutEndTime = new Date(userAttempts.timestamp).getTime() + (10 * 60 * 1000);
+            const currentTime = new Date().getTime();
+            const remainingTime = Math.ceil((lockoutEndTime - currentTime) / 1000);
+            const minutes = Math.floor(remainingTime / 60);
+            const seconds = remainingTime % 60;
+            notify(`Account locked. Please try again in ${minutes}:${seconds.toString().padStart(2, '0')} minutes`, 'error');
+            return;
+        }
+
+        if (!username || !password || !isCaptchaCorrect) {
+            notify("Please fill in all fields and complete the CAPTCHA correctly.", 'error');
             return;
         }
 
         setLoading(true);
 
-        const url = `${localStorage.getItem("url")}login.php`;
-        if (!url) {
-            toast.error("Invalid URL.");
-            setLoading(false);
-            return;
-        }
-
         try {
-            const response = await axios.post(url, 
-                {
-                    operation: "login",
-                    json: {
-                        username: username,
-                        password: password
-                    }
-                },
-                {
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
+            const response = await axios.post(`${localStorage.getItem("url")}login.php`, {
+                operation: "login",
+                json: { 
+                    username: username, 
+                    password: password 
                 }
-            );
+            });
 
-            if (response.data) {
-                const user = response.data;
+            const user = response.data;
+            
+            if (user.status === "success" && user.data) {
+                const userData = user.data;
                 
-                if (user.status === "success" && user.data) {
-                    const userData = user.data;
-                    
-                    // Set common localStorage items
-                    localStorage.setItem("user_id", userData.user_id);
-                    localStorage.setItem("name", `${userData.firstname} ${userData.middlename} ${userData.lastname}`.trim());
-                    localStorage.setItem("school_id", userData.school_id);
-                    localStorage.setItem("contact_number", userData.contact_number);
-                    localStorage.setItem("user_level", userData.user_level_name);
-                    localStorage.setItem("user_level_id", userData.user_level_id);
-                    localStorage.setItem("department_id", userData.department_id);
-                    localStorage.setItem("profile_pic", userData.profile_pic || "");
-                    localStorage.setItem("loggedIn", "true");
-
-                    // Add session storage items
-                    sessionStorage.setItem("user_id", userData.user_id);
-                    sessionStorage.setItem("name", `${userData.firstname} ${userData.middlename} ${userData.lastname}`.trim());
-                    sessionStorage.setItem("school_id", userData.school_id);
-                    sessionStorage.setItem("contact_number", userData.contact_number);
-                    sessionStorage.setItem("user_level", userData.user_level_name);
-                    sessionStorage.setItem("user_level_id", userData.user_level_id);
-                    sessionStorage.setItem("department_id", userData.department_id);
-                    sessionStorage.setItem("profile_pic", userData.profile_pic || "");
-                    sessionStorage.setItem("loggedIn", "true");
-
-                    if (userData.user_level_name === "Super Admin") {
-                        notify("Super Admin Login Successful");
-                        navigateTo("/adminDashboard");
-                    } else if (userData.user_level_name === "Personnel") {
-                        notify("Personnel Login Successful");
-                        navigateTo("/personeldashboard");
-                    } else if (userData.user_level_name === "Admin") {
-                        notify("Personnel Login Successful");
-                        navigateTo("/adminDashboard");
-                    }else if (userData.user_level_name === "Dean") {
-                        notify("Dean Login Successful");
-                        navigateTo("/deanDashboard");
-                    }else {
-                        notify("User Login Successful");
-                        navigateTo("/dashboard");
-                    }
-
-                    // Handle "Remember Me" functionality
-                    if (rememberMe) {
-                        localStorage.setItem("rememberedUsername", username);
-                    } else {
-                        localStorage.removeItem("rememberedUsername");
-                    }
+                resetLoginAttempts(username);
+                clearAllExceptLoginAttempts();
+            
+                // Set localStorage items
+                localStorage.setItem("user_id", userData.user_id);
+                localStorage.setItem("name", `${userData.firstname} ${userData.middlename} ${userData.lastname}`.trim());
+                localStorage.setItem("school_id", userData.school_id);
+                localStorage.setItem("contact_number", userData.contact_number);
+                localStorage.setItem("user_level", userData.user_level_name);
+                localStorage.setItem("user_level_id", userData.user_level_id);
+                localStorage.setItem("department_id", userData.department_id);
+                localStorage.setItem("profile_pic", userData.profile_pic || "");
+                localStorage.setItem("loggedIn", "true");
+            
+                // Set sessionStorage items
+                sessionStorage.setItem("user_id", userData.user_id);
+                sessionStorage.setItem("name", `${userData.firstname} ${userData.middlename} ${userData.lastname}`.trim());
+                sessionStorage.setItem("school_id", userData.school_id);
+                sessionStorage.setItem("contact_number", userData.contact_number);
+                sessionStorage.setItem("user_level", userData.user_level_name);
+                sessionStorage.setItem("user_level_id", userData.user_level_id);
+                sessionStorage.setItem("department_id", userData.department_id);
+                sessionStorage.setItem("profile_pic", userData.profile_pic || "");
+                sessionStorage.setItem("loggedIn", "true");
+            
+                // Handle "Remember Me" functionality
+                if (rememberMe) {
+                    localStorage.setItem("rememberedUsername", username);
                 } else {
-                    const newAttempts = loginAttempts + 1;
-                    setLoginAttempts(newAttempts);
-                    if (newAttempts >= 3) {
-                        notify("Too many failed attempts. Please try again later.", 'error');
-                        setTimeout(() => setLoginAttempts(0), 300000); // Reset after 5 minutes
-                    } else {
-                        notify("Invalid Credentials", 'error');
-                    }
+                    localStorage.removeItem("rememberedUsername");
+                }
+            
+                // Navigate based on user level
+                if (userData.user_level_name === "Super Admin") {
+                    notify("Super Admin Login Successful");
+                    navigateTo("/adminDashboard");
+                } else if (userData.user_level_name === "Personnel") {
+                    notify("Personnel Login Successful");
+                    navigateTo("/personeldashboard");
+                } else if (userData.user_level_name === "Admin") {
+                    notify("Admin Login Successful");
+                    navigateTo("/adminDashboard");
+                } else if (userData.user_level_name === "Dean") {
+                    notify("Dean Login Successful");
+                    navigateTo("/deanDashboard");
+                } else {
+                    notify("User Login Successful");
+                    navigateTo("/dashboard");
+                }
+            } else {
+                const attempts = incrementLoginAttempts(username);
+                if (attempts.count >= 3) {
+                    notify(`Account locked for 10 minutes due to too many failed attempts.`, 'error');
+                } else {
+                    notify(`Invalid credentials. ${3 - attempts.count} attempts remaining.`, 'error');
                 }
             }
         } catch (error) {
-            console.error("Login error:", error.response ? error.response.data : error.message);
-            toast.error("Something went wrong. Please try again.");
+            const attempts = incrementLoginAttempts(username);
+            if (attempts.count >= 3) {
+                notify(`Account locked for 10 minutes due to too many failed attempts.`, 'error');
+            } else {
+                notify(`Login failed. ${3 - attempts.count} attempts remaining.`, 'error');
+            }
         } finally {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        let interval;
+        if (isLocked && lockoutTime > 0) {
+            interval = setInterval(() => {
+                setLockoutTime(time => {
+                    if (time <= 1) {
+                        setIsLocked(false);
+                        return 0;
+                    }
+                    return time - 1;
+                });
+            }, 1000);
+        }
+        return () => clearInterval(interval);
+    }, [isLocked, lockoutTime]);
+
+    useEffect(() => {
+        if (username === blockedUsername) {
+            const attempts = JSON.parse(localStorage.getItem('loginAttempts') || '{}');
+            const userAttempts = attempts[username] || { count: 0, timestamp: null };
+            if (userAttempts.timestamp) {
+                checkLoginAttempts(username);
+            }
+        }
+    }, [username]);
 
     const featureVariants = {
         hidden: { opacity: 0, y: 20 },
@@ -377,6 +521,15 @@ function Logins() {
                             </div>
                             <div className='p-8'>
                                 <form onSubmit={handleLogin} className='space-y-6'>
+                                    {isLocked && (
+                                        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
+                                            <strong className="font-bold">Account Locked!</strong>
+                                            <p className="block sm:inline">
+                                                Please try again in {Math.floor(lockoutTime / 60)}:
+                                                {(lockoutTime % 60).toString().padStart(2, '0')} minutes
+                                            </p>
+                                        </div>
+                                    )}
                                     <div className='space-y-2'>
                                         <label className='text-sm font-medium text-gray-700' htmlFor='username'>
                                             Username
@@ -387,12 +540,13 @@ function Logins() {
                                             </div>
                                             <input 
                                                 value={username} 
-                                                onChange={(e) => setUsername(e.target.value)} 
-                                                className='block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm transition duration-150 ease-in-out' 
+                                                onChange={handleUsernameChange} 
+                                                className={`block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm transition duration-150 ease-in-out ${isAccountLocked(username) ? 'bg-red-50 border-red-300' : ''}`} 
                                                 id='username' 
                                                 type='text'
                                                 placeholder='Enter your username' 
                                                 required 
+                                                disabled={isLocked}
                                             />
                                         </div>
                                     </div>
@@ -407,7 +561,7 @@ function Logins() {
                                             </div>
                                             <input 
                                                 value={password} 
-                                                onChange={(e) => setPassword(e.target.value)} 
+                                                onChange={handlePasswordChange} 
                                                 className='block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm transition duration-150 ease-in-out' 
                                                 id='password' 
                                                 type={showPassword ? 'text' : 'password'} 
@@ -426,40 +580,51 @@ function Logins() {
 
                                     <div className='space-y-2'>
                                         <label className='text-sm font-medium text-gray-700'>
-                                            Math CAPTCHA
+                                            Security Verification
                                         </label>
-                                        <div className='flex items-center space-x-2 bg-green-50 p-3 rounded-md'>
-                                            <FaCalculator className='text-green-500' />
-                                            <span>{captchaNum1} + {captchaNum2} = ?</span>
-                                            <input 
-                                                value={captchaAnswer}
-                                                onChange={handleCaptchaChange}
-                                                className={`w-20 px-2 py-1 border ${isCaptchaCorrect === false ? 'border-red-500' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm transition duration-150 ease-in-out`}
-                                                placeholder='Answer'
-                                            />
+                                        <div className='space-y-3'>
+                                            <div className='relative bg-white rounded-lg shadow-sm border border-gray-200 p-4'>
+                                                <canvas
+                                                    ref={captchaCanvasRef}
+                                                    width="280"
+                                                    height="80"
+                                                    className='bg-white rounded-md'
+                                                />
+                                                <motion.button
+                                                    whileHover={{ scale: 1.05 }}
+                                                    whileTap={{ scale: 0.95 }}
+                                                    onClick={generateCaptcha}
+                                                    type="button"
+                                                    className='absolute top-2 right-2 p-2 text-green-600 hover:text-green-700 rounded-full hover:bg-green-50 transition-colors'
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                                                    </svg>
+                                                </motion.button>
+                                            </div>
+                                            <div className='relative rounded-md shadow-sm'>
+                                                <input
+                                                    type="text"
+                                                    value={userCaptchaInput}
+                                                    onChange={handleCaptchaInput}
+                                                    className={`block w-full px-4 py-2 border ${
+                                                        isCaptchaCorrect === false ? 'border-red-500' : 
+                                                        isCaptchaCorrect === true ? 'border-green-500' : 
+                                                        'border-gray-300'
+                                                    } rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors`}
+                                                    placeholder='Enter the characters above'
+                                                />
+                                                {isCaptchaCorrect === false && (
+                                                    <motion.p
+                                                        initial={{ opacity: 0, y: -10 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        className='absolute text-xs text-red-500 mt-1'
+                                                    >
+                                                        Incorrect CAPTCHA. Please try again.
+                                                    </motion.p>
+                                                )}
+                                            </div>
                                         </div>
-                                        <AnimatePresence>
-                                            {isCaptchaCorrect === false && (
-                                                <motion.p 
-                                                    initial={{ opacity: 0, y: -10 }}
-                                                    animate={{ opacity: 1, y: 0 }}
-                                                    exit={{ opacity: 0, y: -10 }}
-                                                    className='text-red-500 text-xs'
-                                                >
-                                                    Incorrect answer.
-                                                </motion.p>
-                                            )}
-                                            {isCaptchaCorrect === true && (
-                                                <motion.p 
-                                                    initial={{ opacity: 0, y: -10 }}
-                                                    animate={{ opacity: 1, y: 0 }}
-                                                    exit={{ opacity: 0, y: -10 }}
-                                                    className='text-green-500 text-xs'
-                                                >
-                                                    Correct!
-                                                </motion.p>
-                                            )}
-                                        </AnimatePresence>
                                     </div>
 
                                     <div className='flex items-center'>

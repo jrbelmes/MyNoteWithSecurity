@@ -1,28 +1,63 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Dialog } from '@headlessui/react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Dialog } from '@headlessui/react';  // Update this line - import Dialog directly
 import axios from 'axios';
 import { format, isSameDay } from 'date-fns';
 import { toast } from 'react-toastify';
-import { DatePicker, TimePicker, Alert, Space } from 'antd';
+import { DatePicker, TimePicker, Spin, Space } from 'antd';
+import { CheckCircleOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import moment from 'moment';
 const { RangePicker } = DatePicker;
 
 const themeColors = {
-  primary: '#2E7D32',
-  secondary: '#4CAF50',
-  light: '#E8F5E9',
-  white: '#FFFFFF',
-  success: '#388E3C',
-  warning: '#FFA000',
-  error: '#D32F2F',
-  text: '#2C3E50'
+  primary: {
+    light: '#E3F2FD',
+    main: '#2196F3',
+    dark: '#1976D2',
+    contrastText: '#FFFFFF'
+  },
+  secondary: {
+    light: '#E8F5E9',
+    main: '#4CAF50',
+    dark: '#2E7D32',
+    contrastText: '#FFFFFF'
+  },
+  error: {
+    light: '#FFEBEE',
+    main: '#F44336',
+    dark: '#C62828',
+    contrastText: '#FFFFFF'
+  },
+  success: {
+    light: '#E8F5E9',
+    main: '#4CAF50',
+    dark: '#2E7D32',
+    contrastText: '#FFFFFF'
+  }
 };
 
-// Resource colors mapping
-const resourceColors = {
-  venue: 'bg-emerald-200 text-emerald-800',
-  vehicle: 'bg-purple-200 text-purple-800'
+// Update the availabilityStatus object to include partial state
+const availabilityStatus = {
+  available: {
+    className: 'bg-gradient-to-r from-green-50 to-green-100 hover:from-green-100 hover:to-green-200',
+    hoverClass: 'hover:shadow-md hover:scale-[1.02]',
+    textClass: 'text-green-800'
+  },
+  partial: {
+    className: 'bg-gradient-to-r from-yellow-50 to-yellow-100',
+    hoverClass: 'hover:shadow-md hover:scale-[1.02]',
+    textClass: 'text-yellow-800'
+  },
+  reserved: {
+    className: 'bg-gradient-to-r from-red-50 to-red-100',
+    hoverClass: 'cursor-not-allowed',
+    textClass: 'text-red-800'
+  },
+  full: {  
+    className: 'bg-gradient-to-r from-red-50 to-red-100',
+    hoverClass: 'cursor-not-allowed',
+    textClass: 'text-red-800'
+  }
 };
 
 const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
@@ -46,17 +81,28 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
     message: ''
   });
 
+  const [isLoading, setIsLoading] = useState(false);
+
+  const [isSelectionComplete, setIsSelectionComplete] = useState(false);
+
+  const [conflictDetails, setConflictDetails] = useState(null);
+  const [showConflictModal, setShowConflictModal] = useState(false);
+
   useEffect(() => {
     fetchReservations();
   }, [selectedResource]);
+
   const fetchReservations = async () => {
+    setIsLoading(true);
     try {
       const response = await axios.post(
         'http://localhost/coc/gsd/user.php',
         {
           operation: 'fetchAvailability',
           itemType: selectedResource.type,
-          itemId: selectedResource.type === 'venue' ? selectedResource.id : selectedResource.id[0]
+          itemId: selectedResource.type === 'venue' 
+            ? selectedResource.id 
+            : selectedResource.id  // Now this will be an array for vehicles
         },
         {
           headers: {
@@ -64,22 +110,25 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
           }
         }
       );
-      
-
+  
       if (response.data.status === 'success') {
-        // Format reservations data
+        // Format reservations data, now grouping by vehicle
         const formattedReservations = response.data.data.map(res => ({
           id: res.reservation_form_venue_id || res.reservation_form_vehicle_id,
           startDate: new Date(res.reservation_form_start_date),
           endDate: new Date(res.reservation_form_end_date),
-          name: res.ven_name || res.vehicle_license,
+          vehicleId: res.vehicle_id, // Add vehicle ID
+          vehicleLicense: res.vehicle_license, // Add vehicle license
           status: res.reservation_status_status_reservation_id,
           isReserved: res.reservation_status_status_reservation_id === '3'
         }));
         setReservations(formattedReservations);
       }
     } catch (error) {
-      console.error('Error fetching reservations:', error);
+      toast.error('Failed to fetch reservations');
+      console.error('Error:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -160,268 +209,392 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
     console.log('Reservation clicked:', reservation);
   };
 
-  const getDateAvailabilityClass = (date, reservations) => {
-    const currentDate = new Date(date);
-    currentDate.setHours(0, 0, 0, 0);
-    
-    // Check if the entire day (8am-5pm) is reserved
-    const hoursToCheck = Array.from({ length: 10 }, (_, i) => i + 8); // 8 AM to 5 PM
-    
-    const reservedHours = hoursToCheck.filter(hour => {
-      const timeSlot = new Date(currentDate);
-      timeSlot.setHours(hour);
-      return reservations.some(res => {
-        const start = new Date(res.startDate);
-        const end = new Date(res.endDate);
-        return timeSlot >= start && timeSlot <= end && res.isReserved;
+// First, update the getAvailabilityStatus function to always return one of our defined statuses
+const getAvailabilityStatus = (date, allReservations) => {
+  const businessStart = new Date(date);
+  businessStart.setHours(8, 0, 0, 0);
+  const businessEnd = new Date(date);
+  businessEnd.setHours(17, 0, 0, 0);
+
+  // Check for full day reservation first (8AM-5PM)
+  const hasFullDayReservation = allReservations.some(res => 
+    isSameDay(new Date(res.startDate), date) &&
+    new Date(res.startDate).getHours() <= 8 &&
+    new Date(res.endDate).getHours() >= 17 &&
+    res.isReserved
+  );
+
+  if (hasFullDayReservation) {
+    return 'full';
+  }
+
+  if (selectedResource.type === 'vehicle') {
+    // Count reservations for each selected vehicle
+    const vehicleReservations = {};
+    selectedResource.id.forEach(vehicleId => {
+      vehicleReservations[vehicleId] = allReservations.filter(res => 
+        res.vehicleId === vehicleId.toString() &&
+        res.isReserved && 
+        isSameDay(date, new Date(res.startDate))
+      );
+    });
+
+    // Check if all vehicles are fully reserved for the entire day
+    const allVehiclesFullyReserved = selectedResource.id.every(vehicleId => 
+      vehicleReservations[vehicleId].some(res => {
+        const resStart = new Date(res.startDate);
+        const resEnd = new Date(res.endDate);
+        return resStart.getHours() <= 8 && resEnd.getHours() >= 17;
+      })
+    );
+
+    if (allVehiclesFullyReserved) {
+      return 'full';
+    }
+
+    // Check if any vehicle has any reservation
+    const anyVehicleReserved = selectedResource.id.some(vehicleId => 
+      vehicleReservations[vehicleId].length > 0
+    );
+
+    return anyVehicleReserved ? 'partial' : 'available';
+  } else {
+    // Venue logic
+    const dayReservations = allReservations.filter(res => {
+      const resStart = new Date(res.startDate);
+      const resEnd = new Date(res.endDate);
+      return (
+        res.isReserved && 
+        isSameDay(date, new Date(res.startDate))
+      );
+    });
+
+    if (dayReservations.length === 0) return 'available';
+
+    // Check if any reservation spans the entire business day
+    const hasFullDayVenueReservation = dayReservations.some(res => {
+      const resStart = new Date(res.startDate);
+      const resEnd = new Date(res.endDate);
+      return resStart.getHours() <= 8 && resEnd.getHours() >= 17;
+    });
+
+    return hasFullDayVenueReservation ? 'full' : 'partial';
+  }
+};
+
+// Then update the renderCalendarGrid function to handle the status more safely
+const renderCalendarGrid = () => {
+  const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+  const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+  
+  const days = [];
+  const startDay = startOfMonth.getDay();
+  const totalDays = endOfMonth.getDate();
+  
+  // Add previous month's days
+  for (let i = 0; i < startDay; i++) {
+    const prevDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), -i);
+    days.unshift(prevDate);
+  }
+  
+  // Add current month's days
+  for (let i = 1; i <= totalDays; i++) {
+    days.push(new Date(currentDate.getFullYear(), currentDate.getMonth(), i));
+  }
+  
+  // Add next month's days to complete the grid
+  const remainingDays = 42 - days.length; // 6 rows × 7 days
+  for (let i = 1; i <= remainingDays; i++) {
+    days.push(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, i));
+  }
+
+  return (
+    <motion.div className="grid grid-cols-7 gap-1">
+      {days.map((day, index) => {
+        const isCurrentMonth = day.getMonth() === currentDate.getMonth();
+        const status = getAvailabilityStatus(day, reservations);
+        const statusStyle = availabilityStatus[status];
+
+        return (
+          <motion.div
+            key={day.toISOString()}
+            className={`
+              min-h-[100px] p-2 border rounded-lg
+              ${isCurrentMonth ? statusStyle.className : 'bg-gray-100 text-gray-400'}
+              ${statusStyle.hoverClass}
+            `}
+          >
+            <div className="flex justify-between items-start">
+              <span className={`text-sm font-medium ${isCurrentMonth ? statusStyle.textClass : ''}`}>
+                {format(day, 'd')}
+              </span>
+            </div>
+          </motion.div>
+        );
+      })}
+    </motion.div>
+  );
+};
+
+// Update getTimeSlotAvailability for better multiple vehicle handling
+const getTimeSlotAvailability = (date, hour, allReservations) => {
+  if (hour < 8 || hour >= 17) return 'outside';
+
+  const slotStart = new Date(date);
+  slotStart.setHours(hour, 0, 0, 0);
+  const slotEnd = new Date(date);
+  slotEnd.setHours(hour + 1, 0, 0, 0);
+
+  if (selectedResource.type === 'vehicle') {
+    // Check if all vehicles are reserved for this time slot
+    const allVehiclesReserved = selectedResource.id.every(vehicleId => {
+      const vehicleReservations = allReservations.filter(res => 
+        res.vehicleId === vehicleId.toString() &&
+        res.isReserved &&
+        isSameDay(date, new Date(res.startDate))
+      );
+
+      return vehicleReservations.some(res => {
+        const resStart = new Date(res.startDate);
+        const resEnd = new Date(res.endDate);
+        return (
+          (slotStart >= resStart && slotStart < resEnd) ||
+          (slotEnd > resStart && slotEnd <= resEnd) ||
+          (slotStart <= resStart && slotEnd >= resEnd)
+        );
       });
     });
+
+    if (allVehiclesReserved) {
+      return 'full';
+    }
+
+    // Check if any vehicle is reserved
+    const anyVehicleReserved = selectedResource.id.some(vehicleId => {
+      const vehicleReservations = allReservations.filter(res => 
+        res.vehicleId === vehicleId.toString() &&
+        res.isReserved &&
+        isSameDay(date, new Date(res.startDate))
+      );
+
+      return vehicleReservations.some(res => {
+        const resStart = new Date(res.startDate);
+        const resEnd = new Date(res.endDate);
+        return (
+          (slotStart >= resStart && slotStart < resEnd) ||
+          (slotEnd > resStart && slotEnd <= resEnd) ||
+          (slotStart <= resStart && slotEnd >= resEnd)
+        );
+      });
+    });
+
+    return anyVehicleReserved ? 'partial' : 'available';
+  } else {
+    // Existing venue logic remains the same
+    const dayReservations = allReservations.filter(res => {
+      const resStart = new Date(res.startDate);
+      const resEnd = new Date(res.endDate);
+      return isSameDay(date, resStart) && res.isReserved;
+    });
+
+    // Check for full-day reservation first (8AM-5PM)
+    const hasFullDayReservation = dayReservations.some(res => {
+      const resStart = new Date(res.startDate);
+      const resEnd = new Date(res.endDate);
+      return resStart.getHours() === 8 && 
+             resStart.getMinutes() === 0 && 
+             resEnd.getHours() === 17 && 
+             resEnd.getMinutes() === 0;
+    });
+
+    if (hasFullDayReservation) {
+      return 'full';
+    }
+
+    // Check if this specific time slot is within any reservation
+    const isReserved = dayReservations.some(res => {
+      const resStart = new Date(res.startDate);
+      const resEnd = new Date(res.endDate);
+      const slotEnd = new Date(slotStart);
+      slotEnd.setHours(hour + 1, 0, 0, 0);
+      return slotStart >= resStart && slotStart < resEnd;
+    });
+
+    return isReserved ? 'reserved' : 'available';
+  }
+};
+
+// Update the color classes for better visibility
+// Update getTimeSlotClass to use red instead of yellow
+const getTimeSlotClass = (date, hour, reservations) => {
+  const status = getTimeSlotAvailability(date, hour, reservations);
   
-    if (reservedHours.length === 0) {
-      return 'bg-green-200 hover:bg-green-300'; // Fully available
-    } else if (reservedHours.length === hoursToCheck.length) {
-      return 'bg-red-200 hover:bg-red-300'; // Fully reserved
-    } else {
-      return 'bg-yellow-200 hover:bg-yellow-300'; // Partially reserved
-    }
-  };
+  switch (status) {
+    case 'outside':
+      return 'bg-gray-100';
+    case 'full':
+    case 'partial':
+    case 'reserved':
+      return 'bg-red-200 cursor-not-allowed';
+    case 'available':
+      return 'bg-green-100 hover:bg-green-200';
+    default:
+      return 'bg-gray-100';
+  }
+};
 
-  const getTimeSlotAvailability = (date, hour, reservations) => {
-    return reservations.some(res => {
-      const start = new Date(res.startDate);
-      const end = new Date(res.endDate);
-      const slotStart = new Date(date.setHours(hour, 0, 0, 0));
-      const slotEnd = new Date(date.setHours(hour + 1, 0, 0, 0));
-      return slotStart >= start && slotEnd <= end && res.isReserved;
-    });
-  };
+// Update the date availability class for consistency
+// Update getDateAvailabilityClass to use red instead of yellow
+const getDateAvailabilityClass = (date, reservations) => {
+  const status = getAvailabilityStatus(date, reservations);
+  switch (status) {
+    case 'full':
+    case 'partial':
+    case 'reserved':
+      return 'bg-red-100 hover:bg-red-200';
+    case 'available':
+      return 'bg-green-50 hover:bg-green-100';
+    default:
+      return 'bg-gray-50';
+  }
+};
 
-  const renderCalendarGrid = () => {
-    const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-    const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-    
-    const days = [];
-    const startDay = startOfMonth.getDay();
-    const totalDays = endOfMonth.getDate();
-    
-    // Add previous month's days
-    for (let i = 0; i < startDay; i++) {
-      const prevDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), -i);
-      days.unshift(prevDate);
-    }
-    
-    // Add current month's days
-    for (let i = 1; i <= totalDays; i++) {
-      days.push(new Date(currentDate.getFullYear(), currentDate.getMonth(), i));
-    }
-    
-    // Add next month's days to complete the grid
-    const remainingDays = 42 - days.length; // 6 rows × 7 days
-    for (let i = 1; i <= remainingDays; i++) {
-      days.push(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, i));
-    }
+// Update renderWeekView with enhanced full-day indication
+const renderWeekView = () => {
+  const startOfWeek = new Date(currentDate);
+  startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+  
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const day = new Date(startOfWeek);
+    day.setDate(startOfWeek.getDate() + i);
+    return day;
+  });
 
-    return (
-      <motion.div className="grid grid-cols-7 gap-1">
-        {days.map((day, index) => {
-          const isCurrentMonth = day.getMonth() === currentDate.getMonth();
-          const availabilityClass = getDateAvailabilityClass(day, reservations);
-          const isSelected = selectedStartDate && 
-            day.toDateString() === selectedStartDate.toDateString();
-          const isInRange = selectedStartDate && selectedEndDate && 
-            day > selectedStartDate && day < selectedEndDate;
+  const timeSlots = Array.from({ length: 10 }, (_, i) => i + 8); // 8 AM to 5 PM inclusive
 
-          // Get reservations for this day
-          const dayReservations = reservations.filter(res => 
-            isSameDay(day, new Date(res.startDate))
-          );
-
-          return (
-            <motion.div
-              key={day.toISOString()}
-              className={`
-                min-h-[100px] p-2 border rounded-lg cursor-pointer
-                ${isCurrentMonth ? availabilityClass : 'bg-gray-100'}
-                ${isSelected ? 'ring-2 ring-blue-500' : ''}
-                ${isInRange ? 'bg-blue-50' : ''}
-                transition-colors duration-200
-              `}
-              onClick={() => handleDateClick(day)}
-            >
-              <div className="flex justify-between items-start">
-                <span className={`
-                  text-sm font-medium
-                  ${isCurrentMonth ? 'text-gray-900' : 'text-gray-400'}
-                `}>
-                  {format(day, 'd')}
-                </span>
-              </div>
-
-              {/* Show reserved time slots */}
-              {isCurrentMonth && dayReservations.length > 0 && (
-                <div className="mt-1">
-                  {dayReservations.map((res, idx) => (
-                    <div key={idx} className="text-xs text-gray-600">
-                      {format(new Date(res.startDate), 'HH:mm')} - 
-                      {format(new Date(res.endDate), 'HH:mm')}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </motion.div>
-          );
-        })}
-      </motion.div>
-    );
-  };
-
-  const renderWeekView = () => {
-    const startOfWeek = new Date(currentDate);
-    startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
-    
-    const days = Array.from({ length: 7 }, (_, i) => {
-      const day = new Date(startOfWeek);
-      day.setDate(startOfWeek.getDate() + i);
-      return day;
-    });
-
-    const timeSlots = Array.from({ length: 10 }, (_, i) => i + 8); // 8 AM to 5 PM inclusive
-
-    return (
-      <motion.div className="overflow-x-auto">
-        <div className="min-w-[800px]">
-          {/* Header row */}
-          <div className="grid grid-cols-[100px_repeat(7,1fr)] border-b">
-            <div className="p-4 font-medium text-gray-500">Time</div>
-            {days.map((day) => (
-              <div key={day.toISOString()} 
-                className={`p-4 text-center border-l ${
-                  getDateAvailabilityClass(day, reservations)
-                }`}
-              >
-                <div className="font-medium">{format(day, 'EEE')}</div>
-                <div className="text-sm text-gray-500">{format(day, 'MMM d')}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Time slots */}
-          {timeSlots.map((hour) => (
-            <div key={hour} className="grid grid-cols-[100px_repeat(7,1fr)] border-b">
-              <div className="p-4 font-medium text-gray-500">
-                {format(new Date().setHours(hour), 'ha')} {/* Changed to 'ha' format */}
-              </div>
-              {days.map((day) => {
-                const isTimeSlotReserved = getTimeSlotAvailability(
-                  new Date(day), 
-                  hour, 
-                  reservations
-                );
-
-                return (
-                  <div
-                    key={`${day.toISOString()}-${hour}`}
-                    className={`
-                      p-2 border-l min-h-[80px] relative cursor-pointer
-                      ${isTimeSlotReserved ? 'bg-red-50' : 'bg-green-50'}
-                      hover:opacity-75 transition-opacity duration-200
-                    `}
-                    onClick={() => {
-                      const selectedDate = new Date(day);
-                      selectedDate.setHours(hour);
-                      handleDateClick(selectedDate);
-                    }}
-                  >
-                    {/* Display any reservations */}
-                    {reservations
-                      .filter(res => 
-                        isSameDay(day, new Date(res.startDate)) &&
-                        new Date(res.startDate).getHours() === hour
-                      )
-                      .map((res, idx) => (
-                        <div
-                          key={idx}
-                          className="absolute inset-x-0 m-1 p-2 text-xs rounded-sm
-                            bg-red-100 text-red-800"
-                        >
-                         
-                        </div>
-                      ))
-                    }
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-      </motion.div>
-    );
-  };
-
-  // Update day view to show availability
-  const renderDayView = () => {
-    const hours = Array.from({ length: 10 }, (_, i) => i + 8); // 8 AM to 5 PM inclusive
-
-    return (
-      <motion.div className="border rounded-lg">
-        <div className="text-center p-4 border-b">
-          <span className="text-xl font-medium">
-            {format(currentDate, 'EEEE, MMMM d, yyyy')}
-          </span>
-        </div>
-        <div className="divide-y">
-          {hours.map((hour) => {
-            const isTimeSlotReserved = getTimeSlotAvailability(
-              new Date(currentDate),
-              hour,
-              reservations
+  return (
+    <motion.div className="overflow-x-auto">
+      <div className="min-w-[800px]">
+        {/* Header row */}
+        <div className="grid grid-cols-[100px_repeat(7,1fr)] border-b">
+          <div className="p-4 font-medium text-gray-500">Time</div>
+          {days.map((day) => {
+            const hasFullDay = reservations.some(res => 
+              isSameDay(new Date(res.startDate), day) &&
+              new Date(res.startDate).getHours() === 8 &&
+              new Date(res.startDate).getMinutes() === 0 &&
+              new Date(res.endDate).getHours() === 17 &&
+              new Date(res.endDate).getMinutes() === 0 &&
+              res.isReserved
             );
 
             return (
-              <div
-                key={hour}
-                className={`
-                  flex p-4 min-h-[80px] cursor-pointer
-                  ${isTimeSlotReserved ? 'bg-red-50' : 'bg-green-50'}
-                  hover:opacity-75 transition-opacity duration-200
-                `}
-                onClick={() => {
-                  const selectedDate = new Date(currentDate);
-                  selectedDate.setHours(hour);
-                  handleDateClick(selectedDate);
-                }}
+              <div key={day.toISOString()} 
+                className={`p-4 text-center border-l ${
+                  hasFullDay ? 'bg-red-100' : 'bg-white'
+                }`}
               >
-                <div className="w-32 font-medium text-gray-500">
-                  {format(new Date().setHours(hour), 'ha')} {/* Changed to 'ha' format */}
+                <div className={`font-medium ${hasFullDay ? 'text-red-800' : 'text-gray-800'}`}>
+                  {format(day, 'EEE')}
                 </div>
-                <div className="flex-1">
-                  {reservations
-                    .filter(res =>
-                      isSameDay(currentDate, new Date(res.startDate)) &&
-                      new Date(res.startDate).getHours() === hour
-                    )
-                    .map((res, idx) => (
-                      <div
-                        key={idx}
-                        className="p-2 mb-1 rounded-sm bg-red-100 text-red-800"
-                      >                       
-                      </div>
-                    ))
-                  }
+                <div className="text-sm text-gray-500">
+                  {format(day, 'MMM d')}
                 </div>
+                {hasFullDay && (
+                  <div className="text-xs text-red-600 mt-1">
+                    Fully Reserved
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
-      </motion.div>
-    );
-  };
+
+        {/* Time slots */}
+        {timeSlots.map((hour) => (
+          <div key={hour} className="grid grid-cols-[100px_repeat(7,1fr)] border-b">
+            <div className="p-4 font-medium text-gray-500">
+              {format(new Date().setHours(hour), 'ha')} {/* Changed to 'ha' format */}
+            </div>
+            {days.map((day) => {
+              const statusClass = getTimeSlotClass(day, hour, reservations);
+              const status = getTimeSlotAvailability(day, hour, reservations);
+
+              return (
+                <div
+                  key={`${day.toISOString()}-${hour}`}
+                  className={`
+                    p-2 border-l min-h-[80px] relative
+                    ${statusClass}
+                  `}
+                >
+                  
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </motion.div>
+  );
+};
+
+// Update renderDayView with enhanced full-day indication
+const renderDayView = () => {
+  const hours = Array.from({ length: 10 }, (_, i) => i + 8);
+  
+  const hasFullDayReservation = reservations.some(res => 
+    isSameDay(new Date(res.startDate), currentDate) &&
+    new Date(res.startDate).getHours() === 8 &&
+    new Date(res.startDate).getMinutes() === 0 &&
+    new Date(res.endDate).getHours() === 17 &&
+    new Date(res.endDate).getMinutes() === 0 &&
+    res.isReserved
+  );
+
+  return (
+    <motion.div className="border rounded-lg">
+      <div className={`text-center p-4 border-b ${
+        hasFullDayReservation ? 'bg-red-100' : 'bg-white'
+      }`}>
+        <span className={`text-xl font-medium ${
+          hasFullDayReservation ? 'text-red-800' : 'text-gray-800'
+        }`}>
+          {format(currentDate, 'EEEE, MMMM d, yyyy')}
+        </span>
+        {hasFullDayReservation && (
+          <div className="text-sm text-red-600 mt-1">
+            Fully Reserved Today
+          </div>
+        )}
+      </div>
+      <div className="divide-y">
+        {hours.map((hour) => {
+          const status = getTimeSlotAvailability(currentDate, hour, reservations);
+          const statusClass = getTimeSlotClass(currentDate, hour, reservations);
+
+          return (
+            <div
+              key={hour}
+              className={`
+                flex p-4 min-h-[80px]
+                ${statusClass}
+              `}
+            >
+              <div className="w-32 font-medium text-gray-500">
+                {format(new Date().setHours(hour), 'ha')} {/* Changed to 'ha' format */}
+              </div>
+             
+            </div>
+          );
+        })}
+      </div>
+    </motion.div>
+  );
+};
 
   // Available time slots (8 AM to 5 PM)
-  const timeSlots = Array.from({ length: 10 }, (_, i) => ({
-    hour: i + 8,
-    label: format(new Date().setHours(i + 8), 'h:mm a')
-  }));
+  const timeSlots = Array.from({ length: 10 }, (_, i) => (i + 8));
 
   // Function to check if a time slot is available
   const isTimeSlotAvailable = (date, hour) => {
@@ -539,13 +712,13 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
     <Dialog
       open={timeModalOpen}
       onClose={() => setTimeModalOpen(false)}
-      className="fixed inset-0 z-50 overflow-y-auto"
+      className="relative z-50"
     >
-      <div className="flex items-center justify-center min-h-screen">
-        <Dialog.Overlay className="fixed inset-0 bg-black opacity-30" />
+      <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
 
-        <div className="relative bg-white rounded-lg p-6 max-w-md w-full mx-4">
-          <h3 className="text-lg font-medium mb-4">Select Time</h3>
+      <div className="fixed inset-0 flex items-center justify-center p-4">
+        <Dialog.Panel className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+          <Dialog.Title className="text-lg font-medium mb-4">Select Time</Dialog.Title>
           
           <div className="space-y-4">
             <div>
@@ -632,7 +805,7 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
               Confirm
             </button>
           </div>
-        </div>
+        </Dialog.Panel>
       </div>
     </Dialog>
   );
@@ -701,166 +874,325 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
     };
   };
 
-  const renderDateTimeSelection = () => (
-    <div className="mb-6 p-4 bg-white rounded-lg shadow">
+  // Enhanced date-time selection handler
+  
+
+  // Add this new function to check for conflicts
+  const checkScheduleConflicts = (startDateTime, endDateTime) => {
+    const conflicts = reservations.filter(res => {
+      const resStart = new Date(res.startDate);
+      const resEnd = new Date(res.endDate);
+      
+      return (
+        (startDateTime >= resStart && startDateTime < resEnd) ||
+        (endDateTime > resStart && endDateTime <= resEnd) ||
+        (startDateTime <= resStart && endDateTime >= resEnd)
+      ) && res.isReserved;
+    });
+
+    return conflicts;
+  };
+
+  // Update handleDateTimeSelection with enhanced conflict checking
+  const handleDateTimeSelection = (dates) => {
+    if (!dates || !dates[0] || !dates[1]) {
+      setIsSelectionComplete(false);
+      return;
+    }
+
+    const startDateTime = dates[0];
+    const endDateTime = dates[1];
+    
+    // Validate business hours
+    const startHour = startDateTime.hour();
+    const endHour = endDateTime.hour();
+    const startMinute = startDateTime.minute();
+    const endMinute = endDateTime.minute();
+    
+    // Business hours validation
+    if (startHour < 8 || startHour > 16 || 
+        endHour < 9 || endHour > 17 ||
+        (startHour === 17 && startMinute > 0) ||
+        (endHour === 17 && endMinute > 0)) {
+      toast.error('Please select times between 8:00 AM and 5:00 PM');
+      setIsSelectionComplete(false);
+      return;
+    }
+
+    // Validate minimum booking duration
+    const duration = endDateTime.diff(startDateTime, 'hours', true);
+    if (duration < 1) {
+      toast.error('Minimum booking duration is 1 hour');
+      setIsSelectionComplete(false);
+      return;
+    }
+
+    // Check for conflicts
+    const conflicts = checkScheduleConflicts(startDateTime.toDate(), endDateTime.toDate());
+    
+    if (conflicts.length > 0) {
+      setConflictDetails({
+        conflicts,
+        attemptedBooking: {
+          start: startDateTime.format('YYYY-MM-DD HH:mm'),
+          end: endDateTime.format('YYYY-MM-DD HH:mm')
+        }
+      });
+      setShowConflictModal(true);
+      setIsSelectionComplete(false);
+      return;
+    }
+
+    // If no conflicts, proceed with selection
+    setIsSelectionComplete(true);
+    setDateRange(dates);
+    onDateSelect(startDateTime.toDate(), endDateTime.toDate());
+  };
+
+  // Add this new component for conflict modal
+  const renderConflictModal = () => (
+    <Dialog
+      open={showConflictModal}
+      onClose={() => setShowConflictModal(false)}
+      className="relative z-50"
+    >
+      <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+
+      <div className="fixed inset-0 flex items-center justify-center p-4">
+        <Dialog.Panel className="bg-white rounded-lg p-6 max-w-md w-full">
+          <div className="mb-4">
+            <div className="flex items-center mb-2">
+              <span className="text-red-500 text-xl mr-2">⚠️</span>
+              <Dialog.Title className="text-lg font-medium text-red-700">
+                Scheduling Conflict Detected
+              </Dialog.Title>
+            </div>
+            
+            <p className="text-gray-600 mb-4">
+              Your selected time slot conflicts with existing reservations:
+            </p>
+
+            {conflictDetails && (
+              <div className="bg-red-50 p-4 rounded-lg mb-4">
+                <p className="font-medium text-red-800 mb-2">Your attempted booking:</p>
+                <p className="text-red-600">
+                  From: {conflictDetails.attemptedBooking.start}<br/>
+                  To: {conflictDetails.attemptedBooking.end}
+                </p>
+              </div>
+            )}
+
+            <div className="bg-yellow-50 p-4 rounded-lg">
+              <p className="font-medium text-yellow-800 mb-2">Existing reservations:</p>
+              <ul className="space-y-2">
+                {conflictDetails?.conflicts.map((conflict, index) => (
+                  <li key={index} className="text-yellow-700">
+                    {format(new Date(conflict.startDate), 'MMM dd, yyyy HH:mm')} - 
+                    {format(new Date(conflict.endDate), 'HH:mm')}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <div className="mt-6 flex justify-end space-x-3">
+            <button
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              onClick={() => {
+                setShowConflictModal(false);
+                setDateRange(null); // Reset date selection
+              }}
+            >
+              Choose Different Time
+            </button>
+          </div>
+        </Dialog.Panel>
+      </div>
+    </Dialog>
+  );
+
+  // Update the RangePicker in renderEnhancedDateTimeSelection
+  const renderEnhancedDateTimeSelection = () => (
+    <motion.div
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="mb-6 p-6 bg-white rounded-xl shadow-sm border border-gray-100"
+    >
       <Space direction="vertical" size="large" className="w-full">
-        <div>
-          <h4 className="mb-2 font-medium">
-            Select Date Range <span className="text-red-500">*</span>
+        <div className="space-y-2">
+          <h4 className="text-lg font-medium text-gray-800">
+            Select Date and Time Range
           </h4>
-          <RangePicker
-            className={`w-full ${!dateRange ? 'border-red-300' : ''}`}
-            value={dateRange}
-            onChange={(dates) => {
-              setDateRange(dates);
-              setTimeRange(null);
-              if (dates) {
-                setSelectedStartDate(dates[0].toDate());
-                setSelectedEndDate(dates[1].toDate());
-              }
-            }}
-            disabledDate={(current) => {
-              return current && current < moment().startOf('day');
-            }}
-          />
-          {!dateRange && (
-            <p className="text-red-500 text-sm mt-1">Please select date range</p>
-          )}
+          <p className="text-sm text-gray-600">
+            {isSelectionComplete 
+              ? "✓ Date and time selection complete" 
+              : "Please select both start and end date/time"}
+          </p>
         </div>
 
-        {dateRange && (
-          <div>
-            <h4 className="mb-2 font-medium">
-              Select Time Range <span className="text-red-500">*</span>
-            </h4>
-            <TimePicker.RangePicker
-              className={`w-full ${!timeRange ? 'border-red-300' : ''}`}
-              value={timeRange}
-              onChange={(times) => {
-                setTimeRange(times);
-                if (times && dateRange) {
-                  validateDateTime(dateRange, times);
-                }
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              Date Range <span className="text-red-500">*</span>
+            </label>
+            <RangePicker
+              className="w-full rounded-lg border-gray-200"
+              value={dateRange}
+              onChange={(dates) => {
+                setDateRange(dates);
+                handleDateTimeSelection(dates);
               }}
-              format="HH:mm"
-              minuteStep={30}
-              disabledTime={(_, type) => ({
-                disabledHours: () => [...Array(24)].map((_, i) => i).filter(h => h < 8 || h > 17)
+              disabledDate={(current) => {
+                return current && current < moment().startOf('day');
+              }}
+              showTime={{
+                hideDisabledOptions: true,
+                defaultValue: [
+                  moment('08:00:00', 'HH:mm:ss'),
+                  moment('17:00:00', 'HH:mm:ss')
+                ],
+                format: 'HH:mm',
+                minuteStep: 30
+              }}
+              format="YYYY-MM-DD HH:mm"
+              disabledTime={() => ({
+                disabledHours: () => [...Array(8).keys(), ...Array(7).keys().map(i => i + 18)], // Changed from 17 to 18 to include 17:00
+                disabledMinutes: () => []
               })}
-              hideDisabledOptions
+              placeholder={['Start Date & Time', 'End Date & Time']}
             />
-            {!timeRange && (
-              <p className="text-red-500 text-sm mt-1">Please select time range</p>
+            <div className="text-xs text-gray-500 mt-1">
+              Business hours: 8:00 AM - 5:00 PM
+            </div>
+          </div>
+
+          {/* Remove the separate TimePicker since time selection is now integrated in RangePicker */}
+        </div>
+
+        {/* Selection status indicator */}
+        <div className={`mt-4 p-3 rounded-lg ${
+          isSelectionComplete ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'
+        }`}>
+          <div className="flex items-center gap-2">
+            {isSelectionComplete ? (
+              <>
+                <CheckCircleOutlined />
+                <span>Date and time selection complete</span>
+              </>
+            ) : (
+              <>
+                <InfoCircleOutlined />
+                <span>Please complete your selection</span>
+              </>
             )}
           </div>
-        )}
-
-        {!dateTimeValidation.isValid && (
-          <Alert
-            type="error"
-            message={dateTimeValidation.message}
-            showIcon
-          />
-        )}
-
-        {dateRange && timeRange && dateTimeValidation.isValid && (
-          <button
-            className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-            onClick={() => {
-              const startDateTime = new Date(dateRange[0]);
-              startDateTime.setHours(timeRange[0].hour(), timeRange[0].minute());
-              
-              const endDateTime = new Date(dateRange[1]);
-              endDateTime.setHours(timeRange[1].hour(), timeRange[1].minute());
-              
-              if (startDateTime >= endDateTime) {
-                toast.error('End time must be after start time');
-                return;
-              }
-
-              onDateSelect(startDateTime, endDateTime);
-            }}
-          >
-            Confirm Selection
-          </button>
-        )}
+        </div>
       </Space>
+      {renderConflictModal()}
+    </motion.div>
+  );
+
+  // Update renderAvailabilityLegend to include yellow option
+  const renderAvailabilityLegend = () => (
+    <div className="flex gap-4 items-center mb-4 p-3 bg-white rounded-lg shadow-sm">
+      <div className="flex items-center gap-2">
+        <div className="w-4 h-4 rounded bg-green-200"></div>
+        <span className="text-sm">Available</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="w-4 h-4 rounded bg-yellow-200"></div>
+        <span className="text-sm">Partially Reserved</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="w-4 h-4 rounded bg-red-200"></div>
+        <span className="text-sm">Fully Reserved</span>
+      </div>
     </div>
   );
 
+  // Enhanced calendar view with loading state
   return (
-    <div className="p-4">
-      {renderDateTimeSelection()}
-      <div className="mb-6 flex justify-between items-center">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => handleDateNavigation('prev')}
-            className="p-2 rounded-full hover:bg-gray-100"
-          >
-            <span>←</span>
-          </button>
-          <h2 className="text-xl font-semibold">
-            {format(currentDate, 'MMMM yyyy')}
-          </h2>
-          <button
-            onClick={() => handleDateNavigation('next')}
-            className="p-2 rounded-full hover:bg-gray-100"
-          >
-            <span>→</span>
-          </button>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setView('month')}
-            className={`px-3 py-1 rounded ${view === 'month' ? 'bg-blue-500 text-white' : 'bg-gray-100'}`}
-          >
-            Month
-          </button>
-          <button
-            onClick={() => setView('week')}
-            className={`px-3 py-1 rounded ${view === 'week' ? 'bg-blue-500 text-white' : 'bg-gray-100'}`}
-          >
-            Week
-          </button>
-          <button
-            onClick={() => setView('day')}
-            className={`px-3 py-1 rounded ${view === 'day' ? 'bg-blue-500 text-white' : 'bg-gray-100'}`}
-          >
-            Day
-          </button>
-        </div>
-      </div>
+    <div className="p-4 space-y-6">
+      {renderEnhancedDateTimeSelection()}
+      
+      <div className="relative">
+        <AnimatePresence>
+          {isLoading && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-white/80 z-10 flex items-center justify-center"
+            >
+              <Spin size="large" />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-      {view === 'month' && (
-        <>
-          <div className="mb-4 grid grid-cols-7 gap-1">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-              <div key={day} className="text-center font-medium text-gray-500">
-                {day}
-              </div>
-            ))}
+        {renderAvailabilityLegend()}
+
+        <div className="mb-6 flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => handleDateNavigation('prev')}
+              className="p-2 rounded-full hover:bg-gray-100"
+            >
+              <span>←</span>
+            </button>
+            <h2 className="text-xl font-semibold">
+              {format(currentDate, 'MMMM yyyy')}
+            </h2>
+            <button
+              onClick={() => handleDateNavigation('next')}
+              className="p-2 rounded-full hover:bg-gray-100"
+            >
+              <span>→</span>
+            </button>
           </div>
-          {renderCalendarGrid()}
-        </>
-      )}
-      {view === 'week' && renderWeekView()}
-      {view === 'day' && renderDayView()}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setView('month')}
+              className={`px-3 py-1 rounded ${view === 'month' ? 'bg-blue-500 text-white' : 'bg-gray-100'}`}
+            >
+              Month
+            </button>
+            <button
+              onClick={() => setView('week')}
+              className={`px-3 py-1 rounded ${view === 'week' ? 'bg-blue-500 text-white' : 'bg-gray-100'}`}
+            >
+              Week
+            </button>
+            <button
+              onClick={() => setView('day')}
+              className={`px-3 py-1 rounded ${view === 'day' ? 'bg-blue-500 text-white' : 'bg-gray-100'}`}
+            >
+              Day
+            </button>
+          </div>
+        </div>
 
-      <div className="mt-4 flex justify-end">
-        <button
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg"
-          onClick={() => onDateSelect(selectedStartDate, selectedEndDate)}
-          disabled={!selectedStartDate || !selectedEndDate}
-        >
-          Confirm Dates
-        </button>
+        {view === 'month' && (
+          <>
+            <div className="mb-4 grid grid-cols-7 gap-1">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                <div key={day} className="text-center font-medium text-gray-500">
+                  {day}
+                </div>
+              ))}
+            </div>
+            {renderCalendarGrid()}
+          </>
+        )}
+        {view === 'week' && renderWeekView()}
+        {view === 'day' && renderDayView()}
+
+        {renderTimeSelectionModal()}
       </div>
-
-      {renderTimeSelectionModal()}
     </div>
   );
 };
 
 export default ReservationCalendar;
+
 
 
