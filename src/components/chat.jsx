@@ -1,17 +1,13 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
-import EmojiPicker from 'emoji-picker-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { FiMessageCircle, FiMoreVertical, FiSearch, FiPaperclip, FiMic, FiSend, FiX, FiChevronLeft } from 'react-icons/fi';
+import { motion } from 'framer-motion';
+import { FiMessageCircle, FiMoreVertical, FiPaperclip, FiMic, FiSend, FiX, FiChevronLeft } from 'react-icons/fi';
 
 const Chat = () => {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
   const messagesEndRef = useRef(null);
   const [conversations, setConversations] = useState([]);
   const [activeConversation, setActiveConversation] = useState(null);
@@ -20,7 +16,7 @@ const Chat = () => {
   const [searchResults, setSearchResults] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [currentUser, setCurrentUser] = useState({
+  const [currentUser] = useState({
     id: localStorage.getItem('user_id'),
     name: localStorage.getItem('name'),
     picture: localStorage.getItem('profile_pic')
@@ -29,7 +25,7 @@ const Chat = () => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
-  const [reactions, setReactions] = useState({});
+  const [reactions] = useState({});
   const fileInputRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const [audioChunks, setAudioChunks] = useState([]);
@@ -42,20 +38,52 @@ const Chat = () => {
     scrollToBottom();
   }, [messages]);
 
-  useEffect(() => {
-    if (activeConversation) {
-      fetchChatHistory(activeConversation.id);
+  // Memoize fetchChatHistory function
+  const memoizedFetchChatHistory = useCallback(async (receiverId) => {
+    try {
+      const formData = new URLSearchParams();
+      formData.append('operation', 'fetchChatHistory');
+      formData.append('userId', currentUser.id);
+
+      const response = await fetch('http://localhost/coc/gsd/fetch2.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+
+      const data = await response.json();
+      if (data.status === 'success' && Array.isArray(data.data)) {
+        const relevantMessages = data.data.filter(msg => 
+          (msg.sender_id === currentUser.id && msg.receiver_id === receiverId) ||
+          (msg.receiver_id === currentUser.id && msg.sender_id === receiverId)
+        );
+
+        const formattedMessages = relevantMessages.map(msg => ({
+          id: msg.chat_id,
+          text: msg.message,
+          timestamp: new Date(msg.created_at),
+          status: 'delivered',
+          isOwn: msg.sender_id === currentUser.id,
+          senderPic: msg.sender_pic,
+          senderName: `${msg.sender_fname} ${msg.sender_lname}`,
+          receiverName: `${msg.receiver_fname} ${msg.receiver_lname}`
+        }));
+        
+        setMessages(formattedMessages);
+      }
+    } catch (error) {
+      console.error('Error fetching chat history:', error);
     }
-  }, [activeConversation]);
+  }, [currentUser.id]); // Add dependencies used inside the function
 
-  useEffect(() => {
-    fetchAllChats();
-    // Set up periodic refresh every 10 seconds
-    const intervalId = setInterval(fetchAllChats, 10000);
-    return () => clearInterval(intervalId);
-  }, []); // Empty dependency array means this only runs once on mount
-
-  const fetchAllChats = async () => {
+  // Memoize fetchAllChats function
+  const memoizedFetchAllChats = useCallback(async () => {
     try {
       const formData = new URLSearchParams();
       formData.append('operation', 'fetchChatHistory');
@@ -121,50 +149,20 @@ const Chat = () => {
     } catch (error) {
       console.error('Error fetching chats:', error);
     }
-  };
+  }, [currentUser.id, activeConversation]); // Add dependencies used inside the function
 
-  const fetchChatHistory = async (receiverId) => {
-    try {
-      const formData = new URLSearchParams();
-      formData.append('operation', 'fetchChatHistory');
-      formData.append('userId', currentUser.id);
-
-      const response = await fetch('http://localhost/coc/gsd/fetch2.php', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: formData
-      });
-
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-
-      const data = await response.json();
-      if (data.status === 'success' && Array.isArray(data.data)) {
-        const relevantMessages = data.data.filter(msg => 
-          (msg.sender_id === currentUser.id && msg.receiver_id === receiverId) ||
-          (msg.receiver_id === currentUser.id && msg.sender_id === receiverId)
-        );
-
-        const formattedMessages = relevantMessages.map(msg => ({
-          id: msg.chat_id,
-          text: msg.message,
-          timestamp: new Date(msg.created_at),
-          status: 'delivered',
-          isOwn: msg.sender_id === currentUser.id,
-          senderPic: msg.sender_pic,
-          senderName: `${msg.sender_fname} ${msg.sender_lname}`,
-          receiverName: `${msg.receiver_fname} ${msg.receiver_lname}`
-        }));
-        
-        setMessages(formattedMessages);
-      }
-    } catch (error) {
-      console.error('Error fetching chat history:', error);
+  useEffect(() => {
+    if (activeConversation) {
+      memoizedFetchChatHistory(activeConversation.id);
     }
-  };
+  }, [activeConversation, memoizedFetchChatHistory]);
+
+  useEffect(() => {
+    memoizedFetchAllChats();
+    // Set up periodic refresh every 10 seconds
+    const intervalId = setInterval(memoizedFetchAllChats, 10000);
+    return () => clearInterval(intervalId);
+  }, [memoizedFetchAllChats]);
 
   const toggleChat = () => {
     setIsOpen(!isOpen);
@@ -173,17 +171,6 @@ const Chat = () => {
   const closeChat = () => {
     setIsVisible(false);
   };
-
-  const toggleSearch = () => {
-    setIsSearching(!isSearching);
-    if (!isSearching) {
-      setSearchTerm('');
-    }
-  };
-
-  const filteredMessages = messages.filter(message => 
-    message.text.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   const MessageBubble = ({ message, isOwn }) => (
     <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-4 group`}>
@@ -389,7 +376,7 @@ const Chat = () => {
         };
         setMessages(prev => [...prev, newMsg]);
         // Only fetch all chats after successfully sending a message
-        fetchAllChats();
+        memoizedFetchAllChats();
       } else {
         console.error('Error sending message:', result.message);
         // Optionally show an error toast/notification here
@@ -421,7 +408,8 @@ const Chat = () => {
     setSearchEmail('');
   };
 
-  const searchEmails = async (query) => {
+  // Memoize searchEmails function
+  const memoizedSearchEmails = useCallback(async (query) => {
     if (!query || query.length < 2) { // Only search if query is at least 2 characters
       setSearchResults([]);
       return;
@@ -449,7 +437,6 @@ const Chat = () => {
       const result = await response.json();
       
       if (result.status === 'success' && Array.isArray(result.data)) {
-        // Filter out the current user from search results
         const filteredResults = result.data.filter(user => user.users_id !== currentUser.id);
         const userEmails = filteredResults.map(user => ({
           email: user.users_email,
@@ -468,9 +455,8 @@ const Chat = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentUser.id]); 
 
-  // Add debounce function
   const useDebounce = (value, delay) => {
     const [debouncedValue, setDebouncedValue] = useState(value);
   
@@ -493,14 +479,14 @@ const Chat = () => {
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (debouncedSearchTerm) {
-        searchEmails(debouncedSearchTerm);
+        memoizedSearchEmails(debouncedSearchTerm);
       } else {
         setSearchResults([]);
       }
     }, 500);
   
     return () => clearTimeout(timeoutId);
-  }, [debouncedSearchTerm]);
+  }, [debouncedSearchTerm, memoizedSearchEmails]);
 
   // Update the search input handler
   const handleSearchInputChange = (e) => {

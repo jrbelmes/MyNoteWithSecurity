@@ -1,0 +1,96 @@
+/* Mobile-first responsive styles */
+@media screen and (max-width: 375px) {
+  .mobile-steps {
+    padding: 0;
+  }
+
+  .mobile-steps .ant-steps-item {
+    padding: 0 8px;
+  }
+
+  .mobile-steps .ant-steps-item-title {
+    font-size: 12px;
+  }
+
+  .p-card {
+    border-radius: 12px;
+  }
+
+  .p-dialog {
+    width: 95vw !important;
+    margin: 10px;
+  }
+
+  .p-inputtext,
+  .p-dropdown {
+    font-size: 14px;
+    padding: 8px;
+  }
+
+  .p-button {
+    padding: 8px 16px;
+    font-size: 14px;
+  }
+
+  .grid-view {
+    grid-template-columns: 1fr;
+  }
+
+  .list-view .item {
+    flex-direction: column;
+  }
+}
+
+/* Enhanced scrollbar for better mobile experience */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Responsive Typography */
+@media screen and (max-width: 375px) {
+  h1 { font-size: 1.5rem; }
+  h2 { font-size: 1.25rem; }
+  h3 { font-size: 1.125rem; }
+  p { font-size: 0.875rem; }
+}
+
+/* Enhanced touch targets for mobile */
+@media (max-width: 375px) {
+  .p-button,
+  .p-dropdown-trigger,
+  .p-checkbox,
+  .p-radiobutton {
+    min-height: 44px;
+  }
+
+  .p-inputtext {
+    height: 44px;
+  }
+
+  .p-dialog-header {
+    padding: 1rem;
+  }
+
+  .p-dialog-content {
+    padding: 1rem;
+  }
+
+  .p-dialog-footer {
+    padding: 1rem;
+  }
+}

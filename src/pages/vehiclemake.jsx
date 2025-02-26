@@ -5,7 +5,6 @@ import Sidebar from './Sidebar';
 import { FaArrowLeft, FaTrash, FaCar } from 'react-icons/fa';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { sanitizeInput, validateInput } from '../utils/sanitize';
 
@@ -21,9 +20,7 @@ const VehicleMakes = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const user_level_id = localStorage.getItem('user_level_id');
-  const [editingModel, setEditingModel] = useState(null);
 
-  const user_id = localStorage.getItem('user_id');
 
   useEffect(() => {
       if (user_level_id !== '1' && user_level_id !== '2' && user_level_id !== '4') {

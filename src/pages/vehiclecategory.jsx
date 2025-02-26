@@ -20,7 +20,6 @@ const VehicleCategories = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const user_id = localStorage.getItem('user_id');
   const user_level_id = localStorage.getItem('user_level_id');
 
     useEffect(() => {

@@ -2,8 +2,9 @@ import React, { useState, createContext, useCallback } from 'react';
 import { Route, Routes, Navigate } from 'react-router-dom';
 // import Sidebar from './pages/Sidebar';
 // import Login from './pages/Login';
-import Register from './pages/Register';
 import VehicleEntry from './pages/VehicleEntry';
+import PersonnelDashboard from './page_personnel/dashboard';
+import ViewTask from './page_personnel/ViewPersonnelTask';
 import Venue from './pages/Venue';
 import  Dashboard from './page_user/dashboard';
 import Equipment from './pages/Equipment';
@@ -23,28 +24,22 @@ import Position from './pages/position';
 import Equipmentc from './pages/equipmentCategory';
 import Userlevel from './pages/condition';
 import VehicleModel from './pages/vehiclemodel';
-import PersonnelDashboard from './pages/PersonelDashboard';
-import ReleaseAndReturn from './pages/release&return';
 import ViewReserve from './page_user/viewReserve';
 import Calendar from './pages/calendar';
-import Calendars from './pages/landCalendar';
 import Pofiles from './pages/profile';
 import Settings from './pages/Settings';
 import Record from './pages/Record';
 import Admin from './pages/Admin';
 import ViewApproval from './page_dean/viewApproval';
-import UsersProfile from './page_user/component/user_profile';
-import UsersSidebar from './page_user/component/user_sidebar';
-import UsersDashboard from './page_user/dashboard';
-import DeanProfile from './page_dean/component/dean_profile';
-import DeanSidebar from './page_dean/component/dean_sidebar';
 import DeanViewReserve from './page_dean/viewReserve';
 import DeanAddReservation from './page_dean/AddReservation';
 import DeanDashboard from './page_dean/dashboard';
 import Chat from './components/chat';
-import ProtectedRoute from './components/ProtectedRoute';
+import ProtectedRoute from './utils/ProtectedRoute';
+import AssignPersonnel from './pages/AssignPersonnel';
+import LandCalendar from './pages/landCalendar';
 
-// Create a new context for the theme
+
 export const ThemeContext = createContext();
 
 const App = () => {
@@ -91,8 +86,9 @@ const App = () => {
                         <Route path="/equipmentCategory" element={<ProtectedRoute allowedRoles={['Admin']}><Equipmentc /></ProtectedRoute>} />
                         <Route path="/condition" element={<ProtectedRoute allowedRoles={['Admin']}><Userlevel /></ProtectedRoute>} />
                         <Route path="/vehiclemodel" element={<ProtectedRoute allowedRoles={['Admin']}><VehicleModel /></ProtectedRoute>} />
-                        <Route path="/personelDashboard" element={<ProtectedRoute allowedRoles={['Admin']}><PersonnelDashboard /></ProtectedRoute>} />
-                        <Route path="/release&return" element={<ProtectedRoute allowedRoles={['Admin']}><ReleaseAndReturn /></ProtectedRoute>} />
+                        <Route path="/AssignPersonnel" element={<ProtectedRoute allowedRoles={['Admin']}><AssignPersonnel /></ProtectedRoute>} />
+                        <Route path="/LandCalendar" element={<ProtectedRoute allowedRoles={['Admin']}><LandCalendar /></ProtectedRoute>} />
+
                         <Route path="/record" element={<ProtectedRoute allowedRoles={['Admin']}><Record /></ProtectedRoute>} />
                         <Route path="/ViewRequest" element={<ProtectedRoute allowedRoles={['Admin']}><ViewRequest /></ProtectedRoute>} />
                         <Route path="/Reports" element={<ProtectedRoute allowedRoles={['Admin']}><Reports /></ProtectedRoute>} />
@@ -115,6 +111,10 @@ const App = () => {
                         <Route path="/settings" element={<ProtectedRoute allowedRoles={['Admin', 'Dean', 'Secretary', 'user']}><Settings /></ProtectedRoute>} />
                         <Route path="/calendar" element={<ProtectedRoute allowedRoles={['Admin', 'Dean', 'Secretary', 'user']}><Calendar /></ProtectedRoute>} />
                         <Route path="/chat" element={<ProtectedRoute allowedRoles={['Admin', 'Dean', 'Secretary', 'user']}><Chat /></ProtectedRoute>} />
+
+                        {/* Personnel Routes */}
+                        <Route path="/personnelDashboard" element={<ProtectedRoute allowedRoles={['Personnel']}><PersonnelDashboard /></ProtectedRoute>} />
+                        <Route path="/viewTask" element={<ProtectedRoute allowedRoles={['Personnel']}><ViewTask /></ProtectedRoute>} />
                         
                         <Route path="*" element={<div>404 Not Found</div>} />
                     </Routes>

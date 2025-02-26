@@ -143,39 +143,27 @@ const Sidebar = () => {
 
           <div className="flex-grow overflow-y-auto">
             <nav className="mt-5 px-2">
-              {(user_level_id === '1' || user_level_id === '4') && (
-                <SidebarItem icon={FaTachometerAlt} text="Dashboard" link="/adminDashboard" active={activeItem === '/adminDashboard'} />
-              )}
+              <SidebarItem icon={FaTachometerAlt} text="Dashboard" link="/adminDashboard" active={activeItem === '/adminDashboard'} />
+              <SidebarItem icon={FaCalendarAlt} text="Calendar" link="/LandCalendar" active={activeItem === '/LandCalendar'} />
               
-             
-              {(user_level_id === '1' || user_level_id === '4') && (
-                <SidebarDropdown icon={FaFileAlt} text="Manage Resources" active={['/Venue', '/VehicleEntry', '/Equipment'].includes(activeItem)}>
-                  <SidebarSubItem icon={FaHome} text="Venue" link="/Venue" active={activeItem === '/Venue'} />
-                  <SidebarSubItem icon={FaCar} text="Vehicle" link="/VehicleEntry" active={activeItem === '/VehicleEntry'} />
-                  <SidebarSubItem icon={FaTools} text="Equipments" link="/Equipment" active={activeItem === '/Equipment'} />
-                </SidebarDropdown>
-              )}
+              <SidebarDropdown icon={FaFileAlt} text="Manage Resources" active={['/Venue', '/VehicleEntry', '/Equipment'].includes(activeItem)}>
+                <SidebarSubItem icon={FaHome} text="Venue" link="/Venue" active={activeItem === '/Venue'} />
+                <SidebarSubItem icon={FaCar} text="Vehicle" link="/VehicleEntry" active={activeItem === '/VehicleEntry'} />
+                <SidebarSubItem icon={FaTools} text="Equipments" link="/Equipment" active={activeItem === '/Equipment'} />
+              </SidebarDropdown>
 
-              {user_level_id === '1' && (
-                <SidebarItem icon={FaFolder} text="Master" link="/Master" active={activeItem === '/Master'} />
-              )}
+              <SidebarItem icon={FaFolder} text="Master" link="/Master" active={activeItem === '/Master'} />
 
-              {(user_level_id === '1' || user_level_id === '4') && (
-                <SidebarItem icon={FaUserCircle} text="Users" link="/Faculty" active={activeItem === '/Faculty'} />
-              )}
+              <SidebarItem icon={FaUserCircle} text="Users" link="/Faculty" active={activeItem === '/Faculty'} />
 
-              {canAccessMenu('viewRequest') && (
-                <SidebarDropdown icon={FaCar} text="Reservations" active={['/viewReservation', '/ViewRequest', '/AddReservation'].includes(activeItem)}>
-                  <SidebarSubItem icon={FaHeadset} text="View Requests" link="/ViewRequest" active={activeItem === '/ViewRequest'} />
-                  {(user_level_id === '1' || user_level_id === '4') && (
-                    <SidebarSubItem icon={FaCar} text="Add Reservation" link="/AddReservation" active={activeItem === '/AddReservation'} />
-                  )}
-                </SidebarDropdown>
-              )}
+              <SidebarDropdown icon={FaCar} text="Reservations" active={['/viewReservation', '/ViewRequest', '/AddReservation'].includes(activeItem)}>
+                <SidebarSubItem icon={FaHeadset} text="View Requests" link="/ViewRequest" active={activeItem === '/ViewRequest'} />
+                <SidebarSubItem icon={FaCar} text="Add Reservation" link="/AddReservation" active={activeItem === '/AddReservation'} />
+              </SidebarDropdown>
 
-              {canAccessMenu('viewReservation') && (
-                <SidebarSubItem icon={FaFileAlt} text="Records" link="/record" active={activeItem === '/record'} />
-              )}
+              <SidebarItem icon={FaFileAlt} text="Records" link="/record" active={activeItem === '/record'} />
+              
+              <SidebarItem icon={FaUserCircle} text="Assign Personnel" link="/AssignPersonnel" active={activeItem === '/AssignPersonnel'} />
             </nav>
           </div>
 

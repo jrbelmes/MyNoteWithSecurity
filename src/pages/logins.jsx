@@ -4,14 +4,6 @@ import axios from 'axios';
 import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 import { FaEye, FaEyeSlash, FaLock, FaUser, FaCalculator, FaCalendarCheck, FaChartLine, FaClock } from 'react-icons/fa';
 import toast, { Toaster } from 'react-hot-toast';
-import { 
-    getLoginAttempts, 
-    setLoginAttempts, 
-    clearAllExceptLoginAttempts, 
-    isAccountLocked,
-    incrementLoginAttempts,
-    resetLoginAttempts 
-} from '../utils/loginAttempts';
 
 function Logins() {
     const [username, setUsername] = useState("");
@@ -20,14 +12,10 @@ function Logins() {
     const [isCaptchaCorrect, setIsCaptchaCorrect] = useState(null);
     const [showPassword, setShowPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
-    const [loginAttempts, setLoginAttempts] = useState(0);
     const navigateTo = useNavigate();
     const [isHovering, setIsHovering] = useState(false);
     const controls = useAnimation();
     const [isLoggedIn, setIsLoggedIn] = useState(false);
-    const [isLocked, setIsLocked] = useState(false);
-    const [lockoutTime, setLockoutTime] = useState(0);
-    const [blockedUsername, setBlockedUsername] = useState('');
     const [captchaText, setCaptchaText] = useState('');
     const [userCaptchaInput, setUserCaptchaInput] = useState('');
     const [captchaCanvasRef] = useState(React.createRef());
@@ -118,7 +106,7 @@ function Logins() {
 
     const notify = (message, type = 'success') => {
         toast[type](message, {
-            duration: 3000,
+            duration: 4000, // Increased duration for blocked messages
             position: 'top-right',
             style: {
                 borderRadius: '10px',
@@ -132,59 +120,13 @@ function Logins() {
         });
     };
 
-    const checkLoginAttempts = (username) => {
-        const attempts = getLoginAttempts();
-        const userAttempts = attempts[username] || { count: 0, timestamp: null };
-        
-        if (userAttempts.count >= 3 && userAttempts.timestamp) {
-            const lockoutEndTime = new Date(userAttempts.timestamp).getTime() + (10 * 60 * 1000);
-            const currentTime = new Date().getTime();
-            
-            if (currentTime < lockoutEndTime) {
-                const remainingTime = Math.ceil((lockoutEndTime - currentTime) / 1000);
-                setLockoutTime(remainingTime);
-                setBlockedUsername(username);
-                return false;
-            } else {
-                // Reset attempts after lockout period
-                attempts[username] = { count: 0, timestamp: null };
-                setLoginAttempts(attempts);
-            }
-        }
-        return true;
-    };
-
-    const updateLoginAttempts = (username, isSuccessful) => {
-        const attempts = getLoginAttempts();
-        
-        if (isSuccessful) {
-            attempts[username] = { count: 0, timestamp: null };
-        } else {
-            const userAttempts = attempts[username] || { count: 0, timestamp: null };
-            userAttempts.count += 1;
-            if (userAttempts.count >= 3) {
-                userAttempts.timestamp = new Date().toISOString();
-            }
-            attempts[username] = userAttempts;
-        }
-        
-        setLoginAttempts(attempts);
+    const validateSchoolId = (id) => {
+        const schoolIdPattern = /^[^-]+-[^-]+-[^-]+$/;
+        return schoolIdPattern.test(id);
     };
 
     const handleUsernameChange = (e) => {
         const input = e.target.value;
-        
-        if (isAccountLocked(input)) {
-            const attempts = getLoginAttempts();
-            const userAttempts = attempts[input];
-            const lockoutEndTime = new Date(userAttempts.timestamp).getTime() + (10 * 60 * 1000);
-            const currentTime = new Date().getTime();
-            const remainingTime = Math.ceil((lockoutEndTime - currentTime) / 1000);
-            const minutes = Math.floor(remainingTime / 60);
-            const seconds = remainingTime % 60;
-            notify(`This account is locked. Please try again in ${minutes}:${seconds.toString().padStart(2, '0')} minutes`, 'error');
-            return;
-        }
         setUsername(input);
     };
 
@@ -195,20 +137,15 @@ function Logins() {
     const handleLogin = async (e) => {
         e.preventDefault();
 
-        if (isAccountLocked(username)) {
-            const attempts = getLoginAttempts();
-            const userAttempts = attempts[username];
-            const lockoutEndTime = new Date(userAttempts.timestamp).getTime() + (10 * 60 * 1000);
-            const currentTime = new Date().getTime();
-            const remainingTime = Math.ceil((lockoutEndTime - currentTime) / 1000);
-            const minutes = Math.floor(remainingTime / 60);
-            const seconds = remainingTime % 60;
-            notify(`Account locked. Please try again in ${minutes}:${seconds.toString().padStart(2, '0')} minutes`, 'error');
+        if (!username || !password || !isCaptchaCorrect) {
+            notify("Please fill in all fields and complete the CAPTCHA correctly.", 'error');
+            generateCaptcha(); // Refresh captcha on validation failure
             return;
         }
 
-        if (!username || !password || !isCaptchaCorrect) {
-            notify("Please fill in all fields and complete the CAPTCHA correctly.", 'error');
+        if (!validateSchoolId(username)) {
+            notify("Invalid school ID format.", 'error');
+            generateCaptcha(); // Refresh captcha on validation failure
             return;
         }
 
@@ -225,13 +162,28 @@ function Logins() {
 
             const user = response.data;
             
+            if (user.status === "error") {
+                generateCaptcha(); // Refresh captcha on login error
+                if (user.message.includes("blocked")) {
+                    // Handle blocked account message
+                    notify(user.message, 'error');
+                } else if (user.message === "School ID does not exist") {
+                    notify("School ID does not exist", 'error');
+                } else {
+                    notify("Invalid password", 'error');
+                }
+                return;
+            }
+                    
             if (user.status === "success" && user.data) {
                 const userData = user.data;
                 
-                resetLoginAttempts(username);
-                clearAllExceptLoginAttempts();
-            
+                // Clear existing storage
+                localStorage.clear();
+                sessionStorage.clear();
+
                 // Set localStorage items
+                localStorage.setItem("url", response.config.url.split('login.php')[0]);
                 localStorage.setItem("user_id", userData.user_id);
                 localStorage.setItem("name", `${userData.firstname} ${userData.middlename} ${userData.lastname}`.trim());
                 localStorage.setItem("school_id", userData.school_id);
@@ -266,7 +218,7 @@ function Logins() {
                     navigateTo("/adminDashboard");
                 } else if (userData.user_level_name === "Personnel") {
                     notify("Personnel Login Successful");
-                    navigateTo("/personeldashboard");
+                    navigateTo("/personnelDashboard");
                 } else if (userData.user_level_name === "Admin") {
                     notify("Admin Login Successful");
                     navigateTo("/adminDashboard");
@@ -278,50 +230,19 @@ function Logins() {
                     navigateTo("/dashboard");
                 }
             } else {
-                const attempts = incrementLoginAttempts(username);
-                if (attempts.count >= 3) {
-                    notify(`Account locked for 10 minutes due to too many failed attempts.`, 'error');
-                } else {
-                    notify(`Invalid credentials. ${3 - attempts.count} attempts remaining.`, 'error');
-                }
+                notify("Invalid credentials", 'error');
             }
         } catch (error) {
-            const attempts = incrementLoginAttempts(username);
-            if (attempts.count >= 3) {
-                notify(`Account locked for 10 minutes due to too many failed attempts.`, 'error');
+            generateCaptcha(); // Refresh captcha on error
+            if (error.response && error.response.data && error.response.data.message) {
+                notify(error.response.data.message, 'error');
             } else {
-                notify(`Login failed. ${3 - attempts.count} attempts remaining.`, 'error');
+                notify("Login failed. Please try again.", 'error');
             }
         } finally {
             setLoading(false);
         }
     };
-
-    useEffect(() => {
-        let interval;
-        if (isLocked && lockoutTime > 0) {
-            interval = setInterval(() => {
-                setLockoutTime(time => {
-                    if (time <= 1) {
-                        setIsLocked(false);
-                        return 0;
-                    }
-                    return time - 1;
-                });
-            }, 1000);
-        }
-        return () => clearInterval(interval);
-    }, [isLocked, lockoutTime]);
-
-    useEffect(() => {
-        if (username === blockedUsername) {
-            const attempts = JSON.parse(localStorage.getItem('loginAttempts') || '{}');
-            const userAttempts = attempts[username] || { count: 0, timestamp: null };
-            if (userAttempts.timestamp) {
-                checkLoginAttempts(username);
-            }
-        }
-    }, [username]);
 
     const featureVariants = {
         hidden: { opacity: 0, y: 20 },
@@ -350,24 +271,24 @@ function Logins() {
                     exit="out"
                     variants={pageVariants}
                     transition={pageTransition}
-                    className='flex min-h-screen bg-gradient-to-br from-green-50 to-green-100 overflow-hidden'
+                    className='flex flex-col md:flex-row min-h-screen bg-gradient-to-br from-green-50 to-green-100 overflow-x-hidden'
                 >
                     {/* Left side: Introduction with picture */}
                     <motion.div 
                         initial={{ opacity: 0, x: -50 }} 
                         animate={{ opacity: 1, x: 0 }} 
                         transition={{ duration: 0.5 }}
-                        className='w-1/2 p-8 flex flex-col items-center justify-center bg-gradient-to-br from-white to-green-100 text-green-800 relative'
+                        className='w-full md:w-1/2 p-4 md:p-8 flex flex-col items-center justify-center bg-gradient-to-br from-white to-green-100 text-green-800 relative'
                     >
                         <motion.img 
                             src="/images/assets/phinma.png" 
                             alt="PHINMA CDO Logo" 
-                            className='w-64 h-64 object-cover rounded-full mb-8 shadow-lg'
+                            className='w-32 h-32 md:w-64 md:h-64 object-cover rounded-full mb-4 md:mb-8 shadow-lg'
                             whileHover={{ scale: 1.1, rotate: 360 }}
                             transition={{ duration: 0.5 }}
                         />
                         <motion.h2 
-                            className='text-4xl font-bold mb-4 text-green-700 font-sans'
+                            className='text-2xl md:text-4xl font-bold mb-2 md:mb-4 text-green-700 font-sans text-center'
                             initial={{ opacity: 0, y: -20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.2 }}
@@ -375,16 +296,17 @@ function Logins() {
                             General Service Department
                         </motion.h2>
                         <motion.h3 
-                            className='text-2xl font-semibold mb-2 text-green-600 font-sans'
+                            className='text-xl md:text-2xl font-semibold mb-2 text-green-600 font-sans text-center'
                             initial={{ opacity: 0, y: -20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.4 }}
                         >
                             Reservation and Monitoring System
                         </motion.h3>
-                      
+
+                        {/* Features list - Hidden on small screens */}
                         <motion.ul 
-                            className='space-y-4 mt-8'
+                            className='hidden md:block space-y-4 mt-8'
                             variants={{
                                 hidden: { opacity: 0 },
                                 visible: { 
@@ -486,7 +408,7 @@ function Logins() {
                         initial={{ opacity: 0, x: 50 }} 
                         animate={{ opacity: 1, x: 0 }} 
                         transition={{ duration: 0.5 }}
-                        className='w-1/2 p-8 flex items-center justify-center relative'
+                        className='w-full md:w-1/2 p-4 md:p-8 flex items-center justify-center relative'
                     >
                         {/* Decorative background elements */}
                         <motion.div 
@@ -515,22 +437,13 @@ function Logins() {
                         />
 
                         <div className='w-full max-w-md bg-white rounded-xl shadow-2xl overflow-hidden z-10'>
-                            <div className='bg-gradient-to-r from-green-600 to-green-700 p-6 text-white'>
-                                <h2 className='text-center text-3xl font-bold'>General Service Department</h2>
-                                <p className='text-center text-green-100 mt-2'>Please login to your account</p>
+                            <div className='bg-gradient-to-r from-green-600 to-green-700 p-4 md:p-6 text-white'>
+                                <h2 className='text-center text-2xl md:text-3xl font-bold'>General Service Department</h2>
+                                <p className='text-center text-green-100 mt-2 text-sm md:text-base'>Please login to your account</p>
                             </div>
-                            <div className='p-8'>
-                                <form onSubmit={handleLogin} className='space-y-6'>
-                                    {isLocked && (
-                                        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
-                                            <strong className="font-bold">Account Locked!</strong>
-                                            <p className="block sm:inline">
-                                                Please try again in {Math.floor(lockoutTime / 60)}:
-                                                {(lockoutTime % 60).toString().padStart(2, '0')} minutes
-                                            </p>
-                                        </div>
-                                    )}
-                                    <div className='space-y-2'>
+                            <div className='p-4 md:p-8'>
+                                <form onSubmit={handleLogin} className='space-y-4 md:space-y-6'>
+                                    <div className='space-y-1 md:space-y-2'>
                                         <label className='text-sm font-medium text-gray-700' htmlFor='username'>
                                             Username
                                         </label>
@@ -541,17 +454,16 @@ function Logins() {
                                             <input 
                                                 value={username} 
                                                 onChange={handleUsernameChange} 
-                                                className={`block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm transition duration-150 ease-in-out ${isAccountLocked(username) ? 'bg-red-50 border-red-300' : ''}`} 
+                                                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm transition duration-150 ease-in-out" 
                                                 id='username' 
                                                 type='text'
-                                                placeholder='Enter your username' 
+                                                placeholder='Enter your school ID (e.g., COL-2023-001)' 
                                                 required 
-                                                disabled={isLocked}
                                             />
                                         </div>
                                     </div>
 
-                                    <div className='space-y-2'>
+                                    <div className='space-y-1 md:space-y-2'>
                                         <label className='text-sm font-medium text-gray-700' htmlFor='password'>
                                             Password
                                         </label>
@@ -578,17 +490,17 @@ function Logins() {
                                         </div>
                                     </div>
 
-                                    <div className='space-y-2'>
+                                    <div className='space-y-1 md:space-y-2'>
                                         <label className='text-sm font-medium text-gray-700'>
                                             Security Verification
                                         </label>
-                                        <div className='space-y-3'>
-                                            <div className='relative bg-white rounded-lg shadow-sm border border-gray-200 p-4'>
+                                        <div className='space-y-2 md:space-y-3'>
+                                            <div className='relative bg-white rounded-lg shadow-sm border border-gray-200 p-2 md:p-4'>
                                                 <canvas
                                                     ref={captchaCanvasRef}
                                                     width="280"
-                                                    height="80"
-                                                    className='bg-white rounded-md'
+                                                    height="60"
+                                                    className='w-full bg-white rounded-md'
                                                 />
                                                 <motion.button
                                                     whileHover={{ scale: 1.05 }}
@@ -643,14 +555,14 @@ function Logins() {
                                         whileTap={{ scale: 0.95 }}
                                         className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-150 ease-in-out ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
                                         type='submit'
-                                        disabled={loading || loginAttempts >= 3}
+                                        disabled={loading}
                                     >
                                         {loading ? 'Logging in...' : 'Sign In'}
                                     </motion.button>
                                 </form>
 
-                                <div className='mt-6 text-center'>
-                                    <a href="#" className='text-sm text-green-600 hover:text-green-700 transition duration-150 ease-in-out'>Forgot your password?</a>
+                                <div className='mt-4 md:mt-6 text-center'>
+                                    <a href="#" className='text-xs md:text-sm text-green-600 hover:text-green-700 transition duration-150 ease-in-out'>Forgot your password?</a>
                                 </div>
                             </div>
                         </div>

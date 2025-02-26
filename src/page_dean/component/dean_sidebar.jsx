@@ -1,9 +1,8 @@
 import React, { useState, useEffect, createContext, useContext, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
-  FaSignOutAlt, FaTachometerAlt, FaCar, FaCog, FaFileAlt, FaHeadset,
-  FaChevronDown, FaBars, FaHome, FaTools, FaUserCircle, FaFolder,
-  FaCalendarAlt, FaChartBar,
+  FaSignOutAlt, FaTachometerAlt, FaCar, FaCog, FaFileAlt, 
+ FaBars, FaUserCircle, 
   FaThumbsUp
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -24,19 +23,14 @@ const Sidebar = () => {
   const location = useLocation();
   const [activeItem, setActiveItem] = useState('');
   const [isSidebarOpen, setSidebarOpen] = useState(true);
-  const [isDarkMode, setIsDarkMode] = useState(() => {
+  const [isDarkMode] = useState(() => {
     const savedMode = localStorage.getItem('darkMode');
     return savedMode ? JSON.parse(savedMode) : false;
   });
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [searchQuery, setSearchQuery] = useState('');
-  const [notifications, setNotifications] = useState([]);
-  const [showUserMenu, setShowUserMenu] = useState(false);
-  const [systemStatus, setSystemStatus] = useState('online');
   const [showProfileModal, setShowProfileModal] = useState(false);
 
   const name = localStorage.getItem('name') || 'Admin User';
-  const user_level_id = localStorage.getItem('user_level_id');
 
   useEffect(() => {
     setActiveItem(location.pathname);
@@ -61,7 +55,6 @@ const Sidebar = () => {
   }, []);
 
   const toggleSidebar = () => setSidebarOpen(!isSidebarOpen);
-  const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
 
   const handleLogout = () => {
     clearAllExceptLoginAttempts();
@@ -203,78 +196,6 @@ const SidebarItem = React.memo(({ icon: Icon, text, link, active }) => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="font-medium"
-          >
-            {text}
-          </motion.span>
-        )}
-      </AnimatePresence>
-    </Link>
-  );
-});
-
-// Memoize the SidebarDropdown component
-const SidebarDropdown = React.memo(({ icon: Icon, text, active, children }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const { isSidebarOpen } = useContext(SidebarContext);
-
-  return (
-    <div>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`w-full flex items-center justify-between p-2 rounded-lg transition-colors ${
-          active ? 'bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-200' : 
-          'text-gray-600 dark:text-gray-300 hover:bg-green-50 dark:hover:bg-green-900 hover:text-green-600 dark:hover:text-green-300'
-        }`}
-        aria-expanded={isOpen}
-      >
-        <div className="flex items-center space-x-3">
-          <Icon className={`text-xl ${active ? 'text-green-600' : 'text-gray-400'}`} />
-          <AnimatePresence>
-            {isSidebarOpen && (
-              <motion.span
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="font-medium"
-              >
-                {text}
-              </motion.span>
-            )}
-          </AnimatePresence>
-        </div>
-        <FaChevronDown className={`transition-transform ${isOpen ? 'rotate-180' : ''} text-gray-400`} />
-      </button>
-      {isOpen && (
-        <div className="ml-4 mt-2 space-y-2" role="menu">
-          {children}
-        </div>
-      )}
-    </div>
-  );
-});
-
-// Memoize the SidebarSubItem component
-const SidebarSubItem = React.memo(({ icon: Icon, text, link, active }) => {
-  const { isSidebarOpen } = useContext(SidebarContext);
-  
-  return (
-    <Link 
-      to={link} 
-      className={`flex items-center space-x-3 p-2 rounded-lg transition-colors ${
-        active ? 'bg-green-50 dark:bg-green-900 text-green-600 dark:text-green-300' : 
-        'text-gray-500 dark:text-gray-400 hover:bg-green-50 dark:hover:bg-green-900 hover:text-green-600 dark:hover:text-green-300'
-      }`}
-      role="menuitem"
-      aria-current={active ? 'page' : undefined}
-    >
-      <Icon className={`text-sm ${active ? 'text-green-500' : 'text-gray-400'}`} />
-      <AnimatePresence>
-        {isSidebarOpen && (
-          <motion.span
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="text-sm"
           >
             {text}
           </motion.span>

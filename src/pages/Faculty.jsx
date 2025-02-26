@@ -999,6 +999,9 @@ const FacultyModal = ({
                 case '1':
                     operation = 'saveAdmin';
                     break;
+                case '2':
+                    operation = 'savePersonnel';
+                    break;
                 case '5':
                     operation = 'saveDean';
                     break;
@@ -1021,6 +1024,24 @@ const FacultyModal = ({
                         password: formData.users_password,
                         departmentId: selectedDepartment.departments_id,
                         pic: ""
+                    }
+                };
+            } else if (formData.users_role === '2') {
+                // Add new case for Personnel
+                jsonData = {
+                    operation: operation,
+                    data: {
+                        adminId: localStorage.getItem("user_id"),
+                        firstName: formData.users_firstname,
+                        middleName: formData.users_middlename,
+                        lastName: formData.users_lastname,
+                        contact: formData.users_email,
+                        schoolId: formData.users_school_id,
+                        contactNumber: formData.users_contact_number,
+                        userLevelId: formData.users_role,
+                        password: formData.users_password,
+                        departmentId: selectedDepartment.departments_id,
+                        pic: "" // Add pic handling if needed
                     }
                 };
             } else {

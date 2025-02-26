@@ -1,16 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
-import Calendar from './landCalendar';  // Add this import
-import { FaClipboardList, FaCar, FaUsers, FaBuilding, FaTools, FaUserTie, FaEye, FaCheckCircle, FaBell, FaPlus, FaSearch, FaCog, FaUserCog, FaUserCircle, FaSun, FaMoon } from 'react-icons/fa';
-import { Line, Doughnut, Bar } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, ArcElement, BarElement, Title, Tooltip, Legend } from 'chart.js';
+
+import { FaClipboardList, FaCar, FaUsers, FaBuilding, FaTools, FaUserTie, FaEye, FaCheckCircle, FaBell, FaPlus, FaSearch, FaCog, FaUserCog, FaUserCircle, FaSun, FaMoon, FaClock, FaTimesCircle, FaSpinner, FaFlag, FaClipboardCheck, FaCalendar, FaFileAlt } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { toast } from 'react-toastify';
-
-// Register ChartJS components
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ArcElement, BarElement, Title, Tooltip, Legend);
+import { format } from 'date-fns';
 
 const formatDate = (dateInput) => {
     if (!dateInput) return 'N/A';
@@ -52,18 +48,22 @@ const Dashboard = () => {
     const [darkMode, setDarkMode] = useState(false); // Dark mode state
     const [totals, setTotals] = useState({
         reservations: 0,
+        pending_requests: 0,
         vehicles: 0,
-        users: 0,
         venues: 0,
         equipments: 0,
-        personnel: 0 // Added personnel in state
+        users: 0
     });
-    const [chartData, setChartData] = useState(null);
+    const [reservationStats, setReservationStats] = useState({
+        daily: [],
+        weekly: [],
+        monthly: []
+    });
+    const [activeView, setActiveView] = useState('daily');
+    const [pendingApprovals, setPendingApprovals] = useState([]);
+    const [upcomingReservations, setUpcomingReservations] = useState([]);
     const [notifications, setNotifications] = useState([]);
     const [showNotifications, setShowNotifications] = useState(false);
-    const [reservationChartData, setReservationChartData] = useState(null);
-    const [totalReservationsData, setTotalReservationsData] = useState(null);
-    const [userActivityData, setUserActivityData] = useState(null);
     const [venues, setVenues] = useState([]);
     const [vehicles, setVehicles] = useState([]);
     const [equipment, setEquipment] = useState([]);
@@ -85,6 +85,8 @@ const Dashboard = () => {
     const [releaseModalOpen, setReleaseModalOpen] = useState(false);
     const [returnConfirmation, setReturnConfirmation] = useState({ show: false, success: false, message: '' });
     const [releaseConfirmation, setReleaseConfirmation] = useState({ show: false, success: false, message: '' });
+    const [recentRequests, setRecentRequests] = useState([]);
+    const [completedTasks, setCompletedTasks] = useState([]);
 
     // Read dark mode preference from localStorage
     useEffect(() => {
@@ -122,43 +124,22 @@ const Dashboard = () => {
     }, [loading]);
 
     useEffect(() => {
-        const fetchTotals = async () => {
-            try {
-                const response = await fetch('http://localhost/coc/gsd/get_totals.php');
-                const result = await response.json();
-
-                if (result.status === 'success') {
-                    setTotals(result.data);
-                } else {
-                    console.error('Error fetching totals:', result.message);
-                }
-            } catch (error) {
-                console.error('Error fetching totals:', error);
-            }
-        };
-
-        fetchTotals();
-    }, []);
-
-    // Add chart data initialization after the state declarations
-    useEffect(() => {
-        const fetchChartData = async () => {
+        const fetchReservationStats = async () => {
             try {
                 const response = await axios.post('http://localhost/coc/gsd/fetch_reserve.php', {
-                    operation: 'fetchChartData'
+                    operation: 'getReservationStats'
                 });
                 if (response.data.status === 'success') {
-                    setChartData(response.data.data);
+                    setTotals(response.data.totals);
+                    setReservationStats(response.data.stats);
                 }
             } catch (error) {
-                console.error('Error fetching chart data:', error);
+                console.error('Error fetching reservation stats:', error);
             }
         };
 
-        if (!loading) {
-            fetchChartData();
-        }
-    }, [loading]);
+        fetchReservationStats();
+    }, []);
 
     // Fix dark mode implementation after useEffect
     useEffect(() => {
@@ -310,6 +291,57 @@ const Dashboard = () => {
         }
     }, []);
 
+    const fetchTotals = async () => {
+        try {
+            const response = await axios.post('http://localhost/coc/gsd/get_totals.php', { 
+                operation: 'getTotals' 
+            });
+
+            if (response.data.status === 'success') {
+                setTotals(response.data.data);
+            } else {
+                toast.error('Error fetching dashboard statistics');
+            }
+        } catch (error) {
+            console.error('Error fetching totals:', error);
+            toast.error('Error fetching dashboard statistics');
+        }
+    };
+
+    const fetchRequest = useCallback(async () => {
+        try {
+            const response = await axios.post('http://localhost/coc/gsd/get_totals.php', {
+                operation: 'fetchRequest'
+            });
+
+            if (response.data && response.data.status === 'success') {
+                setRecentRequests(response.data.data);
+            } else {
+                toast.error('Error fetching requests');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            toast.error('Failed to fetch requests');
+        }
+    }, []);
+
+    const fetchCompletedTask = useCallback(async () => {
+        try {
+            const response = await axios.post('http://localhost/coc/gsd/get_totals.php', {
+                operation: 'fetchCompletedTask'
+            });
+            
+            if (response.data.status === 'success') {
+                setCompletedTasks(response.data.data);
+            } else {
+                console.error('Failed to fetch completed tasks');
+            }
+        } catch (error) {
+            console.error('Error fetching completed tasks:', error);
+            toast.error('Failed to load completed tasks');
+        }
+    }, []);
+
     useEffect(() => {
         if (!loading) {
             fetchVenues();
@@ -319,8 +351,11 @@ const Dashboard = () => {
             fetchReleaseFacilities();
             fetchPersonnel(); // Add this line
             fetchReturnFacilities();
+            fetchTotals();
+            fetchRequest(); // Add this line
+            fetchCompletedTask();
         }
-    }, [loading, fetchVenues, fetchVehicles, fetchEquipment, fetchReservations, fetchReleaseFacilities, fetchReturnFacilities]);
+    }, [loading, fetchVenues, fetchVehicles, fetchEquipment, fetchReservations, fetchReleaseFacilities, fetchReturnFacilities, fetchRequest, fetchCompletedTask]);
 
     // Handle back navigation behavior
     useEffect(() => {
@@ -437,213 +472,6 @@ const Dashboard = () => {
         }
     };
 
-    const handleRelease = useCallback(async (reservationId) => {
-        try {
-            const adminId = localStorage.getItem('user_id');
-            if (!adminId) {
-                setReleaseConfirmation({
-                    show: true,
-                    success: false,
-                    message: 'Admin ID not found. Please log in again.'
-                });
-                return;
-            }
-
-            setLoading(true);
-
-            const payload = {
-                operation: "insertRelease",
-                reservationId: reservationId,
-                adminId: adminId
-            };
-
-            const response = await axios.post('http://localhost/coc/gsd/fetch_reserve.php', payload);
-
-            if (response.data && response.data.status === 'success') {
-                setReleaseConfirmation({
-                    show: true,
-                    success: true,
-                    message: response.data.message || 'Facility released successfully'
-                });
-                
-                // Update local state
-                setReleaseFacilities(prevFacilities => 
-                    prevFacilities.filter(facility => facility.reservation_id !== reservationId)
-                );
-
-                // Close modal after successful release
-                setReleaseModalOpen(false);
-                setSelectedReleaseReservation(null);
-            } else {
-                setReleaseConfirmation({
-                    show: true,
-                    success: false,
-                    message: response.data.message || 'Error releasing facility. Please try again.'
-                });
-            }
-        } catch (error) {
-            console.error('Release facility error:', error);
-            setReleaseConfirmation({
-                show: true,
-                success: false,
-                message: 'An error occurred while processing your request.'
-            });
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
-    const handleReturn = async (reservationId) => {
-        try {
-            const adminId = localStorage.getItem('user_id');
-            if (!adminId) {
-                setReturnConfirmation({
-                    show: true,
-                    success: false,
-                    message: 'Admin ID not found. Please log in again.'
-                });
-                return;
-            }
-
-            setLoading(true);
-
-            // Prepare the conditions object
-            const conditions = {
-                equipment: {},
-                vehicle: {},
-                ven: {}
-            };
-
-            // Populate the conditions object based on itemConditions state
-            Object.entries(itemConditions).forEach(([key, value]) => {
-                const [type, id] = key.split('_');
-                if (type === 'venue') {
-                    conditions.ven[id] = parseInt(value);
-                } else if (type === 'vehicle') {
-                    conditions.vehicle[id] = parseInt(value);
-                } else if (type === 'equipment') {
-                    conditions.equipment[id] = parseInt(value);
-                }
-            });
-
-            // Check if all items have a condition selected
-            const allItemsHaveCondition = selectedReturnReservation.venues.every(venue => conditions.ven[venue.ven_id]) &&
-                selectedReturnReservation.vehicles.every(vehicle => conditions.vehicle[vehicle.vehicle_id]) &&
-                selectedReturnReservation.equipment.every(equip => conditions.equipment[equip.equip_id]);
-
-            if (!allItemsHaveCondition) {
-                setReturnConfirmation({
-                    show: true,
-                    success: false,
-                    message: 'Please select a condition for all items before returning.'
-                });
-                setLoading(false);
-                return;
-            }
-
-            const payload = {
-                operation: "insertReturn",
-                reservationId: parseInt(reservationId),
-                adminId: parseInt(adminId),
-                conditions: conditions
-            };
-
-            const response = await axios.post('http://localhost/coc/gsd/fetch_reserve.php', payload);
-
-            if (response.data && response.data.status === 'success') {
-                setReturnConfirmation({
-                    show: true,
-                    success: true,
-                    message: response.data.message || 'Facility returned successfully'
-                });
-                
-                // Update local state
-                setReturnFacilities(prevFacilities => 
-                    prevFacilities.filter(facility => facility.reservation_id !== reservationId)
-                );
-
-                setReturnModalOpen(false);
-                setSelectedReturnReservation(null);
-                setItemConditions({});
-            } else {
-                setReturnConfirmation({
-                    show: true,
-                    success: false,
-                    message: response.data.message || 'Error returning facility. Please try again.'
-                });
-            }
-        } catch (error) {
-            console.error('Return facility error:', error);
-            let errorMessage = 'An error occurred while processing your request.';
-            if (error.response && error.response.data && error.response.data.message) {
-                errorMessage = error.response.data.message;
-            } else if (error.message) {
-                errorMessage = error.message;
-            }
-            setReturnConfirmation({
-                show: true,
-                success: false,
-                message: errorMessage
-            });
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const fetchRecentReservationDetails = async (reservationId) => {
-        try {
-            const response = await axios.post('http://localhost/coc/gsd/fetch_reserve.php', {
-                operation: 'getReservationDetailsById',
-                reservation_id: reservationId,
-            });
-
-            if (response.data && response.data.status === 'success') {
-                setSelectedRecentReservation(response.data.data);
-                setRecentReservationModalOpen(true);
-            } else {
-                toast.error('Error fetching recent reservation details.');
-            }
-        } catch (error) {
-            toast.error('Error fetching recent reservation details.');
-        }
-    };
-
-    const fetchReleaseReservationDetails = async (reservationId) => {
-        try {
-            const response = await axios.post('http://localhost/coc/gsd/fetch_reserve.php', {
-                operation: 'getReservationDetailsById',
-                reservation_id: reservationId,
-            });
-
-            if (response.data && response.data.status === 'success') {
-                setSelectedReleaseReservation(response.data.data);
-                setReleaseModalOpen(true);
-            } else {
-                toast.error('Error fetching release reservation details.');
-            }
-        } catch (error) {
-            toast.error('Error fetching release reservation details.');
-        }
-    };
-
-    const fetchReturnReservationDetails = async (reservationId) => {
-        try {
-            const response = await axios.post('http://localhost/coc/gsd/fetch_reserve.php', {
-                operation: 'getReservationDetailsById',
-                reservation_id: reservationId,
-            });
-
-            if (response.data && response.data.status === 'success') {
-                setSelectedReturnReservation(response.data.data);
-                setReturnModalOpen(true);
-            } else {
-                toast.error('Error fetching return reservation details.');
-            }
-        } catch (error) {
-            toast.error('Error fetching return reservation details.');
-        }
-    };
-
     if (loading) {
         return (
             <div className="flex items-center justify-center h-screen bg-gray-100">
@@ -676,895 +504,176 @@ const Dashboard = () => {
     }
 
     return (
-        <motion.div 
-            className={`dashboard-container flex h-screen ${fadeIn ? 'fade-in' : ''} ${darkMode ? 'dark' : ''}`}
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-        >
+        <motion.div className={`dashboard-container flex h-screen ${fadeIn ? 'fade-in' : ''}`}>
             <Sidebar />
-            <div className="flex-1 overflow-hidden bg-gradient-to-br from-white to-green-100">
+            <div className="flex-1 overflow-hidden bg-gray-50">
                 <div className="h-full flex flex-col">
                     {/* Header */}
-                    <header className="bg-white shadow-md p-4">
+                    <header className="bg-white shadow-sm p-4">
                         <div className="flex justify-between items-center">
-                            <h1 className="text-2xl font-bold text-green-800">Admin Dashboard</h1>
+                            <h1 className="text-2xl font-bold text-gray-800">Admin Dashboard</h1>
                             <div className="flex items-center space-x-4">
-                                <button onClick={() => setShowQuickActions(!showQuickActions)} className="bg-green-500 text-white px-4 py-2 rounded-full hover:bg-green-600 transition-colors">
-                                    Quick Actions
-                                </button>
-                                <button onClick={() => setDarkMode(!darkMode)} className="text-gray-600 hover:text-gray-800">
-                                    {darkMode ? <FaSun /> : <FaMoon />}
+                                <button onClick={() => setDarkMode(!darkMode)} 
+                                    className="p-2 rounded-full hover:bg-gray-100">
+                                    {darkMode ? <FaSun className="text-yellow-500" /> : <FaMoon className="text-gray-600" />}
                                 </button>
                             </div>
                         </div>
                     </header>
 
-                    {/* Main content area */}
-                    <div className="flex-1 overflow-y-auto p-6">
-                    <motion.div 
-                                className=""
-                                variants={itemVariants}
-                            >
-                                <h3 className="text-xl font-semibold mb-4 text-green-800"></h3>
-                                <div className="h-[800px] overflow-hidden">
-                                    <Calendar />
-                                </div>
-                            </motion.div>
-                        {/* Quick Actions Dropdown */}
-                        <AnimatePresence>
-                            {showQuickActions && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: -10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -10 }}
-                                    className="bg-white rounded-lg shadow-lg p-4 mb-6 border border-green-200"
-                                >
-                                    <h3 className="text-xl font-semibold mb-4 text-green-800">Quick Actions</h3>
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                                        <button className="bg-green-100 hover:bg-green-200 text-green-800 font-bold py-2 px-4 rounded flex items-center justify-center">
-                                            <FaPlus className="mr-2" /> Add Reservation
-                                        </button>
-                                        <button className="bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold py-2 px-4 rounded flex items-center justify-center">
-                                            <FaSearch className="mr-2" /> Search Users
-                                        </button>
-                                        <button className="bg-yellow-100 hover:bg-yellow-200 text-yellow-800 font-bold py-2 px-4 rounded flex items-center justify-center">
-                                            <FaCar className="mr-2" /> Manage Vehicles
-                                        </button>
-                                        <button className="bg-purple-100 hover:bg-purple-200 text-purple-800 font-bold py-2 px-4 rounded flex items-center justify-center">
-                                            <FaBuilding className="mr-2" /> Manage Venues
-                                        </button>
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-
-                        {/* Dashboard Grid */}
-                        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                            {/* Summary Cards */}
-                            <motion.div 
-                                className="col-span-full grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4"
-                                variants={itemVariants}
-                            >
-                                {[
-                                    { icon: <FaClipboardList />, title: "Reservations", value: totals.reservations },
-                                    { icon: <FaCar />, title: "Vehicles", value: totals.vehicles },
-                                    { icon: <FaUsers />, title: "Users", value: totals.users },
-                                    { icon: <FaBuilding />, title: "Venues", value: totals.venues },
-                                    { icon: <FaTools />, title: "Equipments", value: totals.equipments },
-                                    { icon: <FaUserTie />, title: "Personnel", value: totals.personnel }
-                                ].map((item, index) => (
-                                    <motion.div 
-                                        key={index} 
-                                        className={`bg-white rounded-lg shadow-md p-4 flex flex-col items-center justify-center transform hover:scale-105 transition-transform duration-200`}
-                                        variants={itemVariants}
-                                        whileHover={{ scale: 1.05 }}
-                                        whileTap={{ scale: 0.95 }}
-                                    >
-                                        <motion.div 
-                                            className="text-3xl mb-2 text-green-500"
-                                            initial={{ scale: 0 }}
-                                            animate={{ scale: 1 }}
-                                            transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-                                        >
-                                            {item.icon}
-                                        </motion.div>
-                                        <p className="text-sm font-medium mb-1 text-gray-600">{item.title}</p>
-                                        <motion.p 
-                                            className="text-xl font-bold text-gray-800"
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                            transition={{ delay: 0.5 }}
-                                        >
-                                            {item.value}
-                                        </motion.p>
-                                    </motion.div>
-                                ))}
-                            </motion.div>
-
-                            {/* Main Content Column */}
-                            <div className="col-span-full lg:col-span-3 space-y-6">
-                                {/* Recent Reservations */}
-                                <motion.div 
-                                    className="bg-white rounded-lg shadow-md p-6"
-                                    variants={itemVariants}
-                                >
-                                    <h3 className="text-xl font-semibold mb-4 text-green-800">Recent Reservations</h3>
-                                    <div className="overflow-x-auto">
-                                        <table className="min-w-full">
-                                            <thead className="bg-gray-100">
-                                                <tr>
-                                                    <th className="px-4 py-2 text-left">Name</th>
-                                                    <th className="px-4 py-2 text-left">Event Title</th>
-                                                    <th className="px-4 py-2 text-left">Created</th>
-                                                    <th className="px-4 py-2 text-left">Status</th>
-                                                    <th className="px-4 py-2 text-left">Actions</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {recentReservations.map((reservation) => (
-                                                    <tr key={reservation.reservation_id} className="hover:bg-gray-50">
-                                                        <td className="px-4 py-2">{reservation.reservation_name}</td>
-                                                        <td className="px-4 py-2">{reservation.reservation_event_title}</td>
-                                                        <td className="px-4 py-2">{formatDate(new Date(reservation.date_created))}</td>
-                                                        <td className="px-4 py-2">
-                                                            <span className={`px-2 py-1 rounded-full text-xs ${getStatusClass(reservation.reservation_status_name)}`}>
-                                                                {reservation.reservation_status_name}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-4 py-2">
-                                                            <button 
-                                                                className="text-blue-500 hover:text-blue-700 transition-colors"
-                                                                onClick={() => fetchRecentReservationDetails(reservation.reservation_id)}
-                                                            >
-                                                                <FaEye />
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </motion.div>
-
-                                {/* Today's Facility Releases */}
-                                <motion.div 
-                                    className="bg-white rounded-lg shadow-md p-6"
-                                    variants={itemVariants}
-                                >
-                                    <h3 className="text-xl font-semibold mb-4 text-green-800">Today's Facility Releases</h3>
-                                    {releaseFacilities.length > 0 ? (
-                                        <div className="overflow-y-auto max-h-[300px]">
-                                            <table className="min-w-full">
-                                                <thead className="bg-gray-100">
-                                                    <tr>
-                                                        <th className="px-4 py-2 text-left">Reservation Name</th>
-                                                        <th className="px-4 py-2 text-left">Event Title</th>
-                                                        <th className="px-4 py-2 text-left">Action</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {releaseFacilities.map((facility) => (
-                                                        <tr key={facility.reservation_id} className="hover:bg-gray-50">
-                                                            <td className="px-4 py-2">{facility.reservation_name}</td>
-                                                            <td className="px-4 py-2">{facility.reservation_event_title}</td>
-                                                            <td className="px-4 py-2">
-                                                                <button 
-                                                                    className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 transition-colors"
-                                                                    onClick={() => fetchReleaseReservationDetails(facility.reservation_id)}
-                                                                >
-                                                                    View
-                                                                </button>
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    ) : (
-                                        <p className="text-gray-600 italic">No records for today</p>
-                                    )}
-                                </motion.div>
-
-                                {/* Ongoing Reservations */}
-                                <motion.div 
-                                    className="bg-white rounded-lg shadow-md p-6"
-                                    variants={itemVariants}
-                                >
-                                    <h3 className="text-xl font-semibold mb-4 text-green-800">Ongoing Reservations</h3>
-                                    <div className="overflow-y-auto max-h-[300px]">
-                                        <table className="min-w-full">
-                                            <thead className="bg-gray-100">
-                                                <tr>
-                                                    <th className="px-4 py-2 text-left">Event</th>
-                                                    <th className="px-4 py-2 text-left">Start Date</th>
-                                                    <th className="px-4 py-2 text-left">End Date</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {ongoingReservations.map((reservation, index) => (
-                                                    <tr key={index} className="hover:bg-gray-50">
-                                                        <td className="px-4 py-2">{reservation.reservation_event_title}</td>
-                                                        <td className="px-4 py-2">{formatDate(reservation.reservation_start_date)}</td>
-                                                        <td className="px-4 py-2">{formatDate(reservation.reservation_end_date)}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </motion.div>
-
-                                {/* Facilities to Return */}
-                                <motion.div 
-                                    className="bg-white rounded-lg shadow-md p-6"
-                                    variants={itemVariants}
-                                >
-                                    <h3 className="text-xl font-semibold mb-4 text-green-800">Facilities to Return</h3>
-                                    {returnFacilities.length > 0 ? (
-                                        <div className="overflow-y-auto max-h-[300px]">
-                                            <table className="min-w-full">
-                                                <thead className="bg-gray-100">
-                                                    <tr>
-                                                        <th className="px-4 py-2 text-left">Reservation Name</th>
-                                                        <th className="px-4 py-2 text-left">Event Title</th>
-                                                        <th className="px-4 py-2 text-left">End Date</th>
-                                                        <th className="px-4 py-2 text-left">Action</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {returnFacilities.map((facility) => (
-                                                        <tr key={facility.reservation_id} className="hover:bg-gray-50">
-                                                            <td className="px-4 py-2">{facility.reservation_name}</td>
-                                                            <td className="px-4 py-2">{facility.reservation_event_title}</td>
-                                                            <td className="px-4 py-2">{formatDate(facility.reservation_end_date)}</td>
-                                                            <td className="px-4 py-2">
-                                                                <button 
-                                                                    className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 transition-colors"
-                                                                    onClick={() => fetchReturnReservationDetails(facility.reservation_id)}
-                                                                >
-                                                                    View
-                                                                </button>
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    ) : (
-                                        <p className="text-gray-600 italic">No records for today</p>
-                                    )}
-                                </motion.div>
-                            </div>
-
-                            {/* Active Personnel Panel */}
-                            <motion.div 
-                                className="col-span-full lg:col-span-1 bg-white rounded-lg shadow-md p-6 h-full"
-                                variants={itemVariants}
-                            >
-                                <h3 className="text-lg font-semibold mb-3 text-green-800 flex items-center">
-                                    <FaUserCircle className="mr-2" /> Active Personnel
-                                </h3>
-                                <div className="overflow-y-auto max-h-[calc(100vh-200px)]">
-                                    <ul className="space-y-2">
-                                        {personnel.map((person, index) => (
-                                            <li key={index} className="flex items-center bg-gray-50 p-2 rounded">
-                                                <FaUserCircle className="text-green-500 mr-2" />
-                                                <div>
-                                                    <p className="font-medium">{`${person.jo_personel_fname} ${person.jo_personel_lname}`}</p>
-                                                    <p className="text-sm text-gray-600">{person.position_name}</p>
-                                                </div>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            </motion.div>
-
-                            {/* Calendar Component */}
-                            
+                    {/* Main Content */}
+                    <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                        {/* Statistics Overview */}
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                            <StatCard
+                                title="Total Reservations"
+                                value={totals.reservations}
+                                icon={<FaClipboardList />}
+                                color="bg-blue-500"
+                            />
+                            <StatCard
+                                title="Pending Approval"
+                                value={totals.pending_requests}
+                                icon={<FaClock />}
+                                color="bg-yellow-500"
+                            />
+                            <StatCard
+                                title="Venues"
+                                value={totals.venues}
+                                icon={<FaBuilding />}
+                                color="bg-green-500"
+                            />
+                            <StatCard
+                                title="Equipment"
+                                value={totals.equipments}
+                                icon={<FaTools />}
+                                color="bg-purple-500"
+                            />
+                            <StatCard
+                                title="Vehicles"
+                                value={totals.vehicles}
+                                icon={<FaCar />}
+                                color="bg-indigo-500"
+                            />
+                            <StatCard
+                                title="Users"
+                                value={totals.users}
+                                icon={<FaUsers />}
+                                color="bg-red-500"
+                            />
                         </div>
 
-                        {/* Existing modals */}
-                        <AnimatePresence>
-                            {modalOpen && selectedReservation && (
-                                <motion.div 
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
-                                >
-                                    <motion.div 
-                                        initial={{ scale: 0.9, opacity: 0 }}
-                                        animate={{ scale: 1, opacity: 1 }}
-                                        exit={{ scale: 0.9, opacity: 0 }}
-                                        className="bg-white rounded-xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-                                    >
-                                        <h3 className="text-3xl font-bold mb-6 text-green-800 border-b-2 border-green-500 pb-2">Reservation Details</h3>
-                                        <div className="grid grid-cols-2 gap-6">
-                                            <div>
-                                                <p className="font-medium text-gray-600">Name:</p>
-                                                <p className="text-lg">{selectedReservation.reservation?.reservation_name}</p>
-                                            </div>
-                                            <div>
-                                                <p className="font-medium text-gray-600">Status:</p>
-                                                <p className={`px-3 py-1 rounded-full text-sm inline-block ${getStatusClass(selectedReservation.reservation?.status_master_name)}`}>
-                                                    {selectedReservation.reservation?.status_master_name}
-                                                </p>
-                                            </div>
-                                            <div className="col-span-2">
-                                                <p className="font-medium text-gray-600">Event Title:</p>
-                                                <p className="text-lg">{selectedReservation.reservation?.reservation_event_title}</p>
-                                            </div>
-                                            <div className="col-span-2">
-                                                <p className="font-medium text-gray-600">Description:</p>
-                                                <p className="text-sm">{selectedReservation.reservation?.reservation_description}</p>
-                                            </div>
-                                            <div>
-                                                <p className="font-medium text-gray-600">Start:</p>
-                                                <p>{formatDate(selectedReservation.reservation?.reservation_start_date)}</p>
-                                            </div>
-                                            <div>
-                                                <p className="font-medium text-gray-600">End:</p>
-                                                <p>{formatDate(selectedReservation.reservation?.reservation_end_date)}</p>
-                                            </div>
-                                            <div className="col-span-2">
-                                                <p className="font-medium text-gray-600">Created:</p>
-                                                <p>{formatDate(selectedReservation.reservation?.date_created)}</p>
-                                            </div>
-                                            <div>
-                                                <p className="font-medium text-gray-600">Requested By:</p>
-                                                <p className="text-lg">{selectedReservation.reservation?.requested_by}</p>
-                                            </div>
-                                        </div>
-
-                                        {/* Vehicles */}
-                                        {selectedReservation.vehicles && selectedReservation.vehicles.length > 0 && (
-                                            <div className="mt-6">
-                                                <h4 className="font-semibold text-green-700 mb-2">Vehicles Used:</h4>
-                                                <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
-                                                    {selectedReservation.vehicles.map((vehicle) => (
-                                                        <li key={vehicle.vehicle_license} className="text-sm mb-2">
-                                                            {vehicle.vehicle_license} (ID: {vehicle.vehicle_reservation_vehicle_id})
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        )}
-
-                                        {/* Equipment */}
-                                        {selectedReservation.equipment && selectedReservation.equipment.length > 0 && (
-                                            <div className="mt-6">
-                                                <h4 className="font-semibold text-green-700 mb-2">Equipment Used:</h4>
-                                                <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
-                                                    {selectedReservation.equipment.map((equip) => (
-                                                        <li key={equip.equip_name} className="text-sm mb-2">
-                                                            {equip.equip_name} (Quantity: {equip.quantity})
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        )}
-
-                                        {/* Venues */}
-                                        {selectedReservation.venues && selectedReservation.venues.length > 0 && (
-                                            <div className="mt-6">
-                                                <h4 className="font-semibold text-green-700 mb-2">Venues Used:</h4>
-                                                <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
-                                                    {selectedReservation.venues.map((venue) => (
-                                                        <li key={venue.ven_name} className="text-sm mb-2">
-                                                            {venue.ven_name}
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        )}
-
-                                        <div className="mt-8 flex justify-end space-x-4">
-                                            {selectedReservation.reservation?.reservation_status_name === 'reserve' && (
-                                                <button 
-                                                    className={`bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600 transition-colors ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                                    onClick={() => handleRelease(selectedReservation.reservation.reservation_id)}
-                                                    disabled={loading}
-                                                >
-                                                    {loading ? 'Releasing...' : 'Release'}
-                                                </button>
-                                            )}
-                                            <button 
-                                                className="bg-gray-300 text-gray-800 py-2 px-4 rounded hover:bg-gray-400 transition-colors"
-                                                onClick={() => {
-                                                    setModalOpen(false);
-                                                    setSelectedReservation(null);
-                                                }}
-                                                disabled={loading}
-                                            >
-                                                Close
-                                            </button>
-                                        </div>
-                                    </motion.div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-
-                        {/* Recent Reservation Modal */}
-                        <AnimatePresence>
-                            {recentReservationModalOpen && selectedRecentReservation && (
-                                <motion.div 
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
-                                >
-                                    <motion.div 
-                                        initial={{ scale: 0.9, opacity: 0 }}
-                                        animate={{ scale: 1, opacity: 1 }}
-                                        exit={{ scale: 0.9, opacity: 0 }}
-                                        className="bg-white rounded-xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-                                    >
-                                        <h3 className="text-3xl font-bold mb-6 text-green-800 border-b-2 border-green-500 pb-2">Recent Reservation Details</h3>
-                                        <div className="grid grid-cols-2 gap-6">
-                                            <div>
-                                                <p className="font-medium text-gray-600">Name:</p>
-                                                <p className="text-lg">{selectedRecentReservation.reservation?.reservation_name}</p>
-                                            </div>
-                                            <div>
-                                                <p className="font-medium text-gray-600">Status:</p>
-                                                <p className={`px-3 py-1 rounded-full text-sm inline-block ${getStatusClass(selectedRecentReservation.reservation?.status_master_name)}`}>
-                                                    {selectedRecentReservation.reservation?.status_master_name}
-                                                </p>
-                                            </div>
-                                            <div className="col-span-2">
-                                                <p className="font-medium text-gray-600">Event Title:</p>
-                                                <p className="text-lg">{selectedRecentReservation.reservation?.reservation_event_title}</p>
-                                            </div>
-                                            <div className="col-span-2">
-                                                <p className="font-medium text-gray-600">Description:</p>
-                                                <p className="text-sm">{selectedRecentReservation.reservation?.reservation_description}</p>
-                                            </div>
-                                            <div>
-                                                <p className="font-medium text-gray-600">Start:</p>
-                                                <p>{formatDate(selectedRecentReservation.reservation?.reservation_start_date)}</p>
-                                            </div>
-                                            <div>
-                                                <p className="font-medium text-gray-600">End:</p>
-                                                <p>{formatDate(selectedRecentReservation.reservation?.reservation_end_date)}</p>
-                                            </div>
-                                            <div className="col-span-2">
-                                                <p className="font-medium text-gray-600">Created:</p>
-                                                <p>{formatDate(selectedRecentReservation.reservation?.date_created)}</p>
-                                            </div>
-                                            <div>
-                                                <p className="font-medium text-gray-600">Requested By:</p>
-                                                <p className="text-lg">{selectedRecentReservation.reservation?.users_name}</p>
-                                            </div>
-                                            <div>
-                                                <p className="font-medium text-gray-600">Contact Number:</p>
-                                                <p className="text-lg">{selectedRecentReservation.reservation?.users_contact_number}</p>
-                                            </div>
-                                        </div>
-
-                                        {/* Vehicles */}
-                                        {selectedRecentReservation.vehicles && selectedRecentReservation.vehicles.length > 0 && (
-                                            <div className="mt-6">
-                                                <h4 className="font-semibold text-green-700 mb-2">Vehicles Used:</h4>
-                                                <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
-                                                    {selectedRecentReservation.vehicles.map((vehicle) => (
-                                                        <li key={vehicle.vehicle_license} className="text-sm mb-2">
-                                                            {vehicle.vehicle_license} (ID: {vehicle.vehicle_reservation_vehicle_id})
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        )}
-
-                                        {/* Equipment */}
-                                        {selectedRecentReservation.equipment && selectedRecentReservation.equipment.length > 0 && (
-                                            <div className="mt-6">
-                                                <h4 className="font-semibold text-green-700 mb-2">Equipment Used:</h4>
-                                                <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
-                                                    {selectedRecentReservation.equipment.map((equip) => (
-                                                        <li key={equip.equip_name} className="text-sm mb-2">
-                                                            {equip.equip_name} (Quantity: {equip.quantity})
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        )}
-
-                                        {/* Venues */}
-                                        {selectedRecentReservation.venues && selectedRecentReservation.venues.length > 0 && (
-                                            <div className="mt-6">
-                                                <h4 className="font-semibold text-green-700 mb-2">Venues Used:</h4>
-                                                <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
-                                                    {selectedRecentReservation.venues.map((venue) => (
-                                                        <li key={venue.ven_name} className="text-sm mb-2">
-                                                            {venue.ven_name}
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        )}
-
-                                        <div className="mt-8 flex justify-end space-x-4">
-                                            <button 
-                                                className="bg-gray-300 text-gray-800 py-2 px-4 rounded hover:bg-gray-400 transition-colors"
-                                                onClick={() => {
-                                                    setRecentReservationModalOpen(false);
-                                                    setSelectedRecentReservation(null);
-                                                }}
-                                            >
-                                                Close
-                                            </button>
-                                        </div>
-                                    </motion.div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-
-                        {/* Release Reservation Modal */}
-                        <AnimatePresence>
-                            {releaseModalOpen && selectedReleaseReservation && (
-                                <motion.div 
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
-                                >
-                                    <motion.div 
-                                        initial={{ scale: 0.9, opacity: 0 }}
-                                        animate={{ scale: 1, opacity: 1 }}
-                                        exit={{ scale: 0.9, opacity: 0 }}
-                                        className="bg-white rounded-xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-                                    >
-                                        <h3 className="text-3xl font-bold mb-6 text-green-800 border-b-2 border-green-500 pb-2">Release Reservation Details</h3>
-                                        <div className="grid grid-cols-2 gap-6">
-                                            <div>
-                                                <p className="font-medium text-gray-600">Name:</p>
-                                                <p className="text-lg">{selectedReleaseReservation.reservation?.reservation_name}</p>
-                                            </div>
-                                            <div>
-                                                <p className="font-medium text-gray-600">Status:</p>
-                                                <p className={`px-3 py-1 rounded-full text-sm inline-block ${getStatusClass(selectedReleaseReservation.reservation?.status_master_name)}`}>
-                                                    {selectedReleaseReservation.reservation?.status_master_name}
-                                                </p>
-                                            </div>
-                                            <div className="col-span-2">
-                                                <p className="font-medium text-gray-600">Event Title:</p>
-                                                <p className="text-lg">{selectedReleaseReservation.reservation?.reservation_event_title}</p>
-                                            </div>
-                                            <div className="col-span-2">
-                                                <p className="font-medium text-gray-600">Description:</p>
-                                                <p className="text-sm">{selectedReleaseReservation.reservation?.reservation_description}</p>
-                                            </div>
-                                            <div>
-                                                <p className="font-medium text-gray-600">Start:</p>
-                                                <p>{formatDate(selectedReleaseReservation.reservation?.reservation_start_date)}</p>
-                                            </div>
-                                            <div>
-                                                <p className="font-medium text-gray-600">End:</p>
-                                                <p>{formatDate(selectedReleaseReservation.reservation?.reservation_end_date)}</p>
-                                            </div>
-                                            <div className="col-span-2">
-                                                <p className="font-medium text-gray-600">Created:</p>
-                                                <p>{formatDate(selectedReleaseReservation.reservation?.date_created)}</p>
-                                            </div>
-                                            <div>
-                                                <p className="font-medium text-gray-600">Requested By:</p>
-                                                <p className="text-lg">{selectedReleaseReservation.reservation?.users_name}</p>
-                                            </div>
-                                            <div>
-                                                <p className="font-medium text-gray-600">Contact Number:</p>
-                                                <p className="text-lg">{selectedReleaseReservation.reservation?.users_contact_number}</p>
-                                            </div>
-                                        </div>
-
-                                        {/* Vehicles */}
-                                        {selectedReleaseReservation.vehicles && selectedReleaseReservation.vehicles.length > 0 && (
-                                            <div className="mt-6">
-                                                <h4 className="font-semibold text-green-700 mb-2">Vehicles Used:</h4>
-                                                <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
-                                                    {selectedReleaseReservation.vehicles.map((vehicle) => (
-                                                        <li key={vehicle.vehicle_license} className="text-sm mb-2">
-                                                            {vehicle.vehicle_license} (ID: {vehicle.vehicle_reservation_vehicle_id})
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        )}
-
-                                        {/* Equipment */}
-                                        {selectedReleaseReservation.equipment && selectedReleaseReservation.equipment.length > 0 && (
-                                            <div className="mt-6">
-                                                <h4 className="font-semibold text-green-700 mb-2">Equipment Used:</h4>
-                                                <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
-                                                    {selectedReleaseReservation.equipment.map((equip) => (
-                                                        <li key={equip.equip_name} className="text-sm mb-2">
-                                                            {equip.equip_name} (Quantity: {equip.quantity})
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        )}
-
-                                        {/* Venues */}
-                                        {selectedReleaseReservation.venues && selectedReleaseReservation.venues.length > 0 && (
-                                            <div className="mt-6">
-                                                <h4 className="font-semibold text-green-700 mb-2">Venues Used:</h4>
-                                                <ul className="list-disc list-inside bg-green-50 p-4 rounded-lg">
-                                                    {selectedReleaseReservation.venues.map((venue) => (
-                                                        <li key={venue.ven_name} className="text-sm mb-2">
-                                                            {venue.ven_name}
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        )}
-
-                                        <div className="mt-8 flex justify-end space-x-4">
-                                            <button 
-                                                className="bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600 transition-colors"
-                                                onClick={() => handleRelease(selectedReleaseReservation.reservation.reservation_id)}
-                                                disabled={loading}
-                                            >
-                                                {loading ? 'Releasing...' : 'Release'}
-                                            </button>
-                                            <button 
-                                                className="bg-gray-300 text-gray-800 py-2 px-4 rounded hover:bg-gray-400 transition-colors"
-                                                onClick={() => {
-                                                    setReleaseModalOpen(false);
-                                                    setSelectedReleaseReservation(null);
-                                                }}
-                                                disabled={loading}
-                                            >
-                                                Close
-                                            </button>
-                                        </div>
-                                    </motion.div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-
-                        {/* Return Reservation Modal */}
-                        <AnimatePresence>
-                            {returnModalOpen && selectedReturnReservation && (
-                                <motion.div 
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
-                                >
-                                    <motion.div 
-                                        initial={{ scale: 0.9, opacity: 0 }}
-                                        animate={{ scale: 1, opacity: 1 }}
-                                        exit={{ scale: 0.9, opacity: 0 }}
-                                        className="bg-white rounded-xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto"
-                                    >
-                                        <h3 className="text-3xl font-bold mb-6 text-green-800 border-b-2 border-green-500 pb-2">Return Reservation Details</h3>
-                                        
-                                        {/* Reservation Details */}
-                                        <div className="grid grid-cols-2 gap-4 mb-6">
-                                            <div>
-                                                <p className="font-medium text-gray-600">Name:</p>
-                                                <p className="text-lg">{selectedReturnReservation.reservation?.reservation_name}</p>
-                                            </div>
-                                            <div>
-                                                <p className="font-medium text-gray-600">Event Title:</p>
-                                                <p className="text-lg">{selectedReturnReservation.reservation?.reservation_event_title}</p>
-                                            </div>
-                                            <div>
-                                                <p className="font-medium text-gray-600">Start Date:</p>
-                                                <p>{formatDate(selectedReturnReservation.reservation?.reservation_start_date)}</p>
-                                            </div>
-                                            <div>
-                                                <p className="font-medium text-gray-600">End Date:</p>
-                                                <p>{formatDate(selectedReturnReservation.reservation?.reservation_end_date)}</p>
-                                            </div>
-                                            <div>
-                                                <p className="font-medium text-gray-600">Requested By:</p>
-                                                <p className="text-lg">{selectedReturnReservation.reservation?.requested_by}</p>
-                                            </div>
-                                        </div>
-
-                                        {/* Venues */}
-                                        {selectedReturnReservation.venues && selectedReturnReservation.venues.length > 0 && (
-                                            <div className="mb-6">
-                                                <h4 className="font-semibold text-green-700 mb-2">Venues:</h4>
-                                                <table className="w-full">
-                                                    <thead>
-                                                        <tr>
-                                                            <th className="text-left">Name</th>
-                                                            <th className="text-left">Condition</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {selectedReturnReservation.venues.map((venue) => (
-                                                            <tr key={venue.ven_id}>
-                                                                <td className="py-2">{venue.ven_name}</td>
-                                                                <td className="py-2">
-                                                                    <select
-                                                                        className="w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm rounded-md"
-                                                                        onChange={(e) => handleConditionChange('venue', venue.ven_id, e.target.value)}
-                                                                        value={itemConditions[`venue_${venue.ven_id}`] || ''}
-                                                                    >
-                                                                        <option value="">Select condition</option>
-                                                                        {conditions.map((condition) => (
-                                                                            <option key={condition.condition_id} value={condition.condition_id}>
-                                                                                {condition.condition_name}
-                                                                            </option>
-                                                                        ))}
-                                                                    </select>
-                                                                </td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        )}
-
-                                        {/* Vehicles */}
-                                        {selectedReturnReservation.vehicles && selectedReturnReservation.vehicles.length > 0 && (
-                                            <div className="mb-6">
-                                                <h4 className="font-semibold text-green-700 mb-2">Vehicles:</h4>
-                                                <table className="w-full">
-                                                    <thead>
-                                                        <tr>
-                                                            <th className="text-left">License</th>
-                                                            <th className="text-left">Condition</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {selectedReturnReservation.vehicles.map((vehicle) => (
-                                                            <tr key={vehicle.vehicle_id}>
-                                                                <td className="py-2">{vehicle.vehicle_license}</td>
-                                                                <td className="py-2">
-                                                                    <select
-                                                                        className="w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm rounded-md"
-                                                                        onChange={(e) => handleConditionChange('vehicle', vehicle.vehicle_id, e.target.value)}
-                                                                        value={itemConditions[`vehicle_${vehicle.vehicle_id}`] || ''}
-                                                                    >
-                                                                        <option value="">Select condition</option>
-                                                                        {conditions.map((condition) => (
-                                                                            <option key={condition.condition_id} value={condition.condition_id}>
-                                                                                {condition.condition_name}
-                                                                            </option>
-                                                                        ))}
-                                                                    </select>
-                                                                </td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        )}
-
-                                        {/* Equipment */}
-                                        {selectedReturnReservation.equipment && selectedReturnReservation.equipment.length > 0 && (
-                                            <div className="mb-6">
-                                                <h4 className="font-semibold text-green-700 mb-2">Equipment:</h4>
-                                                <table className="w-full">
-                                                    <thead>
-                                                        <tr>
-                                                            <th className="text-left">Name</th>
-                                                            <th className="text-left">Quantity</th>
-                                                            <th className="text-left">Condition</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {selectedReturnReservation.equipment.map((equip) => (
-                                                            <tr key={equip.equip_id}>
-                                                                <td className="py-2">{equip.equip_name}</td>
-                                                                <td className="py-2">{equip.quantity}</td>
-                                                                <td className="py-2">
-                                                                    <select
-                                                                        className="w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm rounded-md"
-                                                                        onChange={(e) => handleConditionChange('equipment', equip.equip_id, e.target.value)}
-                                                                        value={itemConditions[`equipment_${equip.equip_id}`] || ''}
-                                                                    >
-                                                                        <option value="">Select condition</option>
-                                                                        {conditions.map((condition) => (
-                                                                            <option key={condition.condition_id} value={condition.condition_id}>
-                                                                                {condition.condition_name}
-                                                                            </option>
-                                                                        ))}
-                                                                    </select>
-                                                                </td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        )}
-
-                                        <div className="mt-8 flex justify-end space-x-4">
-                                            <button 
-                                                className="bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600 transition-colors"
-                                                onClick={() => handleReturn(selectedReturnReservation.reservation.reservation_id)}
-                                                
-                                            >
-                                                {loading ? 'Returning...' : 'Return'}
-                                            </button>
-                                            <button 
-                                                className="bg-gray-300 text-gray-800 py-2 px-4 rounded hover:bg-gray-400 transition-colors"
-                                                onClick={() => {
-                                                    setReturnModalOpen(false);
-                                                    setSelectedReturnReservation(null);
-                                                    setItemConditions({});
-                                                }}
-                                                disabled={loading}
-                                            >
-                                                Close
-                                            </button>
-                                        </div>
-                                    </motion.div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-
-                        {/* Return Confirmation Modal */}
-                        <AnimatePresence>
-                            {returnConfirmation.show && (
-                                <motion.div
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-                                >
-                                    <motion.div
-                                        initial={{ scale: 0.9, opacity: 0 }}
-                                        animate={{ scale: 1, opacity: 1 }}
-                                        exit={{ scale: 0.9, opacity: 0 }}
-                                        className={`bg-white rounded-lg p-8 max-w-md w-full ${
-                                            returnConfirmation.success ? 'border-green-500' : 'border-red-500'
-                                        } border-4`}
-                                    >
-                                        <h3 className={`text-2xl font-bold mb-4 ${
-                                            returnConfirmation.success ? 'text-green-600' : 'text-red-600'
-                                        }`}>
-                                            {returnConfirmation.success ? 'Success' : 'Error'}
-                                        </h3>
-                                        <p className="text-gray-700 mb-6">{returnConfirmation.message}</p>
-                                        <button
-                                            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
-                                            onClick={() => setReturnConfirmation({ show: false, success: false, message: '' })}
+                        {/* Recent Requests and Completed Tasks Row */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Recent Requests Section */}
+                            <motion.div
+                                className="bg-white rounded-lg shadow-sm p-6"
+                                variants={cardVariants}
+                                initial="hidden"
+                                animate="visible"
+                            >
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-xl font-semibold text-gray-800 flex items-center">
+                                        <FaClipboardList className="text-green-500 text-xl mr-2" />
+                                        Recent Requests
+                                    </h2>
+                                    <span className="text-sm text-gray-500">{recentRequests.length} requests</span>
+                                </div>
+                                <div className="space-y-4">
+                                    {recentRequests.map((request, index) => (
+                                        <motion.div
+                                            key={index}
+                                            className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all duration-200 cursor-pointer border border-gray-100"
+                                            whileHover={{ scale: 1.01 }}
+                                            whileTap={{ scale: 0.99 }}
                                         >
-                                            Close
-                                        </button>
-                                    </motion.div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
+                                            <div className="flex items-start space-x-4">
+                                                <div className="bg-green-100 p-2 rounded-full">
+                                                    <FaFileAlt className="text-green-600 text-lg" />
+                                                </div>
+                                                <div>
+                                                    <h3 className="font-medium text-gray-800 mb-1">
+                                                        {request.reservation_form_name}
+                                                    </h3>
+                                                    <div className="flex items-center space-x-2 text-sm">
+                                                        <span className="text-green-600">
+                                                            {format(new Date(request.reservation_date), 'PPp')}
+                                                        </span>
+                                                        
+                                                        
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                        </motion.div>
+                                    ))}
+                                    {recentRequests.length === 0 && (
+                                        <div className="text-center py-6 text-gray-500">
+                                            No recent requests found
+                                        </div>
+                                    )}
+                                </div>
+                            </motion.div>
 
-                        {/* Release Confirmation Modal */}
-                        <AnimatePresence>
-                            {releaseConfirmation.show && (
-                                <motion.div
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-                                >
-                                    <motion.div
-                                        initial={{ scale: 0.9, opacity: 0 }}
-                                        animate={{ scale: 1, opacity: 1 }}
-                                        exit={{ scale: 0.9, opacity: 0 }}
-                                        className={`bg-white rounded-lg p-8 max-w-md w-full ${
-                                            releaseConfirmation.success ? 'border-green-500' : 'border-red-500'
-                                        } border-4`}
-                                    >
-                                        <h3 className={`text-2xl font-bold mb-4 ${
-                                            releaseConfirmation.success ? 'text-green-600' : 'text-red-600'
-                                        }`}>
-                                            {releaseConfirmation.success ? 'Success' : 'Error'}
-                                        </h3>
-                                        <p className="text-gray-700 mb-6">{releaseConfirmation.message}</p>
-                                        <button
-                                            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
-                                            onClick={() => setReleaseConfirmation({ show: false, success: false, message: '' })}
-                                        >
-                                            Close
-                                        </button>
-                                    </motion.div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
+                            {/* Completed Tasks Section */}
+                            <motion.div
+                                className="bg-white rounded-lg shadow-sm p-6"
+                                variants={cardVariants}
+                                initial="hidden"
+                                animate="visible"
+                            >
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-xl font-semibold text-gray-800 flex items-center">
+                                        <FaCheckCircle className="text-green-500 mr-2" />
+                                        Personnel Task Completion
+                                    </h2>
+                                    <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                                        {completedTasks.length} Completed
+                                    </span>
+                                </div>
+                                <div className="space-y-4">
+                                    {completedTasks.length > 0 ? (
+                                        completedTasks.map((task, index) => (
+                                            <motion.div
+                                                key={index}
+                                                className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-100 hover:bg-gray-100 transition-all duration-200"
+                                                variants={itemVariants}
+                                                whileHover={{ scale: 1.01 }}
+                                                whileTap={{ scale: 0.99 }}
+                                            >
+                                                <div className="flex items-center space-x-4">
+                                                    <div className="bg-green-100 p-2 rounded-full">
+                                                        <FaUserTie className="text-green-600 text-lg" />
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="font-medium text-gray-800">
+                                                            {task.personnel_full_name}
+                                                        </h3>
+                                                        <div className="flex items-center space-x-2 mt-1">
+                                                            <span className="flex items-center text-sm text-green-600">
+                                                                <FaCheckCircle className="mr-1" />
+                                                                {task.status_name}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center">
+                                                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                        Completed
+                                                    </span>
+                                                </div>
+                                            </motion.div>
+                                        ))
+                                    ) : (
+                                        <div className="text-center py-6">
+                                            <FaClipboardCheck className="mx-auto text-gray-400 text-3xl mb-2" />
+                                            <p className="text-gray-500">No completed tasks found</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </motion.div>
+
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1572,4 +681,22 @@ const Dashboard = () => {
     );
 };
 
+// Add new components
+const StatCard = ({ title, value, icon, color }) => (
+    <motion.div
+        className={`${color} text-white rounded-lg p-4 shadow-sm`}
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+    >
+        <div className="flex items-center justify-between">
+            <div className="text-3xl">{icon}</div>
+            <div className="text-2xl font-bold">{value}</div>
+        </div>
+        <div className="mt-2 text-sm font-medium">{title}</div>
+    </motion.div>
+);
+
+
+
 export default Dashboard;
+

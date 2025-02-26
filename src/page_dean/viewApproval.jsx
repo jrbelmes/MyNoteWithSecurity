@@ -3,6 +3,7 @@ import axios from 'axios';
 import DeanSidebar from './component/dean_sidebar';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiFilter, FiRefreshCw, FiCheck, FiX, FiEye, FiCalendar, FiMapPin, FiUser } from 'react-icons/fi';
+import { Modal, Descriptions, Badge, Timeline, Card, Tabs, Button, Tag, Space, Divider } from 'antd';
 
 const ViewApproval = () => {
   const [requests, setRequests] = useState([]);
@@ -281,164 +282,151 @@ const ViewApproval = () => {
       {/* Enhanced Modal */}
       <AnimatePresence>
         {selectedRequest && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 z-50"
-          >
-            <motion.div
-              initial={{ scale: 0.95 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.95 }}
-              className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-xl"
-            >
-              <div className="flex justify-between items-center mb-6">
-                <div>
-                  <h3 className="text-2xl font-semibold">
-                    Form Name: {selectedRequest.vehicle.form_name || selectedRequest.venue.form_name || 'N/A'}
-                  </h3>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Submitted: {new Date(selectedRequest.approval_created_at).toLocaleString()}
-                  </p>
-                </div>
-                <span className={`px-3 py-1 rounded-full text-sm ${
-                  selectedRequest.vehicle.license ? 
-                  'bg-blue-100 text-blue-800' : 
-                  'bg-green-100 text-green-800'
-                }`}>
-                  {selectedRequest.vehicle.license ? 'Vehicle Request' : 'Venue Request'}
-                </span>
+          <Modal
+            visible={!!selectedRequest}
+            onCancel={handleCloseDetails}
+            width={1000}
+            footer={[
+              <Button key="approve" type="primary" className="bg-green-600" onClick={() => handleApproval(selectedRequest.approval_id, 'approved')}>
+                Approve
+              </Button>,
+              <Button key="decline" danger onClick={() => handleDecline(selectedRequest.approval_id)}>
+                Decline
+              </Button>,
+              <Button key="close" onClick={handleCloseDetails}>
+                Close
+              </Button>,
+            ]}
+            title={
+              <div className="flex justify-between items-center">
+                <span className="text-xl">Request Details</span>
+                <Tag color={selectedRequest.vehicle?.license ? 'blue' : 'green'}>
+                  {selectedRequest.vehicle?.license ? 'Vehicle Request' : 'Venue Request'}
+                </Tag>
               </div>
-
-              {/* Content based on request type */}
-              {selectedRequest.vehicle.license ? (
-                // Vehicle Request Details
-                <div className="space-y-6">
-                  <div className="grid grid-cols-2 gap-6">
-                    {/* Vehicle Information */}
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <h4 className="text-lg font-semibold mb-4 text-blue-800">Vehicle Information</h4>
-                      <div className="space-y-2">
-                        <p><span className="font-medium">License:</span> {selectedRequest.vehicle.license}</p>
-                        <p><span className="font-medium">Model:</span> {selectedRequest.vehicle.model}</p>
-                        <p><span className="font-medium">Make:</span> {selectedRequest.vehicle.make}</p>
-                        <p><span className="font-medium">Category:</span> {selectedRequest.vehicle.category}</p>
-                      </div>
-                    </div>
-
-                    {/* Trip Details */}
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <h4 className="text-lg font-semibold mb-4 text-blue-800">Trip Details</h4>
-                      <div className="space-y-2">
-                        <p><span className="font-medium">Purpose:</span> {selectedRequest.vehicle.purpose}</p>
-                        <p><span className="font-medium">Destination:</span> {selectedRequest.vehicle.destination}</p>
-                        <p><span className="font-medium">Requestor:</span> {selectedRequest.vehicle.requester}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Driver Information */}
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h4 className="text-lg font-semibold mb-4 text-blue-800">Driver Information</h4>
-                    <div className="space-y-2">
-                      {selectedRequest.vehicle.driver_names && selectedRequest.vehicle.driver_names.map((driver, index) => (
-                        <p key={index}><span className="font-medium">Driver:</span> {driver}</p>
+            }
+          >
+            <Tabs defaultActiveKey="1">
+              {selectedRequest.vehicle?.license ? (
+                <>
+                  <Tabs.TabPane tab="Basic Information" key="1">
+                    <Descriptions bordered column={2}>
+                      <Descriptions.Item label="Form Name" span={2}>
+                        {selectedRequest.vehicle.form_name}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="License">{selectedRequest.vehicle.license}</Descriptions.Item>
+                      <Descriptions.Item label="Model">{selectedRequest.vehicle.model}</Descriptions.Item>
+                      <Descriptions.Item label="Make">{selectedRequest.vehicle.make}</Descriptions.Item>
+                      <Descriptions.Item label="Category">{selectedRequest.vehicle.category}</Descriptions.Item>
+                      <Descriptions.Item label="Purpose" span={2}>
+                        {selectedRequest.vehicle.purpose}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Destination" span={2}>
+                        {selectedRequest.vehicle.destination}
+                      </Descriptions.Item>
+                    </Descriptions>
+                  </Tabs.TabPane>
+                  
+                  <Tabs.TabPane tab="Schedule & Drivers" key="2">
+                    <Card title="Schedule Information">
+                      <Timeline>
+                        <Timeline.Item color="green">
+                          Start: {new Date(selectedRequest.vehicle.start_date).toLocaleString()}
+                        </Timeline.Item>
+                        <Timeline.Item color="red">
+                          End: {new Date(selectedRequest.vehicle.end_date).toLocaleString()}
+                        </Timeline.Item>
+                      </Timeline>
+                    </Card>
+                    
+                    <Divider />
+                    
+                    <Card title="Driver">
+                      {selectedRequest.vehicle.driver_names?.map((driver, index) => (
+                        <Tag key={index} color="blue" className="mb-2 mr-2">
+                          {driver}
+                        </Tag>
                       ))}
-                    </div>
-                  </div>
-
-                  {/* Schedule */}
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h4 className="text-lg font-semibold mb-4 text-blue-800">Schedule</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="font-medium">Start Date & Time:</p>
-                        <p>{new Date(selectedRequest.vehicle.start_date).toLocaleString()}</p>
-                      </div>
-                      <div>
-                        <p className="font-medium">End Date & Time:</p>
-                        <p>{new Date(selectedRequest.vehicle.end_date).toLocaleString()}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Passengers List */}
-                  {selectedRequest.passengers && selectedRequest.passengers.length > 0 && (
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <h4 className="text-lg font-semibold mb-4 text-blue-800">Passengers</h4>
-                      <div className="grid grid-cols-2 gap-2">
-                        {selectedRequest.passengers.map((passenger) => (
-                          <div key={passenger.passenger_id} className="p-2 bg-white rounded border">
-                            {passenger.passenger_name}
-                          </div>
+                    </Card>
+                  </Tabs.TabPane>
+                  
+                  <Tabs.TabPane tab="Passengers" key="3">
+                    <Card>
+                      <div className="grid grid-cols-3 gap-4">
+                        {selectedRequest.passengers?.map((passenger) => (
+                          <Card key={passenger.passenger_id} size="small" className="bg-gray-50">
+                            <p>{passenger.passenger_name}</p>
+                          </Card>
                         ))}
                       </div>
-                    </div>
-                  )}
-                </div>
+                    </Card>
+                  </Tabs.TabPane>
+                </>
               ) : (
-                // Venue Request Details
-                <div className="space-y-6">
-                  <div className="grid grid-cols-2 gap-6">
-                    {/* Venue Information */}
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <h4 className="text-lg font-semibold mb-4 text-blue-800">Venue Information</h4>
-                      <div className="space-y-2">
-                        <p><span className="font-medium">Venue Name:</span> {selectedRequest.venue.name}</p>
-                        <p><span className="font-medium">Event Title:</span> {selectedRequest.venue.event_title}</p>
-                        <p><span className="font-medium">Description:</span> {selectedRequest.venue.description}</p>
-                        <p><span className="font-medium">Participants:</span> {selectedRequest.venue.participants}</p>
-                        <p><span className="font-medium">Requester:</span> {selectedRequest.venue.requester}</p>
-                      </div>
-                    </div>
-
-                    {/* Schedule */}
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <h4 className="text-lg font-semibold mb-4 text-blue-800">Schedule</h4>
-                      <div className="space-y-2">
-                        <p><span className="font-medium">Start Date:</span> {selectedRequest.venue.start_date}</p>
-                        <p><span className="font-medium">End Date:</span> {selectedRequest.venue.end_date}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Equipment */}
+                <>
+                  <Tabs.TabPane tab="Event Details" key="1">
+                    <Descriptions bordered column={2}>
+                      <Descriptions.Item label="Event Title" span={2}>
+                        {selectedRequest.venue.event_title}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Venue Name">{selectedRequest.venue.name}</Descriptions.Item>
+                      <Descriptions.Item label="Participants">{selectedRequest.venue.participants}</Descriptions.Item>
+                      <Descriptions.Item label="Description" span={2}>
+                        {selectedRequest.venue.description}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Requester" span={2}>
+                        {selectedRequest.venue.requester}
+                      </Descriptions.Item>
+                    </Descriptions>
+                  </Tabs.TabPane>
+                  
+                  <Tabs.TabPane tab="Schedule" key="2">
+                    <Card>
+                      <Timeline>
+                        <Timeline.Item color="green">
+                          Start: {new Date(selectedRequest.venue.start_date).toLocaleString()}
+                        </Timeline.Item>
+                        <Timeline.Item color="red">
+                          End: {new Date(selectedRequest.venue.end_date).toLocaleString()}
+                        </Timeline.Item>
+                      </Timeline>
+                    </Card>
+                  </Tabs.TabPane>
+                  
                   {selectedRequest.equipment && (
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <h4 className="text-lg font-semibold mb-4 text-blue-800">Equipment</h4>
-                      <div className="space-y-2">
-                        <p><span className="font-medium">Name:</span> {selectedRequest.equipment.name}</p>
-                        <p><span className="font-medium">Quantity:</span> {selectedRequest.equipment.quantity}</p>
-                      </div>
-                    </div>
+                    <Tabs.TabPane tab="Equipment" key="3">
+                      <Card>
+                        <Descriptions bordered>
+                          <Descriptions.Item label="Equipment Name">
+                            {selectedRequest.equipment.name}
+                          </Descriptions.Item>
+                          <Descriptions.Item label="Quantity">
+                            {selectedRequest.equipment.quantity}
+                          </Descriptions.Item>
+                        </Descriptions>
+                      </Card>
+                    </Tabs.TabPane>
                   )}
-                </div>
+                </>
               )}
-
-              {/* Action Buttons */}
-              <div className="flex justify-end space-x-4 mt-8 pt-4 border-t">
-                <button
-                  onClick={() => handleApproval(selectedRequest.approval_id, 'approved')}
-                  className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition duration-150"
-                >
-                  Approve
-                </button>
-                <button
-                  onClick={() => handleDecline(selectedRequest.approval_id)}
-                  className="px-6 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-md transition duration-150"
-                >
-                  Decline
-                </button>
-                <button
-                  onClick={handleCloseDetails}
-                  className="px-6 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-md transition duration-150"
-                >
-                  Close
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
+              
+              <Tabs.TabPane tab="Status History" key="4">
+                <Timeline>
+                  <Timeline.Item color="blue">
+                    Request Created: {new Date(selectedRequest.approval_created_at).toLocaleString()}
+                  </Timeline.Item>
+                  {selectedRequest.status_history?.map((status, index) => (
+                    <Timeline.Item 
+                      key={index}
+                      color={status.status === 'approved' ? 'green' : status.status === 'declined' ? 'red' : 'gray'}
+                    >
+                      {status.status.charAt(0).toUpperCase() + status.status.slice(1)}: {new Date(status.timestamp).toLocaleString()}
+                    </Timeline.Item>
+                  ))}
+                </Timeline>
+              </Tabs.TabPane>
+            </Tabs>
+          </Modal>
         )}
       </AnimatePresence>
     </div>

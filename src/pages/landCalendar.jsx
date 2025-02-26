@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Dialog } from '@headlessui/react';
-
+import Sidebar from './Sidebar';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -19,16 +19,55 @@ import {
   setHours
 } from 'date-fns';
 
-// Add theme constants
+// Updated theme constants
 const themeColors = {
-  primary: '#2E7D32', // dark green
-  secondary: '#4CAF50', // medium green
-  light: '#E8F5E9', // light green
+  primary: '#1a73e8',
+  secondary: '#4285f4',
+  light: '#e8f0fe',
   white: '#FFFFFF',
-  success: '#388E3C',
-  warning: '#FFA000',
-  error: '#D32F2F',
-  text: '#2C3E50'
+  success: '#34a853',
+  warning: '#fbbc04',
+  error: '#ea4335',
+  text: '#202124',
+  border: '#dadce0'
+};
+
+// Add animation variants
+const fadeInUp = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -20 }
+};
+
+const scaleUp = {
+  initial: { scale: 0.95, opacity: 0 },
+  animate: { scale: 1, opacity: 1 },
+  exit: { scale: 0.95, opacity: 0 }
+};
+
+// Add custom hook for keyboard navigation
+const useKeyboardNavigation = (currentDate, setCurrentDate) => {
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      switch(e.key) {
+        case 'ArrowLeft':
+          setCurrentDate(prev => addDays(prev, -1));
+          break;
+        case 'ArrowRight':
+          setCurrentDate(prev => addDays(prev, 1));
+          break;
+        case 'ArrowUp':
+          setCurrentDate(prev => addWeeks(prev, -1));
+          break;
+        case 'ArrowDown':
+          setCurrentDate(prev => addWeeks(prev, 1));
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [setCurrentDate]);
 };
 
 const Calendar = () => {
@@ -106,50 +145,55 @@ const Calendar = () => {
   };
 
   const isDateInRange = (date, startDate, endDate) => {
-    // Convert date to start of day for comparison
     const compareDate = new Date(date);
     compareDate.setHours(0, 0, 0, 0);
 
-    // Ensure we're comparing dates only
     const start = new Date(startDate);
     start.setHours(0, 0, 0, 0);
     const end = new Date(endDate);
-    end.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
 
     return compareDate >= start && compareDate <= end;
   };
 
   const getReservationForDate = (date) => {
-    const reservationsForDate = reservations.filter(reservation => {
-      const start = new Date(reservation.approval_created_at);
-      // Create end date by adding hours based on the details string
-      const end = new Date(reservation.approval_created_at);
-      
-      // Parse time from details
-      const timeMatch = (reservation.venue_details || reservation.vehicle_details || '').match(/(\d{2}:\d{2}:\d{2}) to (\d{2}:\d{2}:\d{2})/);
-      if (timeMatch) {
-        const [_, startTime, endTime] = timeMatch;
-        const [startHour] = startTime.split(':');
-        const [endHour] = endTime.split(':');
-        
-        start.setHours(parseInt(startHour), 0, 0);
-        end.setHours(parseInt(endHour), 0, 0);
+    return reservations.filter(reservation => {
+      // Parse the date strings from venue or vehicle details
+      let startDate, endDate;
+
+      if (reservation.venue_details) {
+        const dates = reservation.venue_details.match(/(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) to (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/);
+        if (dates) {
+          startDate = new Date(dates[1]);
+          endDate = new Date(dates[2]);
+        }
+      } else if (reservation.vehicle_details) {
+        const dates = reservation.vehicle_details.match(/(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) to (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/);
+        if (dates) {
+          startDate = new Date(dates[1]);
+          endDate = new Date(dates[2]);
+        }
       }
 
-      const isInRange = isDateInRange(date, start, end);
-      return isInRange;
-    });
+      // Fallback to approval_created_at if no dates found in details
+      if (!startDate || !endDate) {
+        startDate = new Date(reservation.approval_created_at);
+        endDate = new Date(reservation.approval_created_at);
+      }
 
-    return reservationsForDate.map(reservation => ({
+      return isDateInRange(date, startDate, endDate);
+    }).map(reservation => ({
       ...reservation,
       formattedResources: [
         ...(reservation.venue_form_name ? [{
           type: 'venue',
-          name: reservation.venue_form_name
+          name: reservation.venue_form_name,
+          details: reservation.venue_details
         }] : []),
         ...(reservation.vehicle_form_name ? [{
           type: 'vehicle',
-          name: reservation.vehicle_form_name
+          name: reservation.vehicle_form_name,
+          details: reservation.vehicle_details
         }] : [])
       ]
     }));
@@ -235,17 +279,21 @@ const Calendar = () => {
     );
   };
 
+  // Enhanced calendar cell rendering
   const renderCalendarGrid = () => {
-    const start = startOfWeek(currentDate);
-    const end = endOfWeek(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0));
+    const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+    const start = startOfWeek(firstDayOfMonth);
+    const end = endOfWeek(lastDayOfMonth);
     const days = eachDayOfInterval({ start, end });
-
+  
     return (
       <motion.div 
-        className="grid grid-cols-7 gap-1"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
+        className="grid grid-cols-7 gap-2"
+        variants={fadeInUp}
+        initial="initial"
+        animate="animate"
+        exit="exit"
       >
         {days.map((day) => {
           const isCurrentMonth = isSameMonth(day, currentDate);
@@ -256,199 +304,68 @@ const Calendar = () => {
             <motion.div
               key={day.toString()}
               className={`
-                min-h-[100px] p-2 border rounded-lg
-                ${isCurrentMonth ? 'bg-white' : 'bg-gray-50'}
-                ${isToday ? 'ring-2 ring-blue-500 ring-offset-2' : 'border-gray-200'}
-                hover:shadow-lg transition-all duration-200
-                ${isToday ? 'border-blue-500 border-2' : ''}
+                relative min-h-[120px] p-3 rounded-lg
+                transition-all duration-200 ease-in-out
+                ${isCurrentMonth ? 'bg-white' : 'bg-gray-50/50'}
+                ${isToday ? 'ring-2 ring-primary ring-offset-2' : 'border border-border'}
+                hover:shadow-lg hover:border-primary
+                focus-within:ring-2 focus-within:ring-primary
               `}
-              whileHover={{ scale: 1.02 }}
+              variants={scaleUp}
+              whileHover={{ y: -2 }}
               whileTap={{ scale: 0.98 }}
             >
-              <span className={`
-                text-base font-semibold
-                ${isCurrentMonth ? 'text-gray-900' : 'text-gray-400'}
-                ${isToday ? 'text-blue-500' : ''}
-              `}>
-                {format(day, 'd')}
-              </span>
-              {dayReservations.map((reservation, idx) => (
-                <div
-                  key={`${reservation.approval_id}-${idx}`}
-                  className="mt-1 p-1 text-xs rounded cursor-pointer bg-blue-100 text-blue-800"
-                  onClick={() => handleReservationClick(reservation)}
-                >
-                  <div className="font-medium mb-1">Reserved</div>
-                  {reservation.formattedResources.map((resource, resourceIdx) => (
-                    <div
-                      key={resourceIdx}
-                      className={`mt-1 p-1 text-xs rounded ${resourceColors[resource.type]}`}
-                    >
-                      {resource.name}
-                    </div>
-                  ))}
-                </div>
-              ))}
+              <div className="flex items-center justify-between mb-2">
+                <span className={`
+                  text-sm font-medium rounded-full w-7 h-7 flex items-center justify-center
+                  ${isToday ? 'bg-primary text-white' : ''}
+                  ${!isCurrentMonth ? 'text-gray-400' : 'text-text'}
+                `}>
+                  {format(day, 'd')}
+                </span>
+                {dayReservations.length > 0 && (
+                  <span className="text-xs font-medium text-gray-500">
+                    {dayReservations.length} events
+                  </span>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                {dayReservations.slice(0, 3).map((reservation, idx) => (
+                  <motion.div
+                    key={`${reservation.approval_id}-${idx}`}
+                    className="group cursor-pointer"
+                    whileHover={{ scale: 1.02 }}
+                    onClick={() => handleReservationClick(reservation)}
+                  >
+                    {/* Enhanced reservation display */}
+                    {reservation.formattedResources.map((resource, resourceIdx) => (
+                      <div
+                        key={resourceIdx}
+                        className={`
+                          p-1.5 rounded-md text-xs font-medium
+                          ${resourceColors[resource.type]}
+                          group-hover:shadow-sm transition-all
+                        `}
+                      >
+                        <div className="flex items-center space-x-1">
+                          <span className="w-2 h-2 rounded-full bg-current"/>
+                          <span className="truncate">{resource.name}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </motion.div>
+                ))}
+                {dayReservations.length > 3 && (
+                  <div className="text-xs text-gray-500 pl-2">
+                    +{dayReservations.length - 3} more
+                  </div>
+                )}
+              </div>
             </motion.div>
           );
         })}
       </motion.div>
-    );
-  };
-
-  const getEventStyles = (reservation) => {
-    let startHour = 8; // default to 8 AM
-    let endHour = 17; // default to 5 PM
-
-    // Parse time from details
-    const details = reservation.venue_details || reservation.vehicle_details || '';
-    const timeMatch = details.match(/(\d{2}:\d{2}:\d{2}) to (\d{2}:\d{2}:\d{2})/);
-    if (timeMatch) {
-      const [_, startTime, endTime] = timeMatch;
-      startHour = parseInt(startTime.split(':')[0]);
-      endHour = parseInt(endTime.split(':')[0]);
-    }
-
-    return {
-      top: `${startHour * 8}rem`,
-      height: `${(endHour - startHour) * 8}rem`,
-      position: 'absolute',
-      left: '0',
-      right: '0',
-      margin: '0 2px'
-    };
-  };
-
-  const renderWeekView = () => {
-    const start = startOfWeek(currentDate);
-    const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
-    const hours = Array.from({ length: 24 }, (_, i) => i);
-
-    return (
-      <div className="overflow-auto max-h-[1000px] border rounded-lg">
-        <div className="flex">
-          {/* Time column */}
-          <div className="w-20 flex-shrink-0 border-r bg-gray-50">
-            <div className="h-20 border-b"></div> {/* Header spacer */}
-            {hours.map(hour => (
-              <div key={hour} className="h-32 border-b px-2 py-1">
-                <span className="text-sm text-gray-600">
-                  {format(setHours(new Date(), hour), 'ha')}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          {/* Days columns */}
-          <div className="flex-1 flex">
-            {days.map(day => (
-              <div key={day} className="flex-1 min-w-[120px]">
-                {/* Day header */}
-                <div className="h-16 border-b sticky top-0 bg-white flex flex-col items-center justify-center">
-                  <div className="font-semibold text-gray-600">{format(day, 'EEE')}</div>
-                  <div className={`text-lg ${isSameDay(day, new Date()) ? 'text-blue-500 font-bold' : ''}`}>
-                    {format(day, 'd')}
-                  </div>
-                </div>
-
-                {/* Hour slots */}
-                <div className="relative">
-                  {hours.map(hour => (
-                    <div
-                      key={`${day}-${hour}`}
-                      className="h-32 border-b border-r" // Changed from h-20 to h-24 (6rem)
-                    />
-                  ))}
-                  
-                  {/* Render reservations */}
-                  {reservations
-                    .filter(reservation => isSameDay(new Date(reservation.reservation_start_date), day))
-                    .map((reservation, idx) => (
-                      <div
-                        key={reservation.reservation_id}
-                        style={getEventStyles(
-                          new Date(reservation.reservation_start_date),
-                          new Date(reservation.reservation_end_date)
-                        )}
-                        className={`${getStatusColor(reservation.reservation_status_name)} 
-                          rounded-lg p-2 text-sm overflow-hidden shadow-sm z-10`}
-                        onClick={() => handleReservationClick(reservation)}
-                      >
-                        <div className="font-semibold">{reservation.reservation_event_title}</div>
-                        <div className="text-xs">{reservation.venue_names}</div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderDayView = () => {
-    const hours = Array.from({ length: 24 }, (_, i) => i);
-
-    return (
-      <div className="overflow-auto max-h-[1000px] border rounded-lg">
-        <div className="flex">
-          {/* Time column */}
-          <div className="w-20 flex-shrink-0 border-r bg-gray-50">
-            <div className="h-20 border-b"></div> {/* Header spacer */}
-            {hours.map(hour => (
-              <div key={hour} className="h-32 border-b px-2 py-1">
-                <span className="text-sm text-gray-600">
-                  {format(setHours(new Date(), hour), 'ha')}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          {/* Main content area */}
-          <div className="flex-1 min-w-[200px]">
-            {/* Day header */}
-            <div className="h-16 border-b sticky top-0 bg-white flex items-center justify-center">
-              <h3 className="text-xl font-semibold">
-                {format(currentDate, 'EEEE, MMMM d')}
-              </h3>
-            </div>
-
-            {/* Hour slots */}
-            <div className="relative">
-              {hours.map(hour => (
-                <div
-                  key={hour}
-                  className="h-32 border-b" // Keep h-24 (6rem) for consistency
-                />
-              ))}
-              
-              {/* Render reservations */}
-              {reservations
-                .filter(reservation => isSameDay(new Date(reservation.reservation_start_date), currentDate))
-                .map((reservation, idx) => (
-                  <div
-                    key={reservation.reservation_id}
-                    style={getEventStyles(
-                      new Date(reservation.reservation_start_date),
-                      new Date(reservation.reservation_end_date)
-                    )}
-                    className={`${getStatusColor(reservation.reservation_status_name)} 
-                      rounded-lg p-2 text-sm overflow-hidden shadow-sm z-10`}
-                    onClick={() => handleReservationClick(reservation)}
-                  >
-                    <div className="font-semibold">{reservation.reservation_event_title}</div>
-                    <div className="text-xs">{reservation.venue_names}</div>
-                    <div className="text-xs">
-                      {format(new Date(reservation.reservation_start_date), 'h:mm a')} - 
-                      {format(new Date(reservation.reservation_end_date), 'h:mm a')}
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </div>
-        </div>
-      </div>
     );
   };
 
@@ -492,6 +409,7 @@ const Calendar = () => {
     }
   };
 
+  // Enhanced modal rendering with new animations and styling
   const VenueDetailsModal = () => (
     <Dialog
       open={isVenueModalOpen}
@@ -504,7 +422,7 @@ const Calendar = () => {
           <div className="flex justify-between items-center mb-6">
             <div>
               <Dialog.Title className="text-2xl font-bold text-gray-900">
-                Venue Reservation Details
+                {venueDetails?.venue_form_name || 'Venue Reservation Details'}
               </Dialog.Title>
               {venueDetails && (
                 <div className="mt-2">
@@ -562,11 +480,6 @@ const Calendar = () => {
                 </div>
               </div>
 
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="font-semibold mb-3">Reserved By</h3>
-                <p>{venueDetails.venue_form_user_full_name}</p>
-              </div>
-
               {equipmentDetails && (
                 <div className="bg-gray-50 rounded-lg p-4">
                   <h3 className="font-semibold mb-3">Equipment</h3>
@@ -597,7 +510,7 @@ const Calendar = () => {
           <div className="flex justify-between items-center mb-6">
             <div>
               <Dialog.Title className="text-2xl font-bold text-gray-900">
-                Vehicle Reservation Details
+                {vehicleDetails?.vehicle_form_name || 'Vehicle Reservation Details'}
               </Dialog.Title>
               {vehicleDetails && (
                 <div className="mt-2">
@@ -670,11 +583,6 @@ const Calendar = () => {
               </div>
 
               <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="font-semibold mb-3">Reserved By</h3>
-                <p>{vehicleDetails.vehicle_form_user_full_name}</p>
-              </div>
-
-              <div className="bg-gray-50 rounded-lg p-4">
                 <h3 className="font-semibold mb-3">Passengers</h3>
                 <div className="space-y-2">
                   {vehicleDetails.passengers && vehicleDetails.passengers.length > 0 ? (
@@ -695,15 +603,18 @@ const Calendar = () => {
     </Dialog>
   );
 
+  useKeyboardNavigation(currentDate, setCurrentDate);
+
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen bg-gray-50">
+      <Sidebar />
       <div className="flex-1 overflow-auto">
-        <div className="max-w-[1400px] mx-auto p-4"> {/* decreased from p-8 */}
+        <div className="max-w-7xl mx-auto p-6">
           <motion.div 
-            className="rounded-xl shadow-2xl p-6" /* decreased from p-8 */
-            style={{ backgroundColor: themeColors.white }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+            className="rounded-xl bg-white shadow-xl"
+            variants={fadeInUp}
+            initial="initial"
+            animate="animate"
           >
             <div className="flex items-center justify-between mb-6"> {/* decreased from mb-10 */}
               <div className="flex items-center space-x-4"> {/* decreased from space-x-6 */}
@@ -724,7 +635,7 @@ const Calendar = () => {
                     style={{ color: themeColors.primary }}
                     onClick={() => setIsYearModalOpen(true)}
                   > 
-                    {format(currentDate, view === 'month' ? 'MMMM yyyy' : 'MMM d, yyyy')}
+                    {format(currentDate, 'MMMM yyyy')}
                   </h2>
                 </div>
                 <motion.button
@@ -738,45 +649,20 @@ const Calendar = () => {
                   </svg>
                 </motion.button>
               </div>
-              
-              <div className="flex space-x-2">
-                {['month', 'week', 'day'].map((viewOption) => (
-                  <motion.button
-                    key={viewOption}
-                    className={`px-4 py-2 rounded-lg`}
-                    style={{
-                      backgroundColor: view === viewOption ? themeColors.primary : themeColors.light,
-                      color: view === viewOption ? themeColors.white : themeColors.text
-                    }}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setView(viewOption)}
-                  >
-                    {viewOption.charAt(0).toUpperCase() + viewOption.slice(1)}
-                  </motion.button>
-                ))}
-              </div>
             </div>
 
-            {view === 'month' && (
-              <>
-                <div className="grid grid-cols-7 gap-1 mb-2"> {/* decreased gap and margin */}
-                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                    <div 
-                      key={day} 
-                      className="text-center text-base font-semibold text-gray-600 py-1" /* decreased text and padding */
-                      style={{ color: themeColors.primary }}
-                    >
-                      {day}
-                    </div>
-                  ))}
+            <div className="grid grid-cols-7 gap-1 mb-2"> {/* decreased gap and margin */}
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                <div 
+                  key={day} 
+                  className="text-center text-base font-semibold text-gray-600 py-1" /* decreased text and padding */
+                  style={{ color: themeColors.primary }}
+                >
+                  {day}
                 </div>
-                {renderCalendarGrid()}
-              </>
-            )}
-            
-            {view === 'week' && renderWeekView()}
-            {view === 'day' && renderDayView()}
+              ))}
+            </div>
+            {renderCalendarGrid()}
             {renderYearModal()}
             <VenueDetailsModal />
             <VehicleDetailsModal />

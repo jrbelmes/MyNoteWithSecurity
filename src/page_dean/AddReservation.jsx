@@ -1,7 +1,6 @@
 import React, { useState, useEffect, Fragment, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../pages/Sidebar';
-import Sidebar1 from '../pages/sidebarpersonel';
 import axios from 'axios';
 import { Toaster, toast } from 'react-hot-toast';
 import { FaCalendarAlt, FaMapMarkerAlt, FaUser, FaCar, FaTools, FaTimes, FaSearch, FaCheck, FaCheckCircle } from 'react-icons/fa';
@@ -37,7 +36,32 @@ const fadeInAnimation = {
   transition: { duration: 0.3 }
 };
 
+// Add these new style constants
+const mobileBreakpoint = '375px';
 
+const containerStyles = {
+  mobile: {
+    padding: '12px',
+    margin: '0',
+    width: '100%'
+  },
+  desktop: {
+    padding: '24px',
+    maxWidth: '1200px',
+    margin: '0 auto'
+  }
+};
+
+const cardStyles = {
+  mobile: {
+    padding: '12px',
+    margin: '8px 0'
+  },
+  desktop: {
+    padding: '24px',
+    margin: '16px 0'
+  }
+};
 
 const AddReservation = () => {
   const timeSlots = [
@@ -55,10 +79,10 @@ const AddReservation = () => {
   const userId = localStorage.getItem('user_id');
   const [loading, setLoading] = useState(false);
   
+  // Add this state declaration for driver department selection
+  const [selectedDriverDept, setSelectedDriverDept] = useState('current');
+
   const [showAddVehicleModal, setShowAddVehicleModal] = useState(false);
-  const [showAddEquipmentModal, setShowAddEquipmentModal] = useState(false);
-  const [showAddVenueModal, setShowAddVenueModal] = useState(false);
-  const [showUserModal, setShowUserModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredUsers, setFilteredUsers] = useState([]);
 
@@ -119,6 +143,22 @@ const AddReservation = () => {
   // Add these two new state declarations
   const [isLoadingDrivers, setIsLoadingDrivers] = useState(false);
   const [availableDrivers, setAvailableDrivers] = useState([]);
+
+  // Add this state declaration
+  const [showUserModal, setShowUserModal] = useState(false);
+
+  // Add responsive state
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 375);
+
+  // Add resize listener
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 375);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Add these new functions
 const handleAddPassenger = (passengerName) => {
@@ -211,11 +251,11 @@ const handleAddEquipment = () => {
         method: 'post',
         url: 'http://localhost/coc/gsd/fetch2.php',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
+          'Content-Type': 'application/json'
         },
-        data: new URLSearchParams({
+        data: {
           operation: 'fetchVenue'
-        })
+        }
       });
 
       if (response.data.status === 'success') {
@@ -231,61 +271,76 @@ const handleAddEquipment = () => {
 
   
 
-  const fetchVehicles = async () => {
-    try {
-      const response = await axios({
-        method: 'post',
-        url: 'http://localhost/coc/gsd/fetch2.php',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        data: new URLSearchParams({
-          operation: 'fetchVehicles'
-        })
-      });
-
-      if (response.data.status === 'success') {
-        setVehicles(response.data.data);
-      } else {
-        toast.error("Error fetching vehicles: " + response.data.message);
+const fetchVehicles = async () => {
+  try {
+    const response = await axios({
+      method: 'post',
+      url: 'http://localhost/coc/gsd/fetch2.php',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      data: {
+        operation: 'fetchVehicles'
       }
-    } catch (error) {
-      console.error("Error fetching vehicles:", error);
-      toast.error("An error occurred while fetching vehicles.");
+    });
+
+    if (response.data.status === 'success') {
+      setVehicles(response.data.data);
+    } else {
+      toast.error("Error fetching vehicles: " + response.data.message);
     }
-  };
+  } catch (error) {
+    console.error("Error fetching vehicles:", error);
+    toast.error("An error occurred while fetching vehicles.");
+  }
+};
 
-  const fetchEquipment = async () => {
-    try {
-      const response = await axios({
-        method: 'post',
-        url: 'http://localhost/coc/gsd/fetch2.php',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        data: new URLSearchParams({
-          operation: 'fetchEquipments'
-        })
-      });
+const fetchEquipment = async () => {
+  // Only fetch equipment if we have both start and end dates
+  if (!formData.startDate || !formData.endDate) return;
 
-      if (response.data.status === 'success') {
-        const formattedEquipment = response.data.data.map(item => ({
-          equipment_id: item.equip_id,
-          equipment_name: item.equip_name,
-          equipment_quantity: parseInt(item.equip_quantity),
-          equipment_category: item.equipments_category_name,
-          equipment_pic: item.equip_pic,
-          status_availability_name: item.status_availability_name
-        }));
-        setEquipment(formattedEquipment);
-      } else {
-        toast.error("Error fetching equipment: " + response.data.message);
+  try {
+    const response = await axios({
+      method: 'post',
+      url: 'http://localhost/coc/gsd/fetch2.php',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      data: {
+        operation: 'fetchEquipments',
+        startDateTime: format(new Date(formData.startDate), 'yyyy-MM-dd HH:mm:ss'),
+        endDateTime: format(new Date(formData.endDate), 'yyyy-MM-dd HH:mm:ss')
       }
-    } catch (error) {
-      console.error("Error fetching equipment:", error);
-      toast.error("An error occurred while fetching equipment.");
+    });
+
+    if (response.data.status === 'success') {
+      const formattedEquipment = response.data.data.map(item => ({
+        equipment_id: item.equip_id,
+        equipment_name: item.equip_name,
+        equipment_quantity: parseInt(item.equip_quantity),
+        equipment_category: item.equipments_category_name,
+        equipment_pic: item.equip_pic,
+        status_availability_name: item.status_availability_name,
+        reserved_quantity: parseInt(item.reserved_quantity || 0),
+        available_quantity: parseInt(item.equip_quantity) - parseInt(item.reserved_quantity || 0)
+      }));
+      setEquipment(formattedEquipment);
+    } else {
+      toast.error("Error fetching equipment: " + response.data.message);
     }
-  };
+  } catch (error) {
+    console.error("Error fetching equipment:", error);
+    toast.error("An error occurred while fetching equipment.");
+  }
+};
+  
+  // Update useEffect to call fetchEquipment when dates change
+  useEffect(() => {
+    if (formData.startDate && formData.endDate) {
+      fetchEquipment();
+    }
+  }, [formData.startDate, formData.endDate]);
+  
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -382,7 +437,7 @@ const validateCurrentStep = () => {
       // Validate business hours (8 AM - 5 PM)
       const startHour = formData.startDate.getHours();
       const endHour = formData.endDate.getHours();
-      if (startHour < 8 || startHour > 17 || endHour < 8 || endHour > 17) {
+      if (startHour < 5 || startHour > 20 || endHour < 5 || endHour > 20) {
         toast.error('Please select times between 8 AM and 5 PM');
         return false;
       }
@@ -516,54 +571,54 @@ const renderVenues = () => (
   <motion.div 
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
-    className="space-y-4"
+    className="space-y-2"
   >
-    {/* View toggle buttons */}
-    <div className="flex justify-between items-center mb-6">
-      <h3 className="text-xl font-semibold">Select Venue</h3>
-      <div className="flex space-x-2 bg-gray-100 p-1 rounded-lg">
+    {/* Compact header */}
+    <div className="flex justify-between items-center px-2 mb-2">
+      <h3 className="font-medium text-sm sm:text-base truncate flex-1">
+        {formData.venue 
+          ? venues.find(v => v.ven_id === formData.venue)?.ven_name
+          : 'Select Venue'}
+      </h3>
+      <div className="flex space-x-1 bg-gray-100 p-0.5 rounded-md ml-2">
         <button
           onClick={() => setViewMode('grid')}
-          className={`p-2 rounded-md transition-all duration-200 ${
+          className={`p-1 rounded ${
             viewMode === 'grid' 
               ? 'bg-white text-blue-600 shadow-sm' 
-              : 'text-gray-600 hover:text-blue-600'
+              : 'text-gray-600'
           }`}
-          title="Grid View"
         >
-          <BsFillGridFill size={20} />
+          <BsFillGridFill size={14} />
         </button>
         <button
           onClick={() => setViewMode('list')}
-          className={`p-2 rounded-md transition-all duration-200 ${
+          className={`p-1 rounded ${
             viewMode === 'list' 
               ? 'bg-white text-blue-600 shadow-sm' 
-              : 'text-gray-600 hover:text-blue-600'
+              : 'text-gray-600'
           }`}
-          title="List View"
         >
-          <BsList size={20} />
+          <BsList size={14} />
         </button>
       </div>
     </div>
 
-    {/* Venues grid/list container */}
+    {/* Responsive grid/list container */}
     <div className={`
       ${viewMode === 'grid' 
-        ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'
-        : 'space-y-4'
+        ? 'grid grid-cols-2 gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4'
+        : 'space-y-2'
       }
     `}>
       {venues.map((venue) => (
         <Card
           key={venue.ven_id}
           className={`
+            cursor-pointer
             ${viewMode === 'list' ? 'flex' : ''}
-            transition-all duration-300 cursor-pointer hover:shadow-lg
-            ${formData.venue === venue.ven_id ? 
-              'ring-2 ring-green-500 shadow-lg bg-green-50' : 
-              'hover:shadow-md hover:border-green-200'
-            }
+            ${formData.venue === venue.ven_id ? 'ring-1 ring-green-500' : ''}
+            p-1.5 hover:shadow-md transition-shadow
           `}
           onClick={() => {
             setFormData(prev => ({
@@ -573,16 +628,17 @@ const renderVenues = () => (
           }}
         >
           <div className={`
-            ${viewMode === 'list' ? 'flex items-center w-full' : ''}
+            ${viewMode === 'list' ? 'flex items-center gap-2' : ''}
+            ${isMobile ? 'text-xs' : 'text-sm'}
           `}>
-            {/* Image container */}
-            <div className={viewMode === 'list' ? 'w-48 flex-shrink-0' : ''}>
+            {/* Optimized image size */}
+            <div className={viewMode === 'list' ? 'w-16 flex-shrink-0' : ''}>
               <img
                 src={venue.ven_pic ? `http://localhost/coc/gsd/${venue.ven_pic}` : '/default-venue.jpg'}
                 alt={venue.ven_name}
                 className={`
-                  object-cover rounded-t-lg
-                  ${viewMode === 'grid' ? 'w-full h-48' : 'h-32 w-full'}
+                  object-cover rounded
+                  ${viewMode === 'grid' ? 'w-full h-20 sm:h-24' : 'h-16 w-16'}
                 `}
                 onError={(e) => {
                   e.target.src = '/default-venue.jpg';
@@ -591,38 +647,37 @@ const renderVenues = () => (
               />
             </div>
 
-            {/* Content container */}
-            <div className="p-4 flex-grow">
-              <div className="flex justify-between items-start">
-                <h3 className={`text-xl font-semibold ${
-                  formData.venue === venue.ven_id ? 'text-green-700' : 'text-gray-800'
-                }`}>
+            {/* Compact content */}
+            <div className={`
+              ${viewMode === 'list' ? 'flex-1 min-w-0' : 'mt-1.5'}
+              ${isMobile ? 'space-y-0.5' : 'space-y-1'}
+            `}>
+              <div className="flex items-start justify-between gap-1">
+                <h3 className="font-medium text-gray-800 truncate flex-1 text-xs sm:text-sm">
                   {venue.ven_name}
                 </h3>
                 <Tag
                   severity={venue.status_availability_name === 'available' ? 'success' : 'danger'}
                   value={venue.status_availability_name}
+                  className="text-[10px] px-1 py-0.5"
                 />
               </div>
               
-              <div className="space-y-2 text-sm text-gray-600 mt-2">
-                <div className="flex items-center gap-2">
-                  <i className="pi pi-users" />
-                  <span>Capacity: {venue.ven_occupancy}</span>
+              <div className="flex flex-wrap gap-2 text-[10px] sm:text-xs text-gray-600">
+                <div className="flex items-center gap-0.5">
+                  <i className="pi pi-users text-[10px]" />
+                  <span>{venue.ven_occupancy}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <i className="pi pi-clock" />
-                  <span>8:00 AM - 5:00 PM</span>
+                <div className="flex items-center gap-0.5">
+                  <i className="pi pi-clock text-[10px]" />
+                  <span>8-5</span>
                 </div>
               </div>
 
               {formData.venue === venue.ven_id && (
-                <div className="mt-3">
-                  <Tag
-                    severity="success"
-                    icon="pi pi-check"
-                    value="Selected"
-                  />
+                <div className="flex items-center gap-0.5 text-green-600 text-[10px]">
+                  <i className="pi pi-check" />
+                  <span>Selected</span>
                 </div>
               )}
             </div>
@@ -633,19 +688,19 @@ const renderVenues = () => (
   </motion.div>
 );
 
+
 // Modify renderResources to only show vehicles without equipment options
 const renderResources = () => (
-  <div className="space-y-6">
-    {/* Header section with controls */}
-    <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-lg shadow-sm">
-      <div className="flex items-center gap-4">
-        <h3 className="text-lg font-semibold text-gray-800">
-          Select Vehicle{selectedModels.length > 0 ? ` (${selectedModels.length} selected)` : ''}
-        </h3>
-      </div>
+  <div className="space-y-4">
+    {/* Header section with responsive controls */}
+    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 bg-white p-2 sm:p-4 rounded-lg shadow-sm">
+      {/* Title with responsive font size */}
+      <h3 className="text-sm sm:text-lg font-semibold text-gray-800">
+        {selectedModels.length > 0 ? `Vehicles (${selectedModels.length})` : 'Select Vehicle'}
+      </h3>
 
-      <div className="flex items-center gap-4">
-        {/* Category filter */}
+      <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+        {/* Category filter - Full width on mobile */}
         <Dropdown
           value={selectedCategory}
           options={[
@@ -656,44 +711,41 @@ const renderResources = () => (
             }))
           ]}
           onChange={(e) => setSelectedCategory(e.value)}
-          className="w-[200px]"
-          placeholder="Filter by category"
+          className="w-full sm:w-[200px]"
+          placeholder="Category"
         />
 
-        {/* View toggle buttons - Smaller size */}
-        <div className="flex bg-gray-100 p-1 rounded-md">
+        {/* Compact view toggle */}
+        <div className="flex bg-gray-100 p-0.5 rounded-md ml-auto sm:ml-0">
           <button
             onClick={() => setViewMode('grid')}
-            className={`p-1.5 rounded-md transition-all duration-200 ${
+            className={`p-1 rounded-md ${
               viewMode === 'grid' 
                 ? 'bg-white text-blue-600 shadow-sm' 
-                : 'text-gray-600 hover:text-blue-600'
+                : 'text-gray-600'
             }`}
-            title="Grid View"
           >
-            <BsFillGridFill size={16} />
+            <BsFillGridFill size={12} />
           </button>
           <button
             onClick={() => setViewMode('list')}
-            className={`p-1.5 rounded-md transition-all duration-200 ${
+            className={`p-1 rounded-md ${
               viewMode === 'list' 
                 ? 'bg-white text-blue-600 shadow-sm' 
-                : 'text-gray-600 hover:text-blue-600'
+                : 'text-gray-600'
             }`}
-            title="List View"
           >
-            <BsList size={16} />
+            <BsList size={12} />
           </button>
         </div>
       </div>
     </div>
 
-    {/* Vehicles grid/list container */}
+    {/* Vehicles grid/list with responsive layout */}
     <div className={`
       ${viewMode === 'grid' 
-        ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'
-        : 'space-y-3'
-      }
+        ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2'
+        : 'space-y-2'}
     `}>
       {vehicles
         .filter(vehicle => selectedCategory === 'all' || vehicle.vehicle_category_id === selectedCategory)
@@ -702,25 +754,29 @@ const renderResources = () => (
             key={vehicle.vehicle_id}
             className={`
               ${viewMode === 'list' ? 'flex' : ''}
-              transition-all duration-300 cursor-pointer
+              transition-all duration-200
+              cursor-pointer
               ${selectedModels.includes(vehicle.vehicle_id) 
-                ? 'ring-2 ring-blue-500 bg-blue-50' 
-                : 'hover:shadow-lg hover:border-blue-200'
+                ? 'ring-1 ring-blue-500 bg-blue-50' 
+                : 'hover:shadow-md hover:border-blue-200'
               }
+              p-2
             `}
             onClick={() => handleVehicleSelect(vehicle.vehicle_id)}
           >
             <div className={`
-              ${viewMode === 'list' ? 'flex items-center w-full' : ''}
+              ${viewMode === 'list' ? 'flex items-center w-full gap-2' : ''}
             `}>
-              {/* Image container */}
-              <div className={viewMode === 'list' ? 'w-48 flex-shrink-0' : ''}>
+              {/* Responsive image container */}
+              <div className={viewMode === 'list' ? 'w-20 sm:w-32 flex-shrink-0' : ''}>
                 <img
                   src={vehicle.vehicle_pic ? `http://localhost/coc/gsd/${vehicle.vehicle_pic}` : '/default-vehicle.jpg'}
                   alt={`${vehicle.vehicle_make_name} ${vehicle.vehicle_model_name}`}
                   className={`
                     object-cover rounded-lg
-                    ${viewMode === 'grid' ? 'w-full h-48' : 'h-32 w-full'}
+                    ${viewMode === 'grid' 
+                      ? 'w-full h-20 sm:h-32' 
+                      : 'h-16 sm:h-24 w-full'}
                   `}
                   onError={(e) => {
                     e.target.src = '/default-vehicle.jpg';
@@ -729,47 +785,60 @@ const renderResources = () => (
                 />
               </div>
 
-              {/* Content container */}
+              {/* Content with minimized info on mobile */}
               <div className={`
-                p-4 flex-grow
-                ${viewMode === 'list' ? 'flex justify-between items-center' : ''}
+                ${viewMode === 'list' 
+                  ? 'flex-grow flex justify-between items-start' 
+                  : 'mt-2'}
+                p-1
               `}>
-                <div>
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="text-lg font-medium text-gray-900">
-                      {vehicle.vehicle_make_name} {vehicle.vehicle_model_name}
-                    </h3>
+                <div className="space-y-1 w-full">
+                  {/* Vehicle title - Truncated on mobile */}
+                  <h3 className="text-xs sm:text-sm font-medium text-gray-900 truncate max-w-[150px] sm:max-w-none">
+                    {vehicle.vehicle_make_name} {vehicle.vehicle_model_name}
+                  </h3>
+                  
+                  {/* License and availability status */}
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-1">
+                      <CarOutlined className="text-gray-400 text-xs" />
+                      <span className="text-xs text-gray-600 truncate">
+                        {vehicle.vehicle_license}
+                      </span>
+                    </div>
                     <Tag
                       severity={vehicle.status_availability_name === 'available' ? 'success' : 'danger'}
                       value={vehicle.status_availability_name}
+                      className="text-[10px] px-1 py-0"
                     />
                   </div>
-                  
-                  <div className="space-y-2 text-sm text-gray-600">
-                    <div className="flex items-center gap-2">
-                      <CarOutlined className="text-gray-400" />
-                      <span>License: {vehicle.vehicle_license}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <BsPeople className="text-gray-400" />
-                      <span>Capacity: {vehicle.vehicle_capacity || 'N/A'}</span>
-                    </div>
+
+                  {/* Capacity - Hidden on mobile grid view */}
+                  <div className={`
+                    flex items-center gap-1
+                    ${viewMode === 'grid' && window.innerWidth <= 375 ? 'hidden' : 'block'}
+                  `}>
+                    <BsPeople className="text-gray-400 text-xs" />
+                    <span className="text-xs text-gray-600">
+                      {vehicle.vehicle_capacity || 'N/A'}
+                    </span>
                   </div>
 
-                  {/* Selection indicator */}
+                  {/* Selection indicator - Minimal on mobile */}
                   {selectedModels.includes(vehicle.vehicle_id) && (
-                    <div className="mt-3 flex items-center gap-2 text-blue-600">
-                      <CheckCircleOutlined />
-                      <span className="text-sm font-medium">Selected</span>
+                    <div className="flex items-center gap-1 text-blue-600">
+                      <CheckCircleOutlined className="text-xs" />
+                      <span className="text-xs">Selected</span>
                     </div>
                   )}
                 </div>
 
+                {/* Checkbox - Only in list view */}
                 {viewMode === 'list' && (
                   <Checkbox
                     checked={selectedModels.includes(vehicle.vehicle_id)}
                     onChange={() => {}}
-                    className="ml-4"
+                    className="ml-2"
                     disabled={vehicle.status_availability_name !== 'available'}
                   />
                 )}
@@ -779,18 +848,15 @@ const renderResources = () => (
         ))}
     </div>
 
-    {/* Empty state */}
+    {/* Empty state - Compact on mobile */}
     {vehicles.filter(vehicle => 
       selectedCategory === 'all' || vehicle.vehicle_category_id === selectedCategory
     ).length === 0 && (
       <Empty
         description={
-          <div className="text-gray-500">
-            <p>No vehicles found</p>
-            <p className="text-sm">Try adjusting your filters</p>
-          </div>
+          <span className="text-xs sm:text-sm text-gray-500">No vehicles found</span>
         }
-        className="bg-white p-8 rounded-lg"
+        className="bg-white p-3 sm:p-6 rounded-lg"
       />
     )}
   </div>
@@ -798,55 +864,59 @@ const renderResources = () => (
 
 // Modify renderBasicInformation to include date selection button and modal
 const renderBasicInformation = () => {
-  const { Title, Paragraph } = Typography;
+  const { Title } = Typography;
   const { TextArea } = Input;
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-4 md:space-y-6"
+      className="space-y-3"
     >
-      <Card className="shadow-lg border-0">
-        <div className="p-4 md:p-8">
-          <Title level={4} className="mb-6">
-            <InfoCircleOutlined className="mr-2" />
-            {formData.resourceType === 'venue' ? 'Venue Reservation Details' : 'Vehicle Reservation Details'}
+      <Card className="shadow-sm border-0">
+        <div className={`${isMobile ? 'p-3' : 'p-6'}`}>
+          {/* Compact Header */}
+          <Title level={isMobile ? 5 : 4} className="mb-4 flex items-center gap-2">
+            <InfoCircleOutlined />
+            <span className="truncate">
+              {formData.resourceType === 'venue' ? 'Venue Details' : 'Vehicle Details'}
+            </span>
           </Title>
 
-          <Form layout="vertical" className="space-y-4">
+          <Form layout="vertical" className="space-y-3">
             {formData.resourceType === 'venue' ? (
-              // Venue specific fields
+              // Venue Fields - Minimized for Mobile
               <>
                 <Form.Item
-                  label={<span>Event Title <span className="text-red-500">*</span></span>}
+                  label={<span className="text-sm">Event Title <span className="text-red-500">*</span></span>}
                   required
                 >
                   <Input
                     name="eventTitle"
                     value={formData.eventTitle}
                     onChange={handleInputChange}
-                    className="rounded-lg"
-                    placeholder="Enter event title"
+                    className="rounded"
+                    size={isMobile ? 'middle' : 'large'}
+                    placeholder="Event title"
                   />
                 </Form.Item>
 
                 <Form.Item
-                  label={<span>Description <span className="text-red-500">*</span></span>}
+                  label={<span className="text-sm">Description <span className="text-red-500">*</span></span>}
                   required
                 >
                   <TextArea
                     name="description"
                     value={formData.description}
                     onChange={handleInputChange}
-                    rows={4}
-                    className="rounded-lg"
-                    placeholder="Describe your event"
+                    rows={isMobile ? 3 : 4}
+                    className="rounded"
+                    placeholder="Event description"
                   />
                 </Form.Item>
 
                 <Form.Item
-                  label="Number of Participants"
+                  label={<span className="text-sm">Participants</span>}
                 >
                   <InputNumber
                     min={1}
@@ -855,54 +925,63 @@ const renderBasicInformation = () => {
                     onChange={(value) => handleInputChange({
                       target: { name: 'participants', value }
                     })}
-                    className="w-full rounded-lg"
+                    className="w-full"
+                    size={isMobile ? 'middle' : 'large'}
                   />
                 </Form.Item>
 
-                {/* Equipment Selection Section */}
-                <div className="mt-6 border-t pt-6">
-                  <Title level={5} className="mb-4 flex items-center">
-                    <FaTools className="mr-2" />
-                    Equipment Selection
-                  </Title>
-                  
-                  <Button
-                    type="dashed"
-                    icon={<FaTools />}
-                    onClick={() => setShowEquipmentModal(true)}
-                    className="w-full md:w-auto mb-4"
-                  >
-                    Add Equipment
-                  </Button>
+                {/* Equipment Section - Collapsed on Mobile */}
+                <div className={`${isMobile ? 'mt-3 pt-3' : 'mt-6 pt-6'} border-t`}>
+                  <div className="flex justify-between items-center mb-3">
+                    <span className={`font-medium ${isMobile ? 'text-sm' : 'text-base'}`}>
+                      Equipment
+                    </span>
+                    <Button
+                      type="dashed"
+                      icon={<FaTools className="text-xs" />}
+                      onClick={() => setShowEquipmentModal(true)}
+                      size={isMobile ? 'small' : 'middle'}
+                    >
+                      Add
+                    </Button>
+                  </div>
 
+                  {/* Equipment List - Grid for Desktop, List for Mobile */}
                   {Object.keys(selectedVenueEquipment).length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
                       {Object.entries(selectedVenueEquipment).map(([equipId, quantity]) => {
                         const equip = equipment.find(e => e.equipment_id.toString() === equipId);
                         if (!equip) return null;
                         
                         return (
-                          <Card key={equipId} className="bg-gray-50 shadow-sm">
-                            <div className="flex items-center justify-between p-3">
-                              <div className="flex items-center space-x-3">
-                                <img
-                                  src={`http://localhost/coc/gsd/${equip.equipment_pic}`}
-                                  alt={equip.equipment_name}
-                                  className="w-12 h-12 object-cover rounded"
-                                  onError={(e) => {
-                                    e.target.src = '/default-equipment.jpg';
-                                    e.target.onerror = null;
-                                  }}
-                                />
-                                <div>
-                                  <h5 className="font-medium">{equip.equipment_name}</h5>
-                                  <p className="text-sm text-gray-600">Quantity: {quantity}</p>
+                          <Card 
+                            key={equipId} 
+                            size="small"
+                            className="bg-gray-50"
+                          >
+                            <div className="flex items-center gap-2">
+                              <img
+                                src={`http://localhost/coc/gsd/${equip.equipment_pic}`}
+                                alt={equip.equipment_name}
+                                className={`${isMobile ? 'w-8 h-8' : 'w-10 h-10'} object-cover rounded`}
+                                onError={(e) => {
+                                  e.target.src = '/default-equipment.jpg';
+                                  e.target.onerror = null;
+                                }}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="text-xs font-medium truncate">
+                                  {equip.equipment_name}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  Qty: {quantity}
                                 </div>
                               </div>
                               <Button
                                 danger
                                 type="text"
-                                icon={<FaTimes />}
+                                size="small"
+                                icon={<FaTimes className="text-xs" />}
                                 onClick={() => {
                                   const newSelected = { ...selectedVenueEquipment };
                                   delete newSelected[equipId];
@@ -918,106 +997,75 @@ const renderBasicInformation = () => {
                 </div>
               </>
             ) : (
-              // Vehicle specific fields
+              // Vehicle Fields - Minimized for Mobile
               <>
                 <Form.Item
-                  label={<span>Purpose <span className="text-red-500">*</span></span>}
+                  label={<span className="text-sm">Purpose <span className="text-red-500">*</span></span>}
                   required
                 >
                   <TextArea
                     name="purpose"
                     value={formData.purpose}
                     onChange={handleInputChange}
-                    rows={3}
-                    className="rounded-lg"
-                    placeholder="Explain the purpose of vehicle reservation"
+                    rows={isMobile ? 2 : 3}
+                    className="rounded"
+                    placeholder="Trip purpose"
                   />
                 </Form.Item>
 
                 <Form.Item
-                  label={<span>Destination <span className="text-red-500">*</span></span>}
+                  label={<span className="text-sm">Destination <span className="text-red-500">*</span></span>}
                   required
                 >
                   <Input
                     name="destination"
                     value={formData.destination}
                     onChange={handleInputChange}
-                    className="rounded-lg"
+                    className="rounded"
+                    size={isMobile ? 'middle' : 'large'}
                     placeholder="Enter destination"
                   />
                 </Form.Item>
 
+                {renderDriverDropdown()}
+
+                {/* Passengers Section */}
                 <Form.Item
-                  label={<span>Driver <span className="text-red-500">*</span></span>}
+                  label={<span className="text-sm">Passengers <span className="text-red-500">*</span></span>}
                   required
                 >
-                  {isLoadingDrivers ? (
-                    <div className="flex items-center gap-2">
-                      <Spin size="small" />
-                      <span className="text-gray-500">Loading drivers...</span>
-                    </div>
-                  ) : (
-                    <>
-                      <Dropdown
-                        value={formData.driverName}
-                        onChange={(e) => handleInputChange({
-                          target: { name: 'driverName', value: e.value }
-                        })}
-                        options={availableDrivers.length > 0 ? 
-                          availableDrivers.map(driver => ({
-                            label: driver.driver_full_name,
-                            value: driver.driver_id
-                          })) : 
-                          [{ label: 'No drivers available', value: null }]
-                        }
-                        placeholder="Select a driver"
-                        className="w-full"
-                        disabled={availableDrivers.length === 0}
-                      />
-                      {availableDrivers.length === 0 && (
-                        <div className="mt-1 text-sm text-red-500">
-                          No drivers available
-                        </div>
-                      )}
-                    </>
-                  )}
-                </Form.Item>
+                  <Button
+                    icon={<UserOutlined className="text-xs" />}
+                    onClick={() => setShowPassengerModal(true)}
+                    size={isMobile ? 'middle' : 'large'}
+                    className="w-full bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200"
+                  >
+                    Add Passengers
+                  </Button>
 
-                <Form.Item
-                  label={<span>Passengers <span className="text-red-500">*</span></span>}
-                  required
-                >
-                  <div className="space-y-4">
-                    <Button
-                      icon={<UserOutlined />}
-                      onClick={() => setShowPassengerModal(true)}
-                      className="w-full bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200"
-                    >
-                      Add Passengers +
-                    </Button>
-
-                    {formData.passengers.length > 0 && (
-                      <div className="border rounded-lg divide-y">
-                        {formData.passengers.map((passenger, index) => (
-                          <div 
-                            key={passenger.id}
-                            className="flex items-center justify-between p-3 hover:bg-gray-50"
-                          >
-                            <div className="flex items-center gap-3">
-                              <span className="text-gray-500">{index + 1}.</span>
-                              <UserOutlined className="text-gray-400" />
-                              <span className="font-medium">{passenger.name}</span>
-                            </div>
-                            <Button
-                              icon={<FaTimes />}
-                              onClick={() => handleRemovePassenger(passenger.id)}
-                              className="p-button-text p-button-danger p-button-sm"
-                            />
+                  {/* Passenger List - Compact on Mobile */}
+                  {formData.passengers.length > 0 && (
+                    <div className={`mt-2 border rounded divide-y ${isMobile ? 'text-xs' : 'text-sm'}`}>
+                      {formData.passengers.map((passenger, index) => (
+                        <div 
+                          key={passenger.id}
+                          className="flex items-center justify-between p-2"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-500">{index + 1}.</span>
+                            <span className="truncate">{passenger.name}</span>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                          <Button
+                            type="text"
+                            danger
+                            size="small"
+                            icon={<FaTimes className="text-xs" />}
+                            onClick={() => handleRemovePassenger(passenger.id)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </Form.Item>
               </>
             )}
@@ -1035,21 +1083,29 @@ const renderResourceTypeSelection = () => (
     animate={{ opacity: 1, y: 0 }}
     className="max-w-4xl mx-auto"
   >
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className={`grid ${isMobile ? 'grid-cols-1 gap-3' : 'grid-cols-2 gap-6'}`}>
       <Card 
-        className={`cursor-pointer transform transition-all duration-300 hover:scale-105
+        className={`
+          cursor-pointer transform transition-all duration-300
+          ${isMobile ? 'p-3' : 'p-6'}
           ${resourceType === 'venue' ? 'ring-2 ring-blue-500 shadow-lg' : 'hover:shadow-lg'}`}
         onClick={() => {
           setResourceType('venue');
           setFormData(prev => ({ ...prev, resourceType: 'venue' }));
         }}
       >
-        <div className="p-6 text-center">
-          <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center">
-            <FaMapMarkerAlt className="text-2xl text-blue-600" />
+        <div className={`text-center ${isMobile ? 'space-y-2' : 'space-y-4'}`}>
+          <div className={`
+            mx-auto rounded-full flex items-center justify-center
+            ${isMobile ? 'w-12 h-12' : 'w-16 h-16'}
+            bg-blue-100
+          `}>
+            <FaMapMarkerAlt className={`${isMobile ? 'text-xl' : 'text-2xl'} text-blue-600`} />
           </div>
-          <h4 className="text-xl font-semibold mb-2">Venue Reservation</h4>
-          <p className="text-gray-600">Book a venue for your upcoming event</p>
+          <h4 className={`font-semibold ${isMobile ? 'text-lg' : 'text-xl'}`}>
+            Venue Reservation
+          </h4>
+          {!isMobile && <p className="text-gray-600">Book a venue for your upcoming event</p>}
         </div>
       </Card>
 
@@ -1061,12 +1117,18 @@ const renderResourceTypeSelection = () => (
           setFormData(prev => ({ ...prev, resourceType: 'vehicle', venue: '' }));
         }}
       >
-        <div className="p-6 text-center">
-          <div className="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
-            <FaCar className="text-2xl text-green-600" />
+        <div className={`text-center ${isMobile ? 'space-y-2' : 'space-y-4'}`}>
+          <div className={`
+            mx-auto rounded-full flex items-center justify-center
+            ${isMobile ? 'w-12 h-12' : 'w-16 h-16'}
+            bg-green-100
+          `}>
+            <FaCar className={`${isMobile ? 'text-xl' : 'text-2xl'} text-green-600`} />
           </div>
-          <h4 className="text-xl font-semibold mb-2">Vehicle Reservation</h4>
-          <p className="text-gray-600">Reserve a vehicle for transportation</p>
+          <h4 className={`font-semibold ${isMobile ? 'text-lg' : 'text-xl'}`}>
+            Vehicle Reservation
+          </h4>
+          {!isMobile && <p className="text-gray-600">Reserve a vehicle for transportation</p>}
         </div>
       </Card>
     </div>
@@ -1260,188 +1322,182 @@ const renderReviewSection = () => {
   const selectedVenue = venues.find(v => v.ven_id.toString() === formData.venue.toString());
   const selectedVehicleDetails = vehicles.filter(v => selectedModels.includes(v.vehicle_id));
   const storedName = localStorage.getItem('name');
-  // Add this line to find the selected driver's details
   const selectedDriver = drivers.find(d => d.driver_id.toString() === formData.driverName?.toString());
 
   return (
     <div className="max-w-4xl mx-auto">
       <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-        <div className="p-6 space-y-8">
-          <div className="space-y-4">
-            <h4 className="text-lg font-medium text-gray-700 flex items-center gap-2">
+        <div className={`${isMobile ? 'p-3 space-y-3' : 'p-6 space-y-6'}`}>
+          {/* Basic Details - Minimized for mobile */}
+          <div className="space-y-3">
+            <h4 className={`${isMobile ? 'text-sm' : 'text-lg'} font-medium text-gray-700 flex items-center gap-2`}>
               <FaCalendarAlt className="text-green-600" />
               Basic Details
             </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-6">
+            <div className={`grid ${isMobile ? 'grid-cols-2 gap-2' : 'grid-cols-2 gap-6'} pl-4`}>
               <div>
-                <p className="text-sm text-gray-500">Reservation Name</p>
-                <p className="font-medium text-gray-900">{storedName || 'Not provided'}</p>
+                <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-500`}>Name</p>
+                <p className={`${isMobile ? 'text-sm' : 'text-base'} font-medium text-gray-900 truncate`}>
+                  {storedName || '-'}
+                </p>
               </div>
               <div>
-                <p className="text-sm text-gray-500">Resource Type</p>
-                <p className="font-medium text-gray-900 capitalize">{formData.resourceType}</p>
+                <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-500`}>Type</p>
+                <p className={`${isMobile ? 'text-sm' : 'text-base'} font-medium text-gray-900 capitalize`}>
+                  {formData.resourceType}
+                </p>
               </div>
             </div>
           </div>
 
-          {/* Venue/Vehicle Details */}
           {formData.resourceType === 'venue' ? (
-            <div className="space-y-6">
-              {/* Venue Information */}
-              <div className="space-y-4">
-                <h4 className="text-lg font-medium text-gray-700">Venue Details</h4>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {selectedVenue && (
-                      <div className="col-span-full">
-                        <img
-                          src={selectedVenue.image_url || '/default-venue.jpg'}
-                          alt={selectedVenue.ven_name}
-                          className="w-full h-48 object-cover rounded-lg mb-4"
-                        />
-                        <h5 className="font-medium text-lg text-gray-900">{selectedVenue.ven_name}</h5>
-                        <p className="text-sm text-gray-600">Capacity: {selectedVenue.ven_occupancy}</p>
-                      </div>
-                    )}
-                    <div>
-                      <p className="text-sm text-gray-500">Event Title</p>
-                      <p className="font-medium text-gray-900">{formData.eventTitle}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Number of Participants</p>
-                      <p className="font-medium text-gray-900">{formData.participants}</p>
-                    </div>
-                    <div className="col-span-full">
-                      <p className="text-sm text-gray-500">Description</p>
-                      <p className="font-medium text-gray-900">{formData.description}</p>
+            // Venue Details - Minimized for mobile
+            <div className="space-y-4">
+              <h4 className={`${isMobile ? 'text-sm' : 'text-lg'} font-medium text-gray-700`}>
+                Venue Details
+              </h4>
+              <div className="bg-gray-50 rounded-lg p-3">
+                {selectedVenue && (
+                  <div className="space-y-3">
+                    <img
+                      src={selectedVenue.image_url || '/default-venue.jpg'}
+                      alt={selectedVenue.ven_name}
+                      className={`w-full ${isMobile ? 'h-32' : 'h-48'} object-cover rounded-lg`}
+                    />
+                    <div className={isMobile ? 'text-sm' : ''}>
+                      <h5 className="font-medium">{selectedVenue.ven_name}</h5>
+                      <p className="text-xs text-gray-600">Capacity: {selectedVenue.ven_occupancy}</p>
                     </div>
                   </div>
-                </div>
-              </div>
+                )}
 
-              {/* Equipment Section */}
-              {Object.keys(selectedVenueEquipment).length > 0 && (
-                <div className="space-y-4">
-                  <h4 className="text-lg font-medium text-gray-700">Selected Equipment</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {Object.entries(selectedVenueEquipment).map(([equipId, quantity]) => {
-                      const equip = equipment.find(e => e.equipment_id.toString() === equipId.toString());
-                      if (!equip) return null;
-                      return (
-                        <div key={equipId} className="bg-gray-50 p-4 rounded-lg">
-                          <div className="flex items-center gap-4">
+                <div className={`grid ${isMobile ? 'grid-cols-1 gap-2' : 'grid-cols-2 gap-4'} mt-3`}>
+                  <div>
+                    <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-500`}>Event</p>
+                    <p className={`${isMobile ? 'text-sm' : 'text-base'} font-medium truncate`}>
+                      {formData.eventTitle}
+                    </p>
+                  </div>
+                  {!isMobile && (
+                    <div>
+                      <p className="text-sm text-gray-500">Participants</p>
+                      <p className="font-medium">{formData.participants}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Equipment Section - Collapsed on mobile */}
+                {Object.keys(selectedVenueEquipment).length > 0 && (
+                  <div className="mt-4">
+                    <p className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium mb-2`}>Equipment</p>
+                    <div className={`grid ${isMobile ? 'grid-cols-1 gap-2' : 'grid-cols-2 gap-4'}`}>
+                      {Object.entries(selectedVenueEquipment).map(([equipId, quantity]) => {
+                        const equip = equipment.find(e => e.equipment_id.toString() === equipId.toString());
+                        if (!equip) return null;
+                        return (
+                          <div key={equipId} className="flex items-center gap-2 bg-white p-2 rounded">
                             <img
                               src={`http://localhost/coc/gsd/${equip.equipment_pic}`}
                               alt={equip.equipment_name}
-                              className="w-16 h-16 object-cover rounded"
-                              onError={(e) => {
-                                e.target.src = '/default-equipment.jpg';
-                                e.target.onerror = null;
-                              }}
+                              className={`${isMobile ? 'w-8 h-8' : 'w-12 h-12'} object-cover rounded`}
+                              onError={(e) => { e.target.src = '/default-equipment.jpg'; }}
                             />
-                            <div>
-                              <h6 className="font-medium">{equip.equipment_name}</h6>
-                              <p className="text-sm text-gray-600">Quantity: {quantity}</p>
-                              <p className="text-xs text-gray-500">{equip.equipment_category}</p>
+                            <div className={isMobile ? 'text-xs' : 'text-sm'}>
+                              <p className="font-medium truncate">{equip.equipment_name}</p>
+                              <p className="text-gray-500">Qty: {quantity}</p>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           ) : (
-            // Updated Vehicle section
-            <div className="space-y-6">
-              <div className="space-y-4">
-                <h4 className="text-lg font-medium text-gray-700">Vehicle Details</h4>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="grid grid-cols-1 gap-6">
-                    {/* Trip Details */}
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm text-gray-500">Purpose</p>
-                          <p className="font-medium text-gray-900">{formData.purpose}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-500">Destination</p>
-                          <p className="font-medium text-gray-900">{formData.destination}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-500">Driver's Name</p>
-                          <p className="font-medium text-gray-900">{selectedDriver?.driver_full_name || 'Not provided'}</p>
+            // Vehicle Details - Minimized for mobile
+            <div className="space-y-4">
+              <h4 className={`${isMobile ? 'text-sm' : 'text-lg'} font-medium text-gray-700`}>
+                Vehicle Details
+              </h4>
+              <div className="bg-gray-50 rounded-lg p-3">
+                {/* Trip Info - Minimized */}
+                <div className={`grid ${isMobile ? 'grid-cols-1 gap-2' : 'grid-cols-2 gap-4'}`}>
+                  <div>
+                    <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-500`}>Purpose</p>
+                    <p className={`${isMobile ? 'text-sm' : 'text-base'} font-medium truncate`}>
+                      {formData.purpose}
+                    </p>
+                  </div>
+                  <div>
+                    <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-500`}>Driver</p>
+                    <p className={`${isMobile ? 'text-sm' : 'text-base'} font-medium truncate`}>
+                      {selectedDriver?.driver_full_name || '-'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Vehicles - Compact grid */}
+                <div className="mt-4">
+                  <p className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium mb-2`}>Vehicles</p>
+                  <div className={`grid ${isMobile ? 'grid-cols-1 gap-2' : 'grid-cols-2 gap-4'}`}>
+                    {selectedVehicleDetails.map(vehicle => (
+                      <div key={vehicle.vehicle_id} className="bg-white rounded p-2 flex gap-2">
+                        <img
+                          src={vehicle.vehicle_pic ? `http://localhost/coc/gsd/${vehicle.vehicle_pic}` : '/default-vehicle.jpg'}
+                          alt={vehicle.vehicle_model_name}
+                          className={`${isMobile ? 'w-16 h-16' : 'w-20 h-20'} object-cover rounded`}
+                        />
+                        <div className={isMobile ? 'text-xs' : 'text-sm'}>
+                          <p className="font-medium">{vehicle.vehicle_model_name}</p>
+                          <p className="text-gray-500">{vehicle.vehicle_license}</p>
                         </div>
                       </div>
-                    </div>
+                    ))}
+                  </div>
+                </div>
 
-                    {/* Selected Vehicles */}
-                    <div className="space-y-4">
-                      <h5 className="text-md font-medium text-gray-700">Selected Vehicles</h5>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {selectedVehicleDetails.map(vehicle => (
-                          <div key={vehicle.vehicle_id} className="bg-white rounded-lg border p-4">
-                            <div className="space-y-3">
-                              <img
-                                src={vehicle.vehicle_pic ? `http://localhost/coc/gsd/${vehicle.vehicle_pic}` : '/default-vehicle.jpg'}
-                                alt={`${vehicle.vehicle_make_name} ${vehicle.vehicle_model_name}`}
-                                className="w-full h-48 object-cover rounded-lg"
-                              />
-                              <div>
-                                <h6 className="font-medium text-gray-900">
-                                  {vehicle.vehicle_make_name} {vehicle.vehicle_model_name}
-                                </h6>
-                                <p className="text-sm text-gray-600">License: {vehicle.vehicle_license}</p>
-                              </div>
-                            </div>
+                {/* Passengers - Compact list */}
+                <div className="mt-4">
+                  <p className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium mb-2`}>
+                    Passengers ({formData.passengers.length})
+                  </p>
+                  <div className={`${isMobile ? 'text-xs' : 'text-sm'} bg-white rounded p-2`}>
+                    {formData.passengers.length > 0 ? (
+                      <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
+                        {formData.passengers.map((passenger, index) => (
+                          <div key={passenger.id} className="flex items-center gap-1">
+                            <span className="text-gray-500">{index + 1}.</span>
+                            <span className="truncate">{passenger.name}</span>
                           </div>
                         ))}
                       </div>
-                    </div>
-
-                    {/* Passengers List */}
-                    <div className="space-y-4">
-                      <h5 className="text-md font-medium text-gray-700">Passengers</h5>
-                      <div className="bg-white rounded-lg border p-4">
-                        {formData.passengers.length > 0 ? (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {formData.passengers.map((passenger, index) => (
-                              <div key={passenger.id} className="flex items-center space-x-2">
-                                <span className="text-gray-500">{index + 1}.</span>
-                                <span className="font-medium">{passenger.name}</span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-gray-500">No passengers added</p>
-                        )}
-                      </div>
-                    </div>
+                    ) : (
+                      <p className="text-gray-500">No passengers</p>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Schedule Section */}
-          <div className="space-y-4">
-            <h4 className="text-lg font-medium text-gray-700 flex items-center gap-2">
+          {/* Schedule - Minimized for mobile */}
+          <div className="space-y-2">
+            <h4 className={`${isMobile ? 'text-sm' : 'text-lg'} font-medium text-gray-700 flex items-center gap-2`}>
               <BsClock className="text-green-600" />
-              Schedule Details
+              Schedule
             </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-6">
+            <div className={`grid ${isMobile ? 'grid-cols-1 gap-2' : 'grid-cols-2 gap-4'} pl-4`}>
               <div>
-                <p className="text-sm text-gray-500">Start Date & Time</p>
-                <p className="font-medium text-gray-900">
-                  {formData.startDate ? format(new Date(formData.startDate), 'PPpp') : 'Not set'}
+                <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-500`}>Start</p>
+                <p className={`${isMobile ? 'text-sm' : 'text-base'} font-medium`}>
+                  {formData.startDate ? format(new Date(formData.startDate), isMobile ? 'PP p' : 'PPpp') : '-'}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-gray-500">End Date & Time</p>
-                <p className="font-medium text-gray-900">
-                  {formData.endDate ? format(new Date(formData.endDate), 'PPpp') : 'Not set'}
+                <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-500`}>End</p>
+                <p className={`${isMobile ? 'text-sm' : 'text-base'} font-medium`}>
+                  {formData.endDate ? format(new Date(formData.endDate), isMobile ? 'PP p' : 'PPpp') : '-'}
                 </p>
               </div>
             </div>
@@ -2063,33 +2119,34 @@ const [newPassenger, setNewPassenger] = useState('');
 // Add fetchDrivers function
 const fetchDrivers = async (startDate, endDate) => {
   setIsLoadingDrivers(true);
+  const userDepartmentId = localStorage.getItem("department_id");
+
   try {
-    const response = await axios.post(
-      'http://localhost/coc/gsd/user.php',
-      {
-        operation: 'fetchDriver',
-        startDateTime: format(startDate, 'yyyy-MM-dd HH:mm:ss'),
-        endDateTime: format(endDate, 'yyyy-MM-dd HH:mm:ss')
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+    // Determine which departments to fetch based on selectedDriverDept
+    const departmentIds = selectedDriverDept === 'gsd' ? [27] : [userDepartmentId];
+
+    const response = await axios.post('http://localhost/coc/gsd/user.php', {
+      operation: 'fetchDriver',
+      startDateTime: format(startDate, 'yyyy-MM-dd HH:mm:ss'),
+      endDateTime: format(endDate, 'yyyy-MM-dd HH:mm:ss'),
+      departmentIds: departmentIds
+    });
 
     if (response.data.status === 'success') {
-      setAvailableDrivers(response.data.data || []);
-      if (response.data.data.length === 0) {
-        toast.warning('No drivers available for the selected time slot');
-      }
+      const driversData = response.data.data.map(driver => ({
+        ...driver,
+        department_id: departmentIds[0].toString(),
+        displayName: `${driver.driver_full_name} (${driver.departments_name || 'Department Driver'})`
+      }));
+      setAvailableDrivers(driversData);
     } else {
-      console.error('Failed to fetch drivers:', response.data.message);
       setAvailableDrivers([]);
     }
+
   } catch (error) {
     console.error('Error fetching drivers:', error);
     setAvailableDrivers([]);
+    toast.error('Failed to fetch available drivers');
   } finally {
     setIsLoadingDrivers(false);
   }
@@ -2100,7 +2157,7 @@ useEffect(() => {
   if (formData.startDate && formData.endDate && formData.resourceType === 'vehicle') {
     fetchDrivers(formData.startDate, formData.endDate);
   }
-}, [formData.startDate, formData.endDate, formData.resourceType]);
+}, [formData.startDate, formData.endDate, formData.resourceType, selectedDriverDept]); // Add selectedDriverDept
 
 // Add PassengerModal component
 const PassengerModal = ({ visible, onHide }) => {
@@ -2137,7 +2194,7 @@ const PassengerModal = ({ visible, onHide }) => {
       }
       modal
       className="w-[90vw] md:w-[500px]"
-      closeOnEscape
+      closeOnEscapef
       dismissableMask
       footer={
         <div className="flex justify-end gap-2">
@@ -2234,32 +2291,38 @@ const EquipmentSelectionModal = () => {
   const [viewMode, setViewMode] = useState('grid');
   const [localEquipmentQuantities, setLocalEquipmentQuantities] = useState({});
 
-  // Initialize local quantities when modal opens
+  // Track viewport size
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 375);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 375);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   useEffect(() => {
     if (showEquipmentModal) {
       setLocalEquipmentQuantities({ ...equipmentQuantities });
     }
   }, [showEquipmentModal]);
 
-  // Get unique equipment categories
   const categories = ['all', ...new Set(equipment.map(item => item.equipment_category))];
 
-  // Filter equipment based on search and category
   const filteredEquipment = equipment.filter(item => {
     const matchesSearch = item.equipment_name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = categoryFilter === 'all' || item.equipment_category === categoryFilter;
     return matchesSearch && matchesCategory;
   });
 
-  // Handler for quantity changes
   const handleLocalQuantityChange = (equipId, value) => {
     if (value === undefined || value === null || value < 0) return;
     
     const equip = equipment.find(e => e.equipment_id === equipId);
     if (!equip) return;
 
-    if (value > equip.equipment_quantity) {
-      toast.error(`Maximum available quantity is ${equip.equipment_quantity}`);
+    const availableQty = getAvailableQuantity(equip);
+    if (value > availableQty) {
+      toast.error(`Maximum available quantity is ${availableQty}`);
       return;
     }
 
@@ -2269,11 +2332,8 @@ const EquipmentSelectionModal = () => {
     }));
   };
 
-  // Handler for confirming selections
   const handleConfirm = () => {
-    // Update both local and parent state
     setEquipmentQuantities(localEquipmentQuantities);
-    // Update selected equipment immediately
     const newEquipment = {};
     Object.entries(localEquipmentQuantities).forEach(([equipId, quantity]) => {
       if (quantity > 0) {
@@ -2284,19 +2344,99 @@ const EquipmentSelectionModal = () => {
     setShowEquipmentModal(false);
   };
 
+  const getAvailableQuantity = (item) => item.available_quantity || 0;
+
+  // Responsive card rendering
+  const renderEquipmentCard = (item) => (
+    <Card
+      key={item.equipment_id}
+      className={`
+        transition-all duration-300 hover:shadow-md
+        ${viewMode === 'list' ? 'flex items-center' : ''}
+        ${equipmentQuantities[item.equipment_id] > 0 ? 'ring-2 ring-blue-500' : ''}
+        ${isMobile ? 'p-2' : 'p-4'}
+      `}
+      bodyStyle={viewMode === 'list' ? { padding: isMobile ? '8px' : '16px', width: '100%' } : {}}
+    >
+      <div className={viewMode === 'list' ? 'flex gap-2 w-full' : ''}>
+        {/* Image */}
+        <div className={viewMode === 'list' ? (isMobile ? 'w-20' : 'w-32') : ''}>
+          <img
+            src={`http://localhost/coc/gsd/${item.equipment_pic}`}
+            alt={item.equipment_name}
+            className={`
+              object-cover rounded-lg
+              ${viewMode === 'grid' 
+                ? isMobile ? 'h-24 w-full' : 'h-32 w-full'
+                : isMobile ? 'h-20 w-20' : 'h-32 w-32'}
+            `}
+            onError={(e) => {
+              e.target.src = '/default-equipment.jpg';
+              e.target.onerror = null;
+            }}
+          />
+        </div>
+
+        {/* Content */}
+        <div className={`
+          ${viewMode === 'list' ? 'flex-grow flex justify-between items-center' : 'mt-2'}
+          ${isMobile ? 'space-y-1' : 'space-y-2'}
+        `}>
+          <div>
+            <h4 className={`font-medium ${isMobile ? 'text-sm' : 'text-base'} text-gray-900 truncate`}>
+              {item.equipment_name}
+            </h4>
+            {!isMobile && (
+              <p className="text-xs text-gray-500">{item.equipment_category}</p>
+            )}
+            <Tag 
+              color={item.status_availability_name === 'available' ? 'green' : 'red'}
+              className={`${isMobile ? 'text-xs' : 'text-sm'}`}
+            >
+              {item.status_availability_name}
+            </Tag>
+            <div className={isMobile ? 'text-xs' : 'text-sm'}>
+              Available: {getAvailableQuantity(item)}
+            </div>
+          </div>
+
+          {/* Quantity Input */}
+          <div className={viewMode === 'list' ? 'ml-2' : 'mt-2'}>
+            <InputNumber
+              min={0}
+              max={getAvailableQuantity(item)}
+              value={localEquipmentQuantities[item.equipment_id] || 0}
+              onChange={(value) => handleLocalQuantityChange(item.equipment_id, value)}
+              disabled={getAvailableQuantity(item) === 0}
+              className={`w-full ${isMobile ? 'mini-input' : ''}`}
+              size={isMobile ? 'small' : 'middle'}
+              controls={!isMobile}
+            />
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+
   return (
     <Modal
       open={showEquipmentModal}
       onCancel={() => setShowEquipmentModal(false)}
       title={
         <div className="flex items-center gap-2">
-          <FaTools className="text-blue-500" />
-          <span className="font-semibold">Equipment Selection</span>
+          <FaTools className={isMobile ? 'text-sm' : 'text-base'} />
+          <span className={`font-semibold ${isMobile ? 'text-sm' : 'text-base'}`}>
+            Equipment Selection
+          </span>
         </div>
       }
-      width={1000}
+      width={isMobile ? '100%' : 1000}
       footer={[
-        <Button key="cancel" onClick={() => setShowEquipmentModal(false)}>
+        <Button 
+          key="cancel" 
+          onClick={() => setShowEquipmentModal(false)}
+          size={isMobile ? 'small' : 'middle'}
+        >
           Cancel
         </Button>,
         <Button
@@ -2304,143 +2444,229 @@ const EquipmentSelectionModal = () => {
           type="primary"
           onClick={handleConfirm}
           icon={<FaCheck />}
+          size={isMobile ? 'small' : 'middle'}
         >
-          Confirm Selection
+          Confirm
         </Button>
       ]}
       className="equipment-modal"
     >
       {/* Search and Filter Controls */}
-      <div className="mb-6 space-y-4">
-        <div className="flex flex-wrap gap-4 items-center justify-between">
-          <Input.Search
-            placeholder="Search equipment..."
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full md:w-64"
-            allowClear
-          />
-          <div className="flex items-center gap-2">
-            <Select
-              value={categoryFilter}
-              onChange={setCategoryFilter}
-              className="w-48"
-              placeholder="Filter by category"
-            >
-              {categories.map(category => (
-                <Select.Option key={category} value={category}>
-                  {category === 'all' ? 'All Categories' : category}
-                </Select.Option>
-              ))}
-            </Select>
-            <Radio.Group
-              value={viewMode}
-              onChange={(e) => setViewMode(e.target.value)}
-              buttonStyle="solid"
-            >
-              <Radio.Button value="grid"><BsFillGridFill /></Radio.Button>
-              <Radio.Button value="list"><BsList /></Radio.Button>
-            </Radio.Group>
-          </div>
+      <div className={`${isMobile ? 'space-y-2' : 'space-y-4'} mb-4`}>
+        <Input.Search
+          placeholder="Search equipment..."
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full"
+          size={isMobile ? 'small' : 'middle'}
+          allowClear
+        />
+        <div className="flex items-center gap-2 justify-between">
+          <Select
+            value={categoryFilter}
+            onChange={setCategoryFilter}
+            className={isMobile ? 'w-32' : 'w-48'}
+            size={isMobile ? 'small' : 'middle'}
+            placeholder="Category"
+          >
+            {categories.map(category => (
+              <Select.Option key={category} value={category}>
+                {category === 'all' ? 'All' : category}
+              </Select.Option>
+            ))}
+          </Select>
+          <Radio.Group
+            value={viewMode}
+            onChange={(e) => setViewMode(e.target.value)}
+            size={isMobile ? 'small' : 'middle'}
+          >
+            <Radio.Button value="grid"><BsFillGridFill /></Radio.Button>
+            <Radio.Button value="list"><BsList /></Radio.Button>
+          </Radio.Group>
         </div>
       </div>
 
       {/* Equipment List */}
       <div className={`
         ${viewMode === 'grid' 
-          ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'
-          : 'space-y-4'
-        }
+          ? 'grid grid-cols-2 gap-2'
+          : 'space-y-2'}
       `}>
-        {filteredEquipment.map((item) => (
-          <Card
-            key={item.equipment_id}
-            className={`
-              transition-all duration-300 hover:shadow-md
-              ${viewMode === 'list' ? 'flex items-center w-full' : ''}
-              ${equipmentQuantities[item.equipment_id] > 0 ? 'ring-2 ring-blue-500' : ''}
-            `}
-            bodyStyle={viewMode === 'list' ? { width: '100%', display: 'flex' } : {}}
-          >
-            <div className={viewMode === 'list' ? 'flex items-center gap-4 w-full' : ''}>
-              {/* Image */}
-              <div className={viewMode === 'list' ? 'w-32 flex-shrink-0' : ''}>
-                <img
-                  src={`http://localhost/coc/gsd/${item.equipment_pic}`}
-                  alt={item.equipment_name}
-                  className={`
-                    object-cover rounded-lg
-                    ${viewMode === 'grid' ? 'w-full h-48' : 'h-32 w-32'}
-                  `}
-                  onError={(e) => {
-                    e.target.src = '/default-equipment.jpg';
-                    e.target.onerror = null;
-                  }}
-                />
-              </div>
-
-              {/* Content */}
-              <div className={`
-                ${viewMode === 'list' ? 'flex-grow flex justify-between items-center' : 'mt-4'}
-              `}>
-                <div>
-                  <h4 className="font-medium text-lg text-gray-900">{item.equipment_name}</h4>
-                  <p className="text-sm text-gray-500">{item.equipment_category}</p>
-                  <Tag 
-                    color={item.status_availability_name === 'available' ? 'green' : 'red'}
-                    className="mt-2"
-                  >
-                    {item.status_availability_name}
-                  </Tag>
-                  <div className="mt-3">
-                    <span className="text-sm text-gray-600">
-                      Available: {item.equipment_quantity}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Quantity Input */}
-                <div className={viewMode === 'list' ? 'ml-4' : 'mt-4'}>
-                  <InputNumber
-                    min={0}
-                    max={item.equipment_quantity}
-                    value={localEquipmentQuantities[item.equipment_id] || 0}
-                    onChange={(value) => handleLocalQuantityChange(item.equipment_id, value)}
-                    disabled={item.status_availability_name !== 'available'}
-                    className="w-full"
-                    addonBefore="Qty"
-                  />
-                </div>
-              </div>
-            </div>
-          </Card>
-        ))}
+        {filteredEquipment.map(renderEquipmentCard)}
       </div>
 
       {filteredEquipment.length === 0 && (
         <Empty
-          description="No equipment found"
+          description={<span className={isMobile ? 'text-xs' : 'text-sm'}>No equipment found</span>}
           image={Empty.PRESENTED_IMAGE_SIMPLE}
-          className="my-8"
+          className="my-4"
+          imageStyle={{ width: isMobile ? 40 : 60 }}
         />
       )}
     </Modal>
   );
 };
 
+// Add this with other function declarations
+const renderDriverDropdown = () => {
+  const userDepartmentId = localStorage.getItem('department_id');
+  
+  // Filter drivers based on selected department
+  const filteredDrivers = availableDrivers.filter(driver => {
+    if (selectedDriverDept === 'current') {
+      return driver.department_id === userDepartmentId;
+    }
+    return driver.department_id === '27'; // GSD department ID
+  });
+
+  return (
+    <div className="space-y-4">
+      <Form.Item
+        label={<span>Driver Source <span className="text-red-500">*</span></span>}
+        required
+      >
+        <Radio.Group
+          value={selectedDriverDept}
+          onChange={(e) => {
+            setSelectedDriverDept(e.target.value);
+            // Reset driver selection when changing departments
+            handleInputChange({
+              target: { name: 'driverName', value: null }
+            });
+            // Trigger driver fetch with new department selection
+            if (formData.startDate && formData.endDate) {
+              fetchDrivers(formData.startDate, formData.endDate);
+            }
+          }}
+          className="driver-dept-selection"
+        >
+          <Card className="mb-4 w-full">
+            <Radio.Button 
+              value="current" 
+              className="w-full h-full"
+            >
+              <div className="flex items-center gap-3 p-2">
+                <BankOutlined className="text-xl text-blue-500" />
+                <div>
+                  <div className="font-medium">Current Department</div>
+                  <div className="text-sm text-gray-500">
+                    Your department's drivers for the selected time slot
+                  </div>
+                </div>
+              </div>
+            </Radio.Button>
+          </Card>
+
+          <Card>
+            <Radio.Button 
+              value="gsd" 
+              className="w-full h-full"
+            >
+              <div className="flex items-center gap-3 p-2">
+                <CarOutlined className="text-xl text-green-500" />
+                <div>
+                  <div className="font-medium">GSD Driver</div>
+                  <div className="text-sm text-gray-500">
+                    Professional drivers from General Services Department
+                  </div>
+                </div>
+              </div>
+            </Radio.Button>
+          </Card>
+        </Radio.Group>
+      </Form.Item>
+
+      <Form.Item
+        label={<span>Select Driver <span className="text-red-500">*</span></span>}
+        required
+      >
+        <div className="space-y-3">
+          {isLoadingDrivers ? (
+            <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+              <Spin size="small" />
+              <span className="text-gray-500">Loading available drivers...</span>
+            </div>
+          ) : (
+            <>
+              <Select
+                value={formData.driverName}
+                onChange={(value) => handleInputChange({
+                  target: { name: 'driverName', value }
+                })}
+                placeholder="Select a driver"
+                className="w-full"
+                disabled={filteredDrivers.length === 0}
+                showSearch
+                filterOption={(input, option) =>
+                  option.children?.toString().toLowerCase().indexOf(input.toLowerCase()) >= 0
+                }
+                notFoundContent={
+                  <Empty
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    description={selectedDriverDept === 'current'
+                      ? `No drivers available from   for the selected time slot.`
+                      : 'No GSD drivers available for the selected time slot.'}
+                  />
+                }
+              >
+                {filteredDrivers.map(driver => (
+                  <Select.Option 
+                    key={driver.driver_id} 
+                    value={driver.driver_id}
+                  >
+                    <div className="flex items-center gap-2">
+                      <UserOutlined className="text-gray-400" />
+                      <span>{driver.driver_full_name}</span>
+                      {driver.license_type && (
+                        <Tag color="blue" className="ml-2">
+                          {driver.license_type}
+                        </Tag>
+                      )}
+                    </div>
+                  </Select.Option>
+                ))}
+              </Select>
+
+              
+
+              {formData.driverName && (
+                <Card className="bg-blue-50 border-blue-200">
+                  <div className="flex items-center gap-4">
+                    <div className="p-2 bg-blue-100 rounded-full">
+                      <UserOutlined className="text-xl text-blue-500" />
+                    </div>
+                    <div>
+                      <div className="font-medium text-blue-700">
+                        {availableDrivers.find(d => d.driver_id === formData.driverName)?.driver_full_name}
+                      </div>
+                      <div className="text-sm text-blue-600">
+                        {selectedDriverDept === 'gsd' ? 'GSD Driver' : 'Department Driver'}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              )}
+            </>
+          )}
+        </div>
+      </Form.Item>
+    </div>
+  );
+};
+
+
 return (
   <div className="min-h-screen bg-gradient-to-br">
     {/* Sidebar handling */}
     <div className="hidden md:block">
       {userLevel === '100' && <Sidebar />}
-      {userLevel === '1' && <Sidebar1 />}
     </div>
 
     {/* Enhanced main content area */}
-    <div className="w-full p-6 transition-all duration-300">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <div className={`w-full p-6 transition-all duration-300 ${isMobile ? 'px-3 py-4' : 'p-6'}`}>
+      <div className={`mx-auto ${isMobile ? 'max-w-full' : 'max-w-6xl'}`}>
         {/* Enhanced header section with back button */}
-        <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
-          <div className="flex justify-between items-center mb-4">
+        <div className={`bg-white rounded-2xl shadow-sm p-6 border border-gray-100 ${isMobile ? 'mb-3' : 'mb-6'}`}>
+          <div className={`flex ${isMobile ? 'flex-col gap-2' : 'justify-between items-center'}`}>
             <Button
               onClick={() => navigate('/dashboard')}
               className="p-button-text flex items-center gap-2 hover:bg-blue-50 transition-colors"
@@ -2449,27 +2675,28 @@ return (
               <span className="font-medium text-blue-600">Back to Dashboard</span>
             </Button>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2"></h1>
+          <h1 className={`font-bold text-gray-900 ${isMobile ? 'text-xl' : 'text-3xl'}`}>
             Create Reservation
-          
+          </h1>
           <p className="text-gray-600">
             Complete the steps below to make your reservation
           </p>
         </div>
 
         {/* Enhanced steps indicator */}
-        <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 mb-6">
+        <div className={`bg-white rounded-2xl shadow-sm p-6 border border-gray-100 ${isMobile ? 'mb-3 p-2' : 'mb-6 p-4'}`}>
           <StepIndicator 
             currentStep={currentStep} 
             resourceType={formData.resourceType} 
+            isMobile={isMobile}
           />
         </div>
 
         {/* Main content card with enhanced styling */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           {/* Content header */}
-          <div className="px-6 py-4 bg-gray-50 border-b border-gray-100">
-            <h2 className="text-xl font-semibold text-gray-800">
+          <div className={`px-6 py-4 bg-gray-50 border-b border-gray-100 ${isMobile ? 'p-3' : 'px-6 py-4'}`}>
+            <h2 className={`text-xl font-semibold text-gray-800 ${isMobile ? 'text-lg' : 'text-xl'}`}>
               {currentStep === 0 && "Select Resource Type"}
               {currentStep === 1 && `Select ${formData.resourceType === 'venue' ? 'Venue' : 'Vehicle'}`}
               {currentStep === 2 && "Choose Date & Time"}
@@ -2480,26 +2707,28 @@ return (
           </div>
 
           {/* Main content area with enhanced padding */}
-          <div className="p-6">
-            <div className="max-w-4xl mx-auto">
+          <div className={isMobile ? 'p-3' : 'p-6'}>
+            <div className={`mx-auto ${isMobile ? 'max-w-full' : 'max-w-4xl'}`}>
               {renderStepContent()}
             </div>
           </div>
 
           {/* Enhanced footer with better positioned buttons */}
           {currentStep !== 5 && (
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
-              <div className="flex justify-between items-center">
+            <div className={`px-6 py-4 bg-gray-50 border-t border-gray-100 ${isMobile ? 'p-3' : 'px-6 py-4'}`}>
+              <div className={`flex ${isMobile ? 'flex-col gap-2' : 'justify-between items-center'}`}>
                
                 
-                <div className="flex justify-end gap-3">
+                <div className={`flex gap-2 ${isMobile ? 'w-full' : ''}`}>
                   <AntButton
                     type="default"
                     icon={<i className="pi pi-arrow-left" />}
                     onClick={handleBack}
                     size="large"
+                    className={`p-button-outlined ${isMobile ? 'w-full' : ''}`}
+                    disabled={currentStep === 0}
                   >
-                    Previous
+                    {isMobile ? 'Back' : 'Previous'}
                   </AntButton>
                   {currentStep === 4 ? (
                     <AntButton
@@ -2507,9 +2736,9 @@ return (
                       icon={<CheckCircleOutlined />}
                       onClick={handleAddReservation}
                       size="large"
-                      className="bg-green-500 hover:bg-green-600"
+                      className={`${isMobile ? 'w-full' : ''} p-button-success`}
                     >
-                      Submit Reservation
+                      Submit
                     </AntButton>
                   ) : (
                     <AntButton
@@ -2517,6 +2746,7 @@ return (
                       icon={<i className="pi pi-arrow-right" />}
                       onClick={handleNext}
                       size="large"
+                      className={`${isMobile ? 'w-full' : ''} p-button-primary`}
                     >
                       Next
                     </AntButton>
@@ -2557,7 +2787,7 @@ return (
 };
 
 // Update the StepIndicator component with enhanced styling
-const StepIndicator = ({ currentStep, resourceType }) => {
+const StepIndicator = ({ currentStep, resourceType, isMobile }) => {
   const steps = [
     { title: 'Select Type', icon: <TagOutlined className="text-lg" /> },
     { 
@@ -2575,20 +2805,16 @@ const StepIndicator = ({ currentStep, resourceType }) => {
   return (
     <Steps
       current={currentStep}
-      className="custom-steps site-navigation-steps"
+      className={`custom-steps site-navigation-steps ${isMobile ? 'mobile-steps' : ''}`}
       responsive={false}
+      size={isMobile ? 'small' : 'default'}
+      // Only show current and adjacent steps on mobile
+      progressDot={isMobile}
     >
       {steps.map((step, index) => (
         <Steps.Step
           key={index}
-          title={
-            <span className={`
-              hidden sm:inline
-              ${currentStep === index ? 'font-medium' : ''}
-            `}>
-              {step.title}
-            </span>
-          }
+          title={!isMobile && <span>{step.title}</span>}
           icon={
             index < currentStep ? (
               <CheckCircleFilled className="text-green-500 text-lg" />
@@ -2614,30 +2840,7 @@ const StepIndicator = ({ currentStep, resourceType }) => {
   );
 };
 
-// Update modal components with enhanced styling
-const PassengerModal = ({ visible, onHide }) => {
-  // ...existing code...
 
-  return (
-    <Dialog
-      visible={visible}
-      onHide={onHide}
-      header={
-        <div className="flex items-center gap-2 px-4 py-2">
-          <UserOutlined className="text-blue-500" />
-          <span className="text-lg font-semibold">Add Passenger</span>
-        </div>
-      }
-      modal
-      className="w-[90vw] md:w-[500px]"
-      closeOnEscape
-      dismissableMask
-      contentClassName="p-6"
-    >
-      {/* ...existing modal content... */}
-    </Dialog>
-  );
-};
 
 export default AddReservation;
 

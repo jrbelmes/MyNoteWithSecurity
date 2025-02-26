@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaCar, FaPlus, FaTools, FaCogs, FaListAlt, FaUserShield, FaEye } from 'react-icons/fa';
+import { FaCar, FaPlus, FaTools, FaCogs, FaListAlt, FaEye } from 'react-icons/fa';
 import axios from 'axios';
 import Sidebar from './Sidebar';
 import { useNavigate } from 'react-router-dom';
@@ -30,8 +30,8 @@ const Master = () => {
   const [categories, setCategories] = useState([]);
   const [makes, setMakes] = useState([]);
   const [message, setMessage] = useState('');
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [setIsSuccess] = useState(false);
+  const [setLoading] = useState(false);
   const [popupMessage, setPopupMessage] = useState('');
 
   const user_level_id = localStorage.getItem('user_level_id');

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { motion } from 'framer-motion';
-import { FiX, FiMapPin, FiClock, FiPlus, FiCalendar } from 'react-icons/fi';
+import { FiX, FiMapPin, FiClock, FiCalendar } from 'react-icons/fi';
 
 const GSDCalendar = ({ isOpen, onClose }) => {
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -49,13 +49,7 @@ const GSDCalendar = ({ isOpen, onClose }) => {
     return date.toISOString().split('T')[0];
   };
 
-  const formatDisplayDate = (date) => {
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
+  
 
   const isDateInRange = (date, startDate, endDate) => {
     const currentDate = new Date(date);
@@ -70,18 +64,6 @@ const GSDCalendar = ({ isOpen, onClose }) => {
     return currentDate >= start && currentDate <= end;
   };
 
-  const getEventStatus = (startDate) => {
-    const today = new Date();
-    const eventDate = new Date(startDate);
-    
-    if (eventDate < today) {
-      return 'completed';
-    } else if (eventDate.toDateString() === today.toDateString()) {
-      return 'today';
-    } else {
-      return 'upcoming';
-    }
-  };
 
   const statusColors = {
     upcoming: {

@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box,
   Avatar,
   Typography,
   IconButton,
   Grid,
-  useTheme,
   styled,
 } from '@mui/material';
 import { 
@@ -18,7 +16,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons';
 import { Modal, Input, message, Spin, Tooltip } from 'antd';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion} from 'framer-motion';
 
 const StyledInput = styled(Input)`
   &.ant-input-affix-wrapper {

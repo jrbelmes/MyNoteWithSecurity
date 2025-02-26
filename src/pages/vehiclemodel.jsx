@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Modal, Button, Form } from 'react-bootstrap';
 import { toast, Toaster } from 'sonner';
 import Sidebar from './Sidebar';
-import { FaArrowLeft, FaPlus, FaTrash, FaSearch, FaCar, FaEdit } from 'react-icons/fa';
+import { FaArrowLeft, FaPlus, FaTrash, FaSearch, FaEdit } from 'react-icons/fa';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -23,9 +23,7 @@ const VehicleModels = () => {
   const [editMode, setEditMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const user_level_id = localStorage.getItem('user_level_id');
-  const [editingModel, setEditingModel] = useState(null);
-
-  const user_id = localStorage.getItem('user_id');
+  const [setEditingModel] = useState(null);
 
   useEffect(() => {
       if (user_level_id !== '1' && user_level_id !== '2' && user_level_id !== '4') {
