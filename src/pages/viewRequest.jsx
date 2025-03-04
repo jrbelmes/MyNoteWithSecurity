@@ -19,7 +19,7 @@ import {
   DialogContainer,
 } from '../components/core/dialog';
 import { Loader2 } from 'lucide-react';
-import { Modal, Tabs, Badge, Descriptions, Space, Tag, Timeline, Button } from 'antd';
+import { Modal, Tabs, Badge, Descriptions, Space, Tag, Timeline, Button, Alert } from 'antd';
 import { 
     CarOutlined, 
     BuildOutlined, 
@@ -47,6 +47,7 @@ const ReservationRequests = () => {
     const [startDate, endDate] = dateRange;
     const [isAccepting, setIsAccepting] = useState(false);
     const [isDeclining, setIsDeclining] = useState(false);
+    const [availabilityData, setAvailabilityData] = useState(null);
     const navigate = useNavigate();
     const user_level_id = localStorage.getItem('user_level_id');
 
@@ -94,12 +95,23 @@ const ReservationRequests = () => {
             });
 
             if (response.data?.status === 'success') {
-                setReservationDetails(response.data.data[0]);
-                // Store both IDs when fetching details
+                const details = response.data.data[0];
+                // Handle case where equipment is undefined or null
+                if (!details.equipment) {
+                    details.equipment = {
+                        equipment_name: "No Equipment added",
+                        reservation_equipment_quantity: 0,
+                        equip_id: null
+                    };
+                }
+                setReservationDetails(details);
                 setCurrentRequest({
-                    approval_id: response.data.data[0].approval_id,
-                    reservation_id: response.data.data[0].reservation_id
+                    approval_id: details.approval_id,
+                    reservation_id: details.reservation_id
                 });
+                
+                // Check availability after fetching details
+                await checkAvailability(details);
                 setIsDetailModalOpen(true);
             } else {
                 toast.error('Failed to fetch reservation details.');
@@ -107,6 +119,101 @@ const ReservationRequests = () => {
         } catch (error) {
             toast.error('Error fetching reservation details. Please try again later.');
         }
+    };
+
+    const checkAvailability = async (details) => {
+        try {
+            const startDate = details.venue ? details.venue.venue_form_start_date : details.vehicle.vehicle_form_start_date;
+            const endDate = details.venue ? details.venue.venue_form_end_date : details.vehicle.vehicle_form_end_date;
+
+            console.log('Checking availability for:', {
+                startDate,
+                endDate,
+                venue_id: details.venue?.venue_id,
+                vehicle_id: details.vehicle?.vehicle_id,
+                equipment_id: details.equipment?.equipment_id
+            });
+
+            const response = await axios.post('http://localhost/coc/gsd/process_reservation.php', {
+                operation: 'doubleCheckAvailability',
+                start_datetime: startDate,
+                end_datetime: endDate,
+                venue_id: details.venue?.venue_id,
+                vehicle_id: details.vehicle?.vehicle_id,
+                equipment_id: details.equipment?.equipment_id
+            }, {
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.data?.status === 'success') {
+                console.log('Availability response:', response.data.data);
+                setAvailabilityData(response.data.data);
+                
+                // Log detailed availability status
+                if (details.venue) {
+                    console.log('Venue availability:', !response.data.data.unavailable_venues?.some(
+                        v => v.ven_id === details.venue.venue_id
+                    ));
+                }
+                if (details.vehicle) {
+                    console.log('Vehicle availability:', !response.data.data.unavailable_vehicles?.some(
+                        v => v.vehicle_id === details.vehicle.vehicle_id
+                    ));
+                }
+                if (details.equipment) {
+                    console.log('Equipment availability:', !response.data.data.unavailable_equipment?.some(
+                        e => e.equip_id === details.equipment.equipment_id
+                    ));
+                }
+
+                if (isAnyResourceUnavailable(response.data.data, details)) {
+                    console.log('Some resources are unavailable!');
+                    toast.warning('Some requested resources are currently unavailable for the selected time period.');
+                } else {
+                    console.log('All resources are available!');
+                }
+            }
+        } catch (error) {
+            console.error('Error checking availability:', error);
+            toast.error('Error checking resource availability.');
+        }
+    };
+
+    const isAnyResourceUnavailable = (availabilityData, details) => {
+        if (!availabilityData) return false;
+
+        let isUnavailable = false;
+
+        // Check venue availability
+        if (details.venue) {
+            const isVenueUnavailable = availabilityData.unavailable_venues?.some(
+                v => v.ven_id === details.venue.venue_id
+            );
+            console.log('Venue unavailable:', isVenueUnavailable);
+            if (isVenueUnavailable) isUnavailable = true;
+        }
+
+        // Check vehicle availability
+        if (details.vehicle) {
+            const isVehicleUnavailable = availabilityData.unavailable_vehicles?.some(
+                v => v.vehicle_id === details.vehicle.vehicle_id
+            );
+            console.log('Vehicle unavailable:', isVehicleUnavailable);
+            if (isVehicleUnavailable) isUnavailable = true;
+        }
+
+        // Check equipment availability
+        if (details.equipment) {
+            const isEquipmentUnavailable = availabilityData.unavailable_equipment?.some(
+                e => e.equip_id === details.equipment.equipment_id
+            );
+            console.log('Equipment unavailable:', isEquipmentUnavailable);
+            if (isEquipmentUnavailable) isUnavailable = true;
+        }
+
+        return isUnavailable;
     };
 
     useEffect(() => {
@@ -357,8 +464,12 @@ const ReservationRequests = () => {
                 {/* Detail Modal for Accepting */}
                 <DetailModal 
                     visible={isDetailModalOpen}
-                    onClose={() => setIsDetailModalOpen(false)}
+                    onClose={() => {
+                        setIsDetailModalOpen(false);
+                        setAvailabilityData(null);
+                    }}
                     reservationDetails={reservationDetails}
+                    availabilityData={availabilityData}
                     onAccept={handleAccept}
                     onDecline={() => setIsDeclineModalOpen(true)}
                     isAccepting={isAccepting}
@@ -392,10 +503,149 @@ const ReservationRequests = () => {
     );
 };
 
-const DetailModal = ({ visible, onClose, reservationDetails, onAccept, onDecline, isAccepting, isDeclining }) => {
+// Add this utility function before the DetailModal component
+const formatDateRange = (startDate, endDate) => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    const isSameDay = start.toDateString() === end.toDateString();
+    const monthNames = ["January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+    ];
+
+    const formatTime = (date) => {
+        return date.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+        });
+    };
+
+    if (isSameDay) {
+        return `${monthNames[start.getMonth()]} ${start.getDate()} ${formatTime(start)} to ${formatTime(end)}`;
+    } else {
+        return `${monthNames[start.getMonth()]} ${start.getDate()}-${end.getDate()}\n${formatTime(start)} to ${formatTime(end)}`;
+    }
+};
+
+const DetailModal = ({ visible, onClose, reservationDetails, availabilityData, onAccept, onDecline, isAccepting, isDeclining }) => {
     const { TabPane } = Tabs;
 
     if (!reservationDetails) return null;
+
+    // Revised availability check functions
+    const isVenueAvailable = (venueId) => {
+        const unavailable = availabilityData?.unavailable_venues?.some(
+            v => v.ven_id === venueId
+        );
+        return !unavailable;
+    };
+
+    const isVehicleAvailable = (vehicleId) => {
+        const unavailable = availabilityData?.unavailable_vehicles?.some(
+            v => v.vehicle_id === vehicleId
+        );
+        return !unavailable;
+    };
+
+    const isEquipmentAvailable = (equipId) => {
+        const unavailable = availabilityData?.unavailable_equipment?.some(
+            e => e.equip_id === equipId
+        );
+        return !unavailable;
+    };
+
+    const isDriverAvailable = (driverId) => {
+        const unavailable = availabilityData?.unavailable_drivers?.some(
+            d => d.driver_id === driverId
+        );
+        return !unavailable;
+    };
+
+    // Updated badge renderer
+    const getAvailabilityBadge = (isAvailable) => (
+        <Tag color={isAvailable ? 'success' : 'error'}>
+            {isAvailable ? 'Available' : 'Not Available'}
+        </Tag>
+    );
+
+    const isResourceUnavailable = () => {
+        if (!availabilityData || !reservationDetails) return false;
+
+        // Check venue availability
+        if (reservationDetails.venue) {
+            const isUnavailable = availabilityData.unavailable_venues?.some(
+                venue => venue.ven_id === reservationDetails.venue.ven_id
+            );
+            console.log('Venue availability check:', {
+                requestedVenueId: reservationDetails.venue.ven_id,
+                unavailableVenues: availabilityData.unavailable_venues,
+                isUnavailable
+            });
+            if (isUnavailable) return true;
+        }
+
+        // Check vehicle availability
+        if (reservationDetails.vehicle) {
+            const isVehicleUnavailable = availabilityData.unavailable_vehicles?.some(
+                v => v.vehicle_id === reservationDetails.vehicle.vehicle_id
+            );
+            if (isVehicleUnavailable) return true;
+        }
+
+        // Check equipment availability
+        if (reservationDetails.equipment) {
+            const isEquipmentUnavailable = availabilityData.unavailable_equipment?.some(
+                e => e.equip_id === reservationDetails.equipment.equip_id
+            );
+            if (isEquipmentUnavailable) return true;
+        }
+
+        return false;
+    };
+
+    const getUnavailabilityMessage = () => {
+        const messages = [];
+        
+        if (!availabilityData) return null;
+
+        if (reservationDetails.venue) {
+            const venueUnavailable = availabilityData.unavailable_venues?.find(
+                v => v.ven_id === reservationDetails.venue.ven_id
+            );
+            if (venueUnavailable) {
+                messages.push(`Venue ${venueUnavailable.ven_name} is not available`);
+            }
+        }
+
+        if (reservationDetails.vehicle) {
+            const vehicleUnavailable = availabilityData.unavailable_vehicles?.find(
+                v => v.vehicle_id === reservationDetails.vehicle.vehicle_id
+            );
+            if (vehicleUnavailable) {
+                messages.push(`Vehicle ${vehicleUnavailable.vehicle_name || 'Unknown'} is not available`);
+            }
+        }
+
+        if (reservationDetails.equipment) {
+            const equipmentUnavailable = availabilityData.unavailable_equipment?.find(
+                e => e.equip_id === reservationDetails.equipment.equip_id
+            );
+            if (equipmentUnavailable) {
+                messages.push(`Equipment ${equipmentUnavailable.equip_name} is not available`);
+            }
+        }
+
+        return messages.length > 0 ? (
+            <Alert
+                message="Resource Unavailability"
+                description={<ul>{messages.map((msg, i) => <li key={i}>{msg}</li>)}</ul>}
+                type="error"
+                showIcon
+                className="mb-4"
+            />
+        ) : null;
+    };
 
     return (
         <Modal
@@ -419,6 +669,7 @@ const DetailModal = ({ visible, onClose, reservationDetails, onAccept, onDecline
                     type="primary" 
                     loading={isAccepting}
                     onClick={onAccept}
+                    disabled={isResourceUnavailable()}
                     style={{ backgroundColor: '#52c41a' }}
                 >
                     Reserve
@@ -434,6 +685,7 @@ const DetailModal = ({ visible, onClose, reservationDetails, onAccept, onDecline
                 </Space>
             }
         >
+            {getUnavailabilityMessage()}
             <Tabs defaultActiveKey="1">
                 {reservationDetails.vehicle?.vehicle_form_name && (
                     <TabPane
@@ -446,7 +698,15 @@ const DetailModal = ({ visible, onClose, reservationDetails, onAccept, onDecline
                         key="1"
                     >
                         <Descriptions bordered column={2}>
-                            <Descriptions.Item label="License Plate" span={2}>
+                            <Descriptions.Item 
+                                label={
+                                    <Space>
+                                        License Plate
+                                        {getAvailabilityBadge(isVehicleAvailable(reservationDetails.vehicle.vehicle_id))}
+                                    </Space>
+                                } 
+                                span={2}
+                            >
                                 {reservationDetails.vehicle.license}
                             </Descriptions.Item>
                             <Descriptions.Item label="Model">
@@ -474,11 +734,12 @@ const DetailModal = ({ visible, onClose, reservationDetails, onAccept, onDecline
                                 </Space>
                             </Descriptions.Item>
                             <Descriptions.Item label="Schedule" span={2}>
-                                <Space>
+                                <Space direction="vertical">
                                     <CalendarOutlined />
-                                    {new Date(reservationDetails.vehicle.vehicle_form_start_date).toLocaleString()}
-                                    {' - '}
-                                    {new Date(reservationDetails.vehicle.vehicle_form_end_date).toLocaleString()}
+                                    {formatDateRange(
+                                        reservationDetails.vehicle?.vehicle_form_start_date,
+                                        reservationDetails.vehicle?.vehicle_form_end_date
+                                    )}
                                 </Space>
                             </Descriptions.Item>
                         </Descriptions>
@@ -487,8 +748,12 @@ const DetailModal = ({ visible, onClose, reservationDetails, onAccept, onDecline
                             <div className="mt-4">
                                 <Timeline>
                                     {reservationDetails.vehicle.drivers.map((driver, idx) => (
-                                        <Timeline.Item key={idx} dot={<UserOutlined />}>
-                                            Driver: {driver}
+                                        <Timeline.Item 
+                                            key={idx} 
+                                            dot={<UserOutlined />}
+                                            color={isDriverAvailable(driver) ? 'green' : 'red'}
+                                        >
+                                            Driver: {driver} {getAvailabilityBadge(isDriverAvailable(driver))}
                                         </Timeline.Item>
                                     ))}
                                 </Timeline>
@@ -508,7 +773,15 @@ const DetailModal = ({ visible, onClose, reservationDetails, onAccept, onDecline
                         key="2"
                     >
                         <Descriptions bordered column={2}>
-                            <Descriptions.Item label="Venue Name" span={2}>
+                            <Descriptions.Item 
+                                label={
+                                    <Space>
+                                        Venue Name
+                                        {getAvailabilityBadge(isVenueAvailable(reservationDetails.venue.ven_id))}
+                                    </Space>
+                                } 
+                                span={2}
+                            >
                                 {reservationDetails.venue.venue_name}
                             </Descriptions.Item>
                             <Descriptions.Item label="Event Title" span={2}>
@@ -524,34 +797,44 @@ const DetailModal = ({ visible, onClose, reservationDetails, onAccept, onDecline
                                 </Space>
                             </Descriptions.Item>
                             <Descriptions.Item label="Schedule" span={2}>
-                                <Space>
+                                <Space direction="vertical">
                                     <CalendarOutlined />
-                                    {new Date(reservationDetails.venue.venue_form_start_date).toLocaleString()}
-                                    {' - '}
-                                    {new Date(reservationDetails.venue.venue_form_end_date).toLocaleString()}
+                                    {formatDateRange(
+                                        reservationDetails.venue?.venue_form_start_date,
+                                        reservationDetails.venue?.venue_form_end_date
+                                    )}
                                 </Space>
                             </Descriptions.Item>
                         </Descriptions>
 
-                        {reservationDetails.equipment && (
-                            <div className="mt-4">
-                                <Descriptions bordered column={1}>
-                                    <Descriptions.Item 
-                                        label={
-                                            <Space>
-                                                <ToolOutlined />
-                                                Equipment Requested
-                                            </Space>
-                                        }
-                                    >
-                                        {reservationDetails.equipment.equipment_name}
-                                        <Tag color="orange" className="ml-2">
-                                            Quantity: {reservationDetails.equipment.reservation_equipment_quantity}
-                                        </Tag>
-                                    </Descriptions.Item>
-                                </Descriptions>
-                            </div>
-                        )}
+                        {/* Equipment section with null check */}
+                        <div className="mt-4">
+                            <Descriptions bordered column={1}>
+                                <Descriptions.Item 
+                                    label={
+                                        <Space>
+                                            <ToolOutlined />
+                                            Equipment Requested
+                                        </Space>
+                                    }
+                                >
+                                    {reservationDetails.equipment && 
+                                     reservationDetails.equipment.equip_id === null && 
+                                     reservationDetails.equipment.equipment_name === null && 
+                                     reservationDetails.equipment.reservation_equipment_quantity === null ? (
+                                        <Tag color="default">No Equipment Added</Tag>
+                                    ) : (
+                                        <>
+                                            {reservationDetails.equipment.equipment_name}
+                                            <Tag color="orange" className="ml-2">
+                                                Quantity: {reservationDetails.equipment.reservation_equipment_quantity}
+                                            </Tag>
+                                            {getAvailabilityBadge(isEquipmentAvailable(reservationDetails.equipment.equip_id))}
+                                        </>
+                                    )}
+                                </Descriptions.Item>
+                            </Descriptions>
+                        </div>
                     </TabPane>
                 )}
             </Tabs>
@@ -560,3 +843,4 @@ const DetailModal = ({ visible, onClose, reservationDetails, onAccept, onDecline
 };
 
 export default ReservationRequests;
+

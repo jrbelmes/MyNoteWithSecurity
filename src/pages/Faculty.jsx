@@ -1088,7 +1088,7 @@ const FacultyModal = ({
             }
         } catch (error) {
             console.error('Error submitting form:', error);
-            toast.error('Failed to save user data: ' + (error.message || 'Unknown error'));
+        
         }
     };
 

@@ -3,7 +3,7 @@ import axios from 'axios';
 import DeanSidebar from './component/dean_sidebar';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiFilter, FiRefreshCw, FiCheck, FiX, FiEye, FiCalendar, FiMapPin, FiUser } from 'react-icons/fi';
-import { Modal, Descriptions, Badge, Timeline, Card, Tabs, Button, Tag, Space, Divider } from 'antd';
+import { Modal, Descriptions, Badge, Timeline, Card, Tabs, Button, Tag, Space, Divider, Alert } from 'antd';
 
 const ViewApproval = () => {
   const [requests, setRequests] = useState([]);
@@ -14,6 +14,7 @@ const ViewApproval = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('newest');
+  const [availabilityData, setAvailabilityData] = useState(null);
 
   // Fetch the department_id from localStorage on component mount
   useEffect(() => {
@@ -48,6 +49,11 @@ const ViewApproval = () => {
 
   // Approve or Disapprove a request
   const handleApproval = async (approvalId, status) => {
+    if (status === 'approved' && isAnyResourceUnavailable(availabilityData, selectedRequest)) {
+      alert('Cannot approve: One or more resources are unavailable');
+      return;
+    }
+
     try {
       const response = await axios.post('http://localhost/coc/gsd/process_reservation.php', {
         operation: 'approveRequest',
@@ -76,13 +82,15 @@ const ViewApproval = () => {
   };
 
   // View details of the selected request
-  const handleViewDetails = (request) => {
+  const handleViewDetails = async (request) => {
     setSelectedRequest(request);
+    await checkAvailability(request);
   };
 
   // Close the details view
   const handleCloseDetails = () => {
     setSelectedRequest(null);
+    setAvailabilityData(null);
   };
 
   // Decline the selected request
@@ -135,6 +143,80 @@ const ViewApproval = () => {
     }
     return new Date(a.approval_created_at) - new Date(b.approval_created_at);
   });
+
+  const checkAvailability = async (details) => {
+    try {
+      const startDate = details.venue ? details.venue.venue_form_start_date : details.vehicle.vehicle_form_start_date;
+      const endDate = details.venue ? details.venue.venue_form_end_date : details.vehicle.vehicle_form_end_date;
+
+      const response = await axios.post('http://localhost/coc/gsd/process_reservation.php', {
+        operation: 'doubleCheckAvailability',
+        start_datetime: startDate,
+        end_datetime: endDate,
+        venue_id: details.venue?.ven_id,
+        vehicle_id: details.vehicle?.vehicle_id,
+        equipment_id: details.equipment?.equip_id,
+        driver_id: details.vehicle?.driver_id // Add driver_id for checking
+      });
+
+      if (response.data?.status === 'success') {
+        setAvailabilityData(response.data.data);
+        return !isAnyResourceUnavailable(response.data.data, details);
+      }
+      return false;
+    } catch (error) {
+      console.error('Error checking availability:', error);
+      return false;
+    }
+  };
+
+  const isAnyResourceUnavailable = (availabilityData, details) => {
+    if (!availabilityData) return false;
+
+    let isUnavailable = false;
+
+    if (details.venue) {
+      isUnavailable = availabilityData.unavailable_venues?.some(
+        v => v.ven_id === details.venue.venue_id
+      ) || isUnavailable;
+    }
+
+    if (details.vehicle) {
+      isUnavailable = availabilityData.unavailable_vehicles?.some(
+        v => v.vehicle_id === details.vehicle.vehicle_id
+      ) || isUnavailable;
+      
+      // Check driver availability
+      isUnavailable = availabilityData.unavailable_drivers?.some(
+        d => d.driver_id === details.vehicle.driver_id
+      ) || isUnavailable;
+    }
+
+    if (details.equipment) {
+      isUnavailable = availabilityData.unavailable_equipment?.some(
+        e => e.equip_id === details.equipment.equip_id
+      ) || isUnavailable;
+    }
+
+    return isUnavailable;
+  };
+
+  const getAvailabilityStatus = (type, id) => {
+    if (!availabilityData) return true;
+
+    switch (type) {
+      case 'venue':
+        return !availabilityData.unavailable_venues?.some(v => v.ven_id === id);
+      case 'vehicle':
+        return !availabilityData.unavailable_vehicles?.some(v => v.vehicle_id === id);
+      case 'driver':
+        return !availabilityData.unavailable_drivers?.some(d => d.driver_id === id);
+      case 'equipment':
+        return !availabilityData.unavailable_equipment?.some(e => e.equip_id === id);
+      default:
+        return true;
+    }
+  };
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -306,108 +388,86 @@ const ViewApproval = () => {
               </div>
             }
           >
+            {isAnyResourceUnavailable(availabilityData, selectedRequest) && (
+              <Alert
+                message="Resource Unavailability"
+                description="One or more requested resources are currently unavailable"
+                type="error"
+                showIcon
+                className="mb-4"
+              />
+            )}
+            
             <Tabs defaultActiveKey="1">
-              {selectedRequest.vehicle?.license ? (
-                <>
-                  <Tabs.TabPane tab="Basic Information" key="1">
-                    <Descriptions bordered column={2}>
-                      <Descriptions.Item label="Form Name" span={2}>
-                        {selectedRequest.vehicle.form_name}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="License">{selectedRequest.vehicle.license}</Descriptions.Item>
-                      <Descriptions.Item label="Model">{selectedRequest.vehicle.model}</Descriptions.Item>
-                      <Descriptions.Item label="Make">{selectedRequest.vehicle.make}</Descriptions.Item>
-                      <Descriptions.Item label="Category">{selectedRequest.vehicle.category}</Descriptions.Item>
-                      <Descriptions.Item label="Purpose" span={2}>
-                        {selectedRequest.vehicle.purpose}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="Destination" span={2}>
-                        {selectedRequest.vehicle.destination}
-                      </Descriptions.Item>
-                    </Descriptions>
-                  </Tabs.TabPane>
-                  
-                  <Tabs.TabPane tab="Schedule & Drivers" key="2">
-                    <Card title="Schedule Information">
-                      <Timeline>
-                        <Timeline.Item color="green">
-                          Start: {new Date(selectedRequest.vehicle.start_date).toLocaleString()}
-                        </Timeline.Item>
-                        <Timeline.Item color="red">
-                          End: {new Date(selectedRequest.vehicle.end_date).toLocaleString()}
-                        </Timeline.Item>
-                      </Timeline>
-                    </Card>
-                    
-                    <Divider />
-                    
-                    <Card title="Driver">
-                      {selectedRequest.vehicle.driver_names?.map((driver, index) => (
-                        <Tag key={index} color="blue" className="mb-2 mr-2">
-                          {driver}
-                        </Tag>
-                      ))}
-                    </Card>
-                  </Tabs.TabPane>
-                  
-                  <Tabs.TabPane tab="Passengers" key="3">
-                    <Card>
-                      <div className="grid grid-cols-3 gap-4">
-                        {selectedRequest.passengers?.map((passenger) => (
-                          <Card key={passenger.passenger_id} size="small" className="bg-gray-50">
-                            <p>{passenger.passenger_name}</p>
-                          </Card>
-                        ))}
-                      </div>
-                    </Card>
-                  </Tabs.TabPane>
-                </>
-              ) : (
-                <>
-                  <Tabs.TabPane tab="Event Details" key="1">
-                    <Descriptions bordered column={2}>
-                      <Descriptions.Item label="Event Title" span={2}>
-                        {selectedRequest.venue.event_title}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="Venue Name">{selectedRequest.venue.name}</Descriptions.Item>
-                      <Descriptions.Item label="Participants">{selectedRequest.venue.participants}</Descriptions.Item>
-                      <Descriptions.Item label="Description" span={2}>
-                        {selectedRequest.venue.description}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="Requester" span={2}>
-                        {selectedRequest.venue.requester}
-                      </Descriptions.Item>
-                    </Descriptions>
-                  </Tabs.TabPane>
-                  
-                  <Tabs.TabPane tab="Schedule" key="2">
-                    <Card>
-                      <Timeline>
-                        <Timeline.Item color="green">
-                          Start: {new Date(selectedRequest.venue.start_date).toLocaleString()}
-                        </Timeline.Item>
-                        <Timeline.Item color="red">
-                          End: {new Date(selectedRequest.venue.end_date).toLocaleString()}
-                        </Timeline.Item>
-                      </Timeline>
-                    </Card>
-                  </Tabs.TabPane>
-                  
-                  {selectedRequest.equipment && (
-                    <Tabs.TabPane tab="Equipment" key="3">
-                      <Card>
-                        <Descriptions bordered>
-                          <Descriptions.Item label="Equipment Name">
-                            {selectedRequest.equipment.name}
-                          </Descriptions.Item>
-                          <Descriptions.Item label="Quantity">
-                            {selectedRequest.equipment.quantity}
-                          </Descriptions.Item>
-                        </Descriptions>
-                      </Card>
-                    </Tabs.TabPane>
-                  )}
-                </>
+              {selectedRequest?.vehicle && (
+                <Tabs.TabPane tab="Vehicle Details" key="1">
+                  <Descriptions bordered>
+                    <Descriptions.Item label="Form Name" span={2}>
+                      {selectedRequest.vehicle.form_name}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="License">{selectedRequest.vehicle.license}</Descriptions.Item>
+                    <Descriptions.Item label="Model">{selectedRequest.vehicle.model}</Descriptions.Item>
+                    <Descriptions.Item label="Make">{selectedRequest.vehicle.make}</Descriptions.Item>
+                    <Descriptions.Item label="Category">{selectedRequest.vehicle.category}</Descriptions.Item>
+                    <Descriptions.Item label="Purpose" span={2}>
+                      {selectedRequest.vehicle.purpose}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Destination" span={2}>
+                      {selectedRequest.vehicle.destination}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Availability Status">
+                      <Tag color={getAvailabilityStatus('vehicle', selectedRequest.vehicle.vehicle_id) ? 'success' : 'error'}>
+                        {getAvailabilityStatus('vehicle', selectedRequest.vehicle.vehicle_id) ? 'Available' : 'Not Available'}
+                      </Tag>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Driver Availability">
+                      <Tag color={getAvailabilityStatus('driver', selectedRequest.vehicle.driver_id) ? 'success' : 'error'}>
+                        {getAvailabilityStatus('driver', selectedRequest.vehicle.driver_id) ? 'Available' : 'Not Available'}
+                      </Tag>
+                    </Descriptions.Item>
+                  </Descriptions>
+                </Tabs.TabPane>
+              )}
+
+              {selectedRequest?.venue && (
+                <Tabs.TabPane tab="Venue Details" key="2">
+                  <Descriptions bordered>
+                    <Descriptions.Item label="Event Title" span={2}>
+                      {selectedRequest.venue.event_title}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Venue Name">{selectedRequest.venue.name}</Descriptions.Item>
+                    <Descriptions.Item label="Participants">{selectedRequest.venue.participants}</Descriptions.Item>
+                    <Descriptions.Item label="Description" span={2}>
+                      {selectedRequest.venue.description}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Requester" span={2}>
+                      {selectedRequest.venue.requester}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Availability Status">
+                      <Tag color={getAvailabilityStatus('venue', selectedRequest.venue.venue_id) ? 'success' : 'error'}>
+                        {getAvailabilityStatus('venue', selectedRequest.venue.venue_id) ? 'Available' : 'Not Available'}
+                      </Tag>
+                    </Descriptions.Item>
+                  </Descriptions>
+                </Tabs.TabPane>
+              )}
+
+              {selectedRequest?.equipment && (
+                <Tabs.TabPane tab="Equipment Details" key="3">
+                  <Descriptions bordered>
+                    <Descriptions.Item label="Equipment Name">
+                      {selectedRequest.equipment.name}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Quantity">
+                      {selectedRequest.equipment.quantity}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Availability Status">
+                      <Tag color={getAvailabilityStatus('equipment', selectedRequest.equipment.equip_id) ? 'success' : 'error'}>
+                        {getAvailabilityStatus('equipment', selectedRequest.equipment.equip_id) ? 'Available' : 'Not Available'}
+                      </Tag>
+                    </Descriptions.Item>
+                  </Descriptions>
+                </Tabs.TabPane>
               )}
               
               <Tabs.TabPane tab="Status History" key="4">

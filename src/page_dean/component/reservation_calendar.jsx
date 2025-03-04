@@ -259,49 +259,35 @@ const getAvailabilityStatus = (date, allReservations) => {
     return 'past';
   }
 
+  // Check for holidays
+  const formattedDate = compareDate.toISOString().split('T')[0];
+  if (holidays.find(h => h.date === formattedDate)) {
+    return 'holiday';
+  }
+
   // Filter reservations for the current date
   const dayReservations = allReservations.filter(res => {
+    if (!res.isReserved) return false;
+
     const resStart = new Date(res.startDate);
     const resEnd = new Date(res.endDate);
+    resStart.setHours(0, 0, 0, 0);
+    resEnd.setHours(0, 0, 0, 0);
     
-    // Check if the date falls within the reservation range
-    return (
-      res.isReserved && 
-      compareDate >= new Date(resStart.setHours(0, 0, 0, 0)) && 
-      compareDate <= new Date(resEnd.setHours(0, 0, 0, 0))
-    );
+    return compareDate >= resStart && compareDate <= resEnd;
   });
 
   if (dayReservations.length === 0) {
     return 'available';
   }
 
-  // Check for full day reservations (5AM to 7PM)
+  // Check if any reservation covers the entire business hours (5AM to 7PM)
   const hasFullDayReservation = dayReservations.some(res => {
     const resStart = new Date(res.startDate);
     const resEnd = new Date(res.endDate);
-    
-    // Consider it a full day reservation only if it covers the entire business hours
-    if (isSameDay(resStart, compareDate) && isSameDay(resEnd, compareDate)) {
-      return resStart.getHours() <= 5 && resEnd.getHours() >= 19;
-    }
-    
-    // For multi-day reservations
-    if (!isSameDay(resStart, resEnd)) {
-      if (isSameDay(resStart, compareDate)) {
-        return resStart.getHours() <= 5;
-      }
-      if (isSameDay(resEnd, compareDate)) {
-        return resEnd.getHours() >= 19;
-      }
-      // Days in between are considered fully reserved
-      return compareDate > resStart && compareDate < resEnd;
-    }
-    
-    return false;
+    return resStart.getHours() <= 5 && resEnd.getHours() >= 19;
   });
 
-  // If not fully reserved, it's partially reserved
   return hasFullDayReservation ? 'reserved' : 'partial';
 };
 
@@ -366,6 +352,10 @@ const renderCalendarGrid = () => {
           };
         }
 
+        // Add selected date range highlighting
+        const isSelected = selectedStartDate && day >= selectedStartDate && 
+                         (selectedEndDate ? day <= selectedEndDate : day === selectedStartDate);
+
         return (
           <motion.div
             key={day.toISOString()}
@@ -384,6 +374,7 @@ const renderCalendarGrid = () => {
               min-h-[32px] sm:min-h-[60px] p-0.5 sm:p-2 border rounded-md
               ${isCurrentMonth ? statusStyle.className : 'bg-gray-50 text-gray-400'}
               ${statusStyle.hoverClass}
+              ${isSelected ? 'ring-2 ring-blue-500' : ''}
               transition-all duration-200
               ${isSameDay(day, new Date()) ? 'ring-2 ring-blue-500 ring-offset-1' : ''}
             `}
@@ -411,7 +402,7 @@ const renderCalendarGrid = () => {
 
 // Update getTimeSlotAvailability to properly handle business hours
 const getTimeSlotAvailability = (date, hour, allReservations) => {
-  // Business hours are now 5AM to 7PM
+  // Business hours are now 5 AM to 7 PM
   if (hour < 5 || hour >= 19) return 'outside';
 
   const slotStart = new Date(date);
@@ -421,15 +412,15 @@ const getTimeSlotAvailability = (date, hour, allReservations) => {
 
   const hasReservationInSlot = allReservations.some(res => {
     if (!res.isReserved) return false;
-    
+
     const resStart = new Date(res.startDate);
     const resEnd = new Date(res.endDate);
-    
-    // Check if reservation overlaps with this hour slot
+
+    // Check if the slot overlaps with the reservation
     return (
-      (resStart <= slotEnd && resEnd >= slotStart) ||
-      (resStart >= slotStart && resStart < slotEnd) ||
-      (resEnd > slotStart && resEnd <= slotEnd)
+      (slotStart >= resStart && slotStart < resEnd) || // Slot starts during reservation
+      (slotEnd > resStart && slotEnd <= resEnd) ||    // Slot ends during reservation
+      (slotStart <= resStart && slotEnd >= resEnd)    // Slot completely encompasses reservation
     );
   });
 
@@ -465,282 +456,239 @@ const getTimeSlotClass = (date, hour, reservations) => {
 const renderWeekView = () => {
   const startOfWeek = new Date(currentDate);
   startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
-  
+
   const days = Array.from({ length: 7 }, (_, i) => {
     const day = new Date(startOfWeek);
     day.setDate(startOfWeek.getDate() + i);
     return day;
   });
 
-  const timeSlots = Array.from({ length: 14 }, (_, i) => i + 5); // 5 AM to 8 PM
+  const timeSlots = Array.from({ length: 14 }, (_, i) => i + 5); // 5 AM to 7 PM
 
+  const isSlotReserved = (day, hour) => {
+    return reservations.some(res => {
+      if (!res.isReserved) return false;
+
+      const resStart = new Date(res.startDate);
+      const resEnd = new Date(res.endDate);
+      const slotDateTime = new Date(day);
+      slotDateTime.setHours(hour, 0, 0, 0);
+
+      const resEndHour = resEnd.getHours();
+      
+      // For any day within the reservation period
+      if (slotDateTime >= resStart && slotDateTime <= resEnd) {
+        // Set fixed hours regardless of day
+        return hour >= 5 && hour < 10;
+      }
+
+      return false;
+    });
+  };
+
+  const getReservationInfo = (day, hour) => {
+    const reservation = reservations.find(res => {
+      if (!res.isReserved) return false;
+
+      const resStart = new Date(res.startDate);
+      const slotDate = new Date(day);
+      slotDate.setHours(hour, 0, 0, 0);
+
+      return (
+        isSameDay(slotDate, resStart) && 
+        hour === 5 // Only show info at 5 AM
+      );
+    });
+
+    if (reservation) {
+      return {
+        ...reservation
+      };
+    }
+
+    return null;
+  };
+
+  // Rest of the rendering code remains the same
   return (
-    <motion.div className="overflow-x-auto -mx-4 sm:mx-0">
+    <div className="overflow-x-auto -mx-4 sm:mx-0">
       <div className="min-w-full">
-        {/* Header row */}
         <div className="grid grid-cols-[60px_repeat(7,1fr)] sm:grid-cols-[100px_repeat(7,1fr)] border-b">
           <div className="p-2 sm:p-4 text-xs sm:text-sm font-medium text-gray-500">Time</div>
-          {days.map((day) => {
-            const hasFullDay = reservations.some(res => 
-              isSameDay(new Date(res.startDate), day) &&
-              new Date(res.startDate).getHours() === 8 &&
-              new Date(res.startDate).getMinutes() === 0 &&
-              new Date(res.endDate).getHours() === 17 &&
-              new Date(res.endDate).getMinutes() === 0 &&
-              res.isReserved
-            );
-
-            return (
-              <div key={day.toISOString()} 
-                className={`p-2 sm:p-4 text-center border-l ${
-                  hasFullDay ? 'bg-red-100' : 'bg-white'
-                }`}
-              >
-                <div className={`text-xs sm:text-sm font-medium ${hasFullDay ? 'text-red-800' : 'text-gray-800'}`}>
-                  {format(day, 'EEE')}
-                </div>
-                <div className="text-xs text-gray-500">
-                  {format(day, 'MMM d')}
-                </div>
-                {hasFullDay && (
-                  <div className="text-xs text-red-600 mt-1">
-                    Fully Reserved
-                  </div>
-                )}
+          {days.map((day) => (
+            <div key={day.toISOString()} className="p-2 sm:p-4 text-center border-l">
+              <div className="text-xs sm:text-sm font-medium text-gray-800">
+                {format(day, 'EEE')}
               </div>
-            );
-          })}
+              <div className="text-xs text-gray-500">
+                {format(day, 'MMM d')}
+              </div>
+            </div>
+          ))}
         </div>
 
-        {/* Time slots */}
         {timeSlots.map((hour) => (
           <div key={hour} className="grid grid-cols-[60px_repeat(7,1fr)] sm:grid-cols-[100px_repeat(7,1fr)] border-b">
             <div className="p-2 sm:p-4 text-xs sm:text-sm font-medium text-gray-500">
-              {format(new Date().setHours(hour), 'ha')} {/* Changed to 'ha' format */}
+              {format(new Date().setHours(hour), 'ha')}
             </div>
             {days.map((day) => {
-              const now = new Date();
-              const slotDateTime = new Date(day);
-              slotDateTime.setHours(hour, 0, 0, 0);
-              const isPast = slotDateTime < now;
-              
-              const statusClass = getTimeSlotClass(day, hour, reservations);
-              const status = getTimeSlotAvailability(day, hour, reservations);
-              const isSelectable = !isPast && status !== 'full' && status !== 'outside' && status !== 'past';
-
-              // Get any reservations that overlap with this time slot
-              const slotReservations = reservations.filter(res => {
-                const resStart = new Date(res.startDate);
-                const resEnd = new Date(res.endDate);
-                const slotStart = new Date(day);
-                slotStart.setHours(hour, 0, 0, 0);
-                const slotEnd = new Date(day);
-                slotEnd.setHours(hour + 1, 0, 0, 0);
-
-                return (
-                  res.isReserved &&
-                  slotStart < resEnd &&
-                  slotEnd > resStart &&
-                  (
-                    resStart.getHours() <= hour &&
-                    resEnd.getHours() > hour ||
-                    (isSameDay(resStart, day) && resStart.getHours() <= hour) ||
-                    (isSameDay(resEnd, day) && resEnd.getHours() > hour)
-                  )
-                );
-              });
+              const reservationInfo = getReservationInfo(day, hour);
+              const isReserved = isSlotReserved(day, hour);
 
               return (
                 <div
                   key={`${day.toISOString()}-${hour}`}
-                  onClick={() => isSelectable ? handleTimeSlotClick(day, hour) : null}
-                  className={`
-                    p-2 border-l min-h-[80px] relative
-                    ${statusClass}
-                    ${isPast ? 'bg-gray-100 cursor-not-allowed text-gray-400' : ''}
-                  `}
+                  className={`p-2 border-l min-h-[80px] relative ${
+                    isReserved ? 'bg-red-100 dark:bg-red-900/30' : 'bg-green-100 dark:bg-green-900/30'
+                  }`}
+                  onClick={() => handleTimeSlotClick(day, hour)}
                 >
-                  {slotReservations.map((res, index) => (
-                    <div
-                      key={index}
-                      className="absolute inset-0 bg-red-100 opacity-50"
-                      title={`Reserved: ${format(res.startDate, 'HH:mm')} - ${format(res.endDate, 'HH:mm')}`}
-                    />
-                  ))}
+                  {reservationInfo && (
+                    <div className="absolute inset-x-0 top-0 px-2 py-1">
+                      <div className="text-xs text-red-800 dark:text-red-200 whitespace-pre-line">
+                        {reservationInfo.displayText}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
         ))}
       </div>
-    </motion.div>
+    </div>
   );
 };
-
 // Update renderDayView with enhanced full-day indication
 const renderDayView = () => {
-  const hours = Array.from({ length: 16 }, (_, i) => i + 5); // 5 AM to 8 PM
-  const now = new Date();
-  
-  const hasFullDayReservation = reservations.some(res => 
-    isSameDay(new Date(res.startDate), currentDate) &&
-    new Date(res.startDate).getHours() === 8 &&
-    new Date(res.startDate).getMinutes() === 0 &&
-    new Date(res.endDate).getHours() === 17 &&
-    new Date(res.endDate).getMinutes() === 0 &&
-    res.isReserved
-  );
+  const timeSlots = Array.from({ length: 14 }, (_, i) => i + 5); // 5 AM to 7 PM
 
-  return (
-    <motion.div className="border rounded-lg">
-      <div className={`text-center p-4 border-b ${
-        hasFullDayReservation ? 'bg-red-100' : 'bg-white'
-      }`}>
-        <span className={`text-xl font-medium ${
-          hasFullDayReservation ? 'text-red-800' : 'text-gray-800'
-        }`}>
-          {format(currentDate, 'EEEE, MMMM d, yyyy')}
-        </span>
-        {hasFullDayReservation && (
-          <div className="text-sm text-red-600 mt-1">
-            Fully Reserved Today
-          </div>
-        )}
-      </div>
-      <div className="divide-y">
-        {hours.map((hour) => {
-          const slotDateTime = new Date(currentDate);
-          slotDateTime.setHours(hour, 0, 0, 0);
-          const isPast = slotDateTime < now;
-          
-          const status = getTimeSlotAvailability(currentDate, hour, reservations);
-          const statusClass = getTimeSlotClass(currentDate, hour, reservations);
-          const isSelectable = !isPast && status !== 'full' && status !== 'outside' && status !== 'past';
+  const getReservationStyle = (hour) => {
+    const currentSlot = new Date(currentDate);
+    currentSlot.setHours(hour, 0, 0, 0);
 
-          // Get reservations for this specific hour
-          const hourReservations = reservations.filter(res => {
-            const resStart = new Date(res.startDate);
-            const resEnd = new Date(res.endDate);
-            const slotStart = new Date(currentDate);
-            slotStart.setHours(hour, 0, 0, 0);
-            const slotEnd = new Date(currentDate);
-            slotEnd.setHours(hour + 1, 0, 0, 0);
+    for (const res of reservations) {
+      if (!res.isReserved) continue;
 
-            return (
-              res.isReserved &&
-              slotStart < resEnd &&
-              slotEnd > resStart &&
-              (
-                resStart.getHours() <= hour &&
-                resEnd.getHours() > hour ||
-                (isSameDay(resStart, currentDate) && resStart.getHours() <= hour) ||
-                (isSameDay(resEnd, currentDate) && resEnd.getHours() > hour)
-              )
-            );
-          });
+      const resStart = new Date(res.startDate);
+      const resEnd = new Date(res.endDate);
 
-          return (
-            <div
-              key={hour}
-              onClick={() => isSelectable ? handleTimeSlotClick(currentDate, hour) : null}
-              className={`
-                flex p-4 min-h-[80px] relative
-                ${statusClass}
-                ${isPast ? 'bg-gray-100 cursor-not-allowed text-gray-400' : ''}
-              `}
-            >
-              <div className="w-32 font-medium text-gray-500">
-                {format(new Date().setHours(hour), 'ha')} {/* Changed to 'ha' format */}
-              </div>
-              {hourReservations.map((res, index) => (
-                <div
-                  key={index}
-                  className="absolute inset-0 bg-red-100 opacity-50"
-                  title={`Reserved: ${format(res.startDate, 'HH:mm')} - ${format(res.endDate, 'HH:mm')}`}
-                />
-              ))}
-            </div>
-          );
-        })}
-      </div>
-    </motion.div>
-  );
-};
+      // Only apply style if the slot is within the exact reservation hours for this day
+      if (isSameDay(currentSlot, resStart) || isSameDay(currentSlot, resEnd)) {
+        const slotHour = currentSlot.getHours();
+        const startHour = resStart.getHours();
+        const endHour = resEnd.getHours();
 
-  const generateAvailableTimeSlots = (selectedDate) => {
-    const slots = [];
-    const workStart = 8; // 8 AM
-    const workEnd = 17;  // 5 PM
-  
-    // Get all reservations for the selected date
-    const dayReservations = reservations.filter(res => 
-      isSameDay(new Date(res.startDate), selectedDate)
-    );
-  
-    // Create array of blocked time ranges
-    const blockedRanges = dayReservations
-      .filter(res => res.isReserved)
-      .map(res => ({
-        start: new Date(res.startDate).getHours(),
-        end: new Date(res.endDate).getHours()
-      }));
-  
-    // Generate available time slots
-    for (let hour = workStart; hour <= workEnd; hour++) {
-      // Check if this hour is within any blocked range
-      const isBlocked = blockedRanges.some(range => 
-        hour >= range.start && hour < range.end
-      );
-  
-      if (!isBlocked) {
-        // Add available hours with minutes
-        for (let minute = 0; minute < 60; minute++) {
-          slots.push({
-            hour,
-            minute,
-            label: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
-          });
+        if (isSameDay(currentSlot, resStart) && slotHour >= startHour && slotHour < endHour) {
+          const isStart = slotHour === startHour;
+          const isEnd = slotHour === (endHour - 1);
+          return {
+            backgroundColor: 'rgb(254, 226, 226)', // red-100
+            borderLeft: isStart ? '2px solid rgb(220, 38, 38)' : 'none',
+            borderRight: isEnd ? '2px solid rgb(220, 38, 38)' : 'none'
+          };
+        }
+
+        if (isSameDay(currentSlot, resEnd) && slotHour < endHour) {
+          const isStart = slotHour === startHour;
+          const isEnd = slotHour === (endHour - 1);
+          return {
+            backgroundColor: 'rgb(254, 226, 226)', // red-100
+            borderLeft: isStart ? '2px solid rgb(220, 38, 38)' : 'none',
+            borderRight: isEnd ? '2px solid rgb(220, 38, 38)' : 'none'
+          };
         }
       }
     }
-  
-    return slots;
+    return {};
   };
+
+  return (
+    <div className="border rounded-lg">
+      <div className="text-center p-4 border-b">
+        <span className="text-xl font-medium text-gray-800">
+          {format(currentDate, 'EEEE, MMMM d, yyyy')}
+        </span>
+      </div>
+      <div className="divide-y">
+        {timeSlots.map((hour) => (
+          <div
+            key={hour}
+            className="flex p-4 min-h-[80px] relative"
+            style={getReservationStyle(hour)}
+            onClick={() => handleTimeSlotClick(currentDate, hour)}
+          >
+            <div className="w-32 font-medium text-gray-500">
+              {format(new Date().setHours(hour), 'ha')}
+            </div>
+            <div className="flex-1">
+              {reservations.map(res => {
+                if (!res.isReserved) return null;
+                const resStart = new Date(res.startDate);
+                const resEnd = new Date(res.endDate);
+                const currentSlot = new Date(currentDate);
+                currentSlot.setHours(hour, 0, 0, 0);
+
+                if (currentSlot >= resStart && currentSlot < resEnd &&
+                    currentSlot.getHours() === resStart.getHours()) {
+                  return (
+                    <div
+                      key={res.id}
+                      className="px-3 py-1 text-sm text-red-800 font-medium"
+                    >
+                      Reserved
+                      <br />
+                      {format(resStart, 'HH:mm')} - {format(resEnd, 'HH:mm')}
+                    </div>
+                  );
+                }
+                return null;
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 
 // Add this new time conflict check utility function
 const checkTimeSlotConflicts = (startDateTime, endDateTime, reservations) => {
-  const conflicts = [];
-  
-  reservations.forEach(res => {
-    if (!res.isReserved) return;
+  return reservations.filter(res => {
+    if (!res.isReserved) return false;
     
-    try {
-      const resStart = new Date(res.startDate);
-      const resEnd = new Date(res.endDate);
-      
-      // Ensure valid dates before comparison
-      if (isNaN(resStart.getTime()) || isNaN(resEnd.getTime())) {
-        console.warn('Invalid reservation dates detected:', res);
-        return;
-      }
-
-      // Check if there's any overlap
-      if (
-        (startDateTime <= resEnd && endDateTime >= resStart) ||
-        (startDateTime >= resStart && startDateTime < resEnd) ||
-        (endDateTime > resStart && endDateTime <= resEnd)
-      ) {
-        conflicts.push({
-          startDate: resStart,
-          endDate: resEnd
-        });
-      }
-    } catch (error) {
-      console.error('Error processing reservation:', error);
+    const resStart = new Date(res.startDate);
+    const resEnd = new Date(res.endDate);
+    
+    // Convert all times to minutes since midnight for easier comparison
+    const startTime = startDateTime.getHours() * 60 + startDateTime.getMinutes();
+    const endTime = endDateTime.getHours() * 60 + endDateTime.getMinutes();
+    const resStartTime = resStart.getHours() * 60 + resStart.getMinutes();
+    const resEndTime = resEnd.getHours() * 60 + resEnd.getMinutes();
+    
+    // Same day comparison
+    if (isSameDay(startDateTime, resStart)) {
+      // Check if time ranges overlap
+      return !(endTime <= resStartTime || startTime >= resEndTime);
     }
+    
+    // Different day comparison
+    if (startDateTime > resEnd || endDateTime < resStart) {
+      return false; // No overlap if completely before or after
+    }
+    
+    // For multi-day reservations, check specific time ranges
+    if (isSameDay(startDateTime, resStart)) {
+      return startTime < resEndTime;
+    }
+    if (isSameDay(endDateTime, resEnd)) {
+      return endTime > resStartTime;
+    }
+    
+    return false;
   });
-  
-  return conflicts;
 };
 
 // Update the handleTimeSelection function
@@ -751,43 +699,35 @@ const handleTimeSelection = () => {
   }
 
   try {
-    // Create proper date objects for start and end times
     const startDateTime = new Date(selectedStartDate);
     const endDateTime = new Date(selectedEndDate || selectedStartDate);
 
-    // Validate date objects
-    if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) {
-      toast.error('Invalid date selection');
-      return;
-    }
-
     startDateTime.setHours(selectedTimes.startTime || 0);
     startDateTime.setMinutes(selectedTimes.startMinute || 0);
-    startDateTime.setSeconds(0);
-    startDateTime.setMilliseconds(0);
-
     endDateTime.setHours(selectedTimes.endTime || 0);
     endDateTime.setMinutes(selectedTimes.endMinute || 0);
-    endDateTime.setSeconds(0);
-    endDateTime.setMilliseconds(0);
 
-    // Validate time range
-    if (endDateTime <= startDateTime) {
-      toast.error('End time must be after start time');
+    // Add validation for business hours
+    if (startDateTime.getHours() < 5 || endDateTime.getHours() >= 19) {
+      toast.error('Reservations must be between 5 AM and 7 PM');
       return;
     }
 
-    // Check for time slot conflicts
     const conflicts = checkTimeSlotConflicts(startDateTime, endDateTime, reservations);
     
     if (conflicts.length > 0) {
-      setConflictDetails({
-        conflicts,
+      // Format the conflict message more clearly
+      const conflictInfo = {
+        conflicts: conflicts.map(conflict => ({
+          start: dayjs(conflict.startDate).format('MMM D, YYYY h:mm A'),
+          end: dayjs(conflict.endDate).format('MMM D, YYYY h:mm A')
+        })),
         attemptedBooking: {
-          start: dayjs(startDateTime).format('MMM DD, YYYY HH:mm'),
-          end: dayjs(endDateTime).format('MMM DD, YYYY HH:mm')
+          start: dayjs(startDateTime).format('MMM D, YYYY h:mm A'),
+          end: dayjs(endDateTime).format('MMM D, YYYY h:mm A')
         }
-      });
+      };
+      setConflictDetails(conflictInfo);
       setShowConflictModal(true);
       return;
     }
@@ -799,7 +739,6 @@ const handleTimeSelection = () => {
     toast.error('An error occurred while processing your selection');
   }
 };
-
 
 
 const validateDateTime = (dates, times) => {
@@ -854,18 +793,31 @@ const validateDateTime = (dates, times) => {
 };
 
   const checkScheduleConflicts = (startDateTime, endDateTime) => {
-    const conflicts = reservations.filter(res => {
+    return reservations.filter(res => {
+      if (!res.isReserved) return false;
+      
       const resStart = new Date(res.startDate);
       const resEnd = new Date(res.endDate);
       
-      return (
-        (startDateTime >= resStart && startDateTime < resEnd) ||
-        (endDateTime > resStart && endDateTime <= resEnd) ||
-        (startDateTime <= resStart && endDateTime >= resEnd)
-      ) && res.isReserved;
-    });
+      // Check if the new booking starts during an existing reservation
+      // or if the new booking ends during an existing reservation
+      // or if the new booking completely encompasses an existing reservation
+      const hasOverlap = (
+        (startDateTime >= resStart && startDateTime < resEnd) || // New booking starts during existing reservation
+        (endDateTime > resStart && endDateTime <= resEnd) || // New booking ends during existing reservation
+        (startDateTime <= resStart && endDateTime >= resEnd) // New booking encompasses existing reservation
+      );
 
-    return conflicts;
+      // If we're booking on the same day as a reservation that ends at 10 AM,
+      // allow bookings that start at or after 10 AM
+      if (startDateTime.toDateString() === resEnd.toDateString() &&
+          resEnd.getHours() === 10 && 
+          startDateTime.getHours() >= 10) {
+        return false;
+      }
+
+      return hasOverlap && res.isReserved;
+    });
   };
 
   const handleDateTimeSelection = (start, end) => {
@@ -908,67 +860,86 @@ const validateDateTime = (dates, times) => {
     setIsDatePickerModalOpen(false);
   };
 
-  const renderConflictModal = () => (
-    <Dialog
-      open={showConflictModal}
-      onClose={() => setShowConflictModal(false)}
-      className="relative z-50"
-    >
-      <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+ const renderConflictModal = () => (
+  <Dialog
+    open={showConflictModal}
+    onClose={() => setShowConflictModal(false)}
+    className="relative z-50"
+  >
+    <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
 
-      <div className="fixed inset-0 flex items-center justify-center p-4">
-        <Dialog.Panel className="bg-white rounded-lg p-6 max-w-md w-full">
-          <div className="mb-4">
-            <div className="flex items-center mb-2">
-              <span className="text-red-500 text-xl mr-2">⚠️</span>
-              <Dialog.Title className="text-lg font-medium text-red-700">
-                Scheduling Conflict Detected
-              </Dialog.Title>
-            </div>
-            
-            <p className="text-gray-600 mb-4">
-              Your selected time slot conflicts with existing reservations:
-            </p>
+    <div className="fixed inset-0 flex items-center justify-center p-4">
+      <Dialog.Panel className="bg-white rounded-lg p-6 max-w-md w-full">
+        <div className="mb-4">
+          <div className="flex items-center mb-2">
+            <span className="text-red-500 text-xl mr-2">⚠️</span>
+            <Dialog.Title className="text-lg font-medium text-red-700">
+              Scheduling Conflict Detected
+            </Dialog.Title>
+          </div>
+          
+          <p className="text-gray-600 mb-4">
+            Your selected time slot conflicts with existing reservations:
+          </p>
 
-            {conflictDetails && (
+          {conflictDetails && (
+            <>
               <div className="bg-red-50 p-4 rounded-lg mb-4">
                 <p className="font-medium text-red-800 mb-2">Your attempted booking:</p>
                 <p className="text-red-600">
-                  From: {conflictDetails.attemptedBooking.start}<br/>
-                  To: {conflictDetails.attemptedBooking.end}
+                  From: {dayjs(conflictDetails.attemptedBooking.start).format('MMMM D, YYYY h:mm A')}
+                  <br/>
+                  To: {dayjs(conflictDetails.attemptedBooking.end).format('MMMM D, YYYY h:mm A')}
                 </p>
               </div>
-            )}
 
-            <div className="bg-yellow-50 p-4 rounded-lg">
-              <p className="font-medium text-yellow-800 mb-2">Existing reservations:</p>
-              <ul className="space-y-2">
-                {conflictDetails?.conflicts.map((conflict, index) => (
-                  <li key={index} className="text-yellow-700">
-                    {dayjs(conflict.startDate).format('MMM DD, YYYY HH:mm')} - 
-                    {dayjs(conflict.endDate).format('HH:mm')}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
+              <div className="bg-yellow-50 p-4 rounded-lg">
+                <p className="font-medium text-yellow-800 mb-2">Existing reservations:</p>
+                <ul className="space-y-2">
+                  {conflictDetails.conflicts.map((conflict, index) => {
+                    const startDate = dayjs(conflict.startDate);
+                    const endDate = dayjs(conflict.endDate);
+                    const isSameDay = startDate.isSame(endDate, 'day');
+                    
+                    return (
+                      <li key={index} className="text-yellow-700">
+                        {conflict.venueName && <span className="font-medium">{conflict.venueName}</span>}
+                        <br />
+                        {isSameDay ? (
+                          `${startDate.format('MMMM D, YYYY')} from ${startDate.format('h:mm A')} to ${endDate.format('h:mm A')}`
+                        ) : (
+                          `${startDate.format('MMMM D')} - ${endDate.format('MMMM D, YYYY')} from ${startDate.format('h:mm A')} to ${endDate.format('h:mm A')}`
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </>
+          )}
+        </div>
 
-          <div className="mt-6 flex justify-end space-x-3">
-            <button
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-              onClick={() => {
-                setShowConflictModal(false);
-                setDateRange(null); // Reset date selection
-              }}
-            >
-              Choose Different Time
-            </button>
-          </div>
-        </Dialog.Panel>
-      </div>
-    </Dialog>
-  );
-
+        <div className="mt-6 flex justify-end space-x-3">
+          <button
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            onClick={() => {
+              setShowConflictModal(false);
+              setSelectedTimes({
+                startTime: null,
+                endTime: null,
+                startMinute: null,
+                endMinute: null
+              });
+              setDateRange(null);
+            }}
+          >
+            Choose Different Time
+          </button>
+        </div>
+      </Dialog.Panel>
+    </div>
+  </Dialog>
+);
   // Update the RangePicker in renderEnhancedDateTimeSelection
   
 
@@ -1024,10 +995,13 @@ const validateDateTime = (dates, times) => {
       return;
     }
   
+    // Set only start date and open modal directly
     setSelectedStartDate(day);
-    setStartDate(day);  // Make sure this is set
-    setSelectionMode('full');
+    setStartDate(day);
+    setEndDate(null);
+    setSelectedEndDate(null);
     setIsDatePickerModalOpen(true);
+    setSelectionMode('full');
   };
 
   // Add new handler for weekly/daily time slot clicks
@@ -1047,6 +1021,7 @@ const validateDateTime = (dates, times) => {
       return;
     }
 
+    // Set start date and time, then open modal
     setSelectedStartDate(selectedDateTime);
     setStartDate(selectedDateTime);
     setSelectedTimes(prev => ({
@@ -1054,9 +1029,10 @@ const validateDateTime = (dates, times) => {
       startTime: hour,
       startMinute: 0
     }));
-    setSelectionMode('end-only');
-    setEndDate(selectedDateTime); // Initialize end date as same as start date
+    setEndDate(null);
+    setSelectedEndDate(null);
     setIsDatePickerModalOpen(true);
+    setSelectionMode('end-only');
   };
 
   // Add this new function to render the date range modal
@@ -1071,7 +1047,7 @@ const validateDateTime = (dates, times) => {
       <div className="fixed inset-0 flex items-center justify-center p-4">
         <Dialog.Panel className="bg-white rounded-lg p-6 max-w-md w-full">
           <Dialog.Title className="text-lg font-medium mb-4">
-            Select End Date and Time
+            Select Date and Time Range
           </Dialog.Title>
 
           <div className="space-y-4">
@@ -1080,27 +1056,49 @@ const validateDateTime = (dates, times) => {
               <p className="font-medium">{dayjs(startDate).format('MMMM D, YYYY')}</p>
             </div>
             
-            <DatePicker
-              showTime={{ format: 'HH:mm' }}
-              format="YYYY-MM-DD HH:mm"
-              className="w-full"
-              placeholder="Select End Date and Time"
-              disabledDate={(current) => {
-                // Disable dates before start date and holidays
-                const isBeforeStart = current && current < dayjs(startDate).startOf('day');
-                const isHolidayDate = isHoliday(current);
-                return isBeforeStart || isHolidayDate;
-              }}
-              disabledTime={() => ({
-                disabledHours: () => [...Array(24).keys()].filter(h => h <= 5 || h > 19),
-                minuteStep: 30
-              })}
-              onChange={(date) => {
-                if (date) {
-                  handleDateTimeSelection(startDate, date.toDate());
-                }
-              }}
-            />
+            <div>
+              <label className="block text-sm mb-2">Start Time</label>
+              <TimePicker
+                className="w-full"
+                format="HH:mm"
+                minuteStep={30}
+                placeholder="Select start time"
+                disabledTime={() => ({
+                  disabledHours: () => [...Array(24)].map((_, i) => i).filter(h => h < 5 || h >= 19),
+                })}
+                onChange={(time) => {
+                  if (time) {
+                    setSelectedTimes(prev => ({
+                      ...prev,
+                      startTime: time.hour(),
+                      startMinute: time.minute()
+                    }));
+                  }
+                }}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm mb-2">End Time</label>
+              <TimePicker
+                className="w-full"
+                format="HH:mm"
+                minuteStep={30}
+                placeholder="Select end time"
+                disabledTime={() => ({
+                  disabledHours: () => [...Array(24)].map((_, i) => i).filter(h => h < 5 || h >= 19),
+                })}
+                onChange={(time) => {
+                  if (time) {
+                    setSelectedTimes(prev => ({
+                      ...prev,
+                      endTime: time.hour(),
+                      endMinute: time.minute()
+                    }));
+                  }
+                }}
+              />
+            </div>
           </div>
 
           <div className="mt-6 flex justify-end space-x-3">
@@ -1109,6 +1107,49 @@ const validateDateTime = (dates, times) => {
               onClick={() => setIsDatePickerModalOpen(false)}
             >
               Cancel
+            </button>
+            <button
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              onClick={() => {
+                if (!selectedTimes.startTime || !selectedTimes.endTime) {
+                  toast.error('Please select both start and end times');
+                  return;
+                }
+
+                const startDateTime = dayjs(startDate)
+                  .hour(selectedTimes.startTime)
+                  .minute(selectedTimes.startMinute || 0)
+                  .toDate();
+
+                const endDateTime = dayjs(startDate)
+                  .hour(selectedTimes.endTime)
+                  .minute(selectedTimes.endMinute || 0)
+                  .toDate();
+
+                if (endDateTime <= startDateTime) {
+                  toast.error('End time must be after start time');
+                  return;
+                }
+
+                const conflicts = checkTimeSlotConflicts(startDateTime, endDateTime, reservations);
+                
+                if (conflicts.length > 0) {
+                  setConflictDetails({
+                    conflicts,
+                    attemptedBooking: {
+                      start: dayjs(startDateTime).format('MMM DD, YYYY HH:mm'),
+                      end: dayjs(endDateTime).format('MMM DD, YYYY HH:mm')
+                    }
+                  });
+                  setShowConflictModal(true);
+                  return;
+                }
+
+                onDateSelect(startDateTime, endDateTime);
+                setIsDatePickerModalOpen(false);
+              }}
+            >
+              Confirm
             </button>
           </div>
         </Dialog.Panel>
@@ -1128,7 +1169,7 @@ const validateDateTime = (dates, times) => {
         <Dialog.Panel className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-4 sm:p-6 w-full max-w-[340px] sm:max-w-md">
           <div className="flex items-center justify-between mb-4">
             <Dialog.Title className="text-base sm:text-lg font-semibold">
-              Select Reservation Time
+              Select Reservation Period
             </Dialog.Title>
             <button
               onClick={() => setIsDatePickerModalOpen(false)}
@@ -1140,37 +1181,30 @@ const validateDateTime = (dates, times) => {
           </div>
 
           <div className="space-y-4">
-            {/* Start Date Display */}
+            {/* Start Date Display (not editable) */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
-              <div className="p-2 bg-gray-50 rounded">
-                {selectedStartDate && format(selectedStartDate, 'MMMM d, yyyy')}
+              <label className="block text-xs sm:text-sm font-medium mb-1">Start Date</label>
+              <div className="w-full p-2 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
+                {dayjs(selectedStartDate).format('MMMM D, YYYY')}
               </div>
             </div>
 
             {/* End Date Selection */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
-              <DatePicker 
+              <label className="block text-xs sm:text-sm font-medium mb-1">End Date</label>
+              <DatePicker
                 className="w-full"
                 value={selectedEndDate ? dayjs(selectedEndDate) : null}
+                onChange={(date) => setSelectedEndDate(date.toDate())}
                 disabledDate={(current) => {
-                  // Disable dates before or equal to start date and after 7 days from start date
-                  const startDay = dayjs(selectedStartDate).startOf('day');
-                  const maxDate = startDay.add(7, 'day');
-                  return (
-                    current && (
-                      current < startDay ||
-                      current > maxDate
-                    )
-                  );
+                  return current < dayjs(selectedStartDate).startOf('day') ||
+                         current < dayjs().startOf('day');
                 }}
-                onChange={(date) => setSelectedEndDate(date?.toDate())}
               />
             </div>
 
             {/* Time Selection */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-4">
               <div>
                 <label className="block text-xs sm:text-sm font-medium mb-1">Start Time</label>
                 <TimePicker
@@ -1182,15 +1216,10 @@ const validateDateTime = (dates, times) => {
                     dayjs().hour(selectedTimes.startTime).minute(selectedTimes.startMinute || 0) : 
                     null
                   }
-                  disabledTime={() => {
-                    const { hours } = getReservedTimeSlots(selectedStartDate);
-                    return {
-                      disabledHours: () => [...Array(24)].map((_, i) => i)
-                        .filter(h => h < 5 || h >= 20 || hours.includes(h)), // Updated hours
-                      disabledMinutes: () => [],
-                      disabledSeconds: () => []
-                    };
-                  }}
+                  disabledTime={() => ({
+                    disabledHours: () => [...Array(24)].map((_, i) => i).filter(h => h < 5 || h >= 20),
+                    disabledMinutes: () => []
+                  })}
                   onChange={(time) => {
                     if (time) {
                       setSelectedTimes(prev => ({
@@ -1213,44 +1242,17 @@ const validateDateTime = (dates, times) => {
                     dayjs().hour(selectedTimes.endTime).minute(selectedTimes.endMinute || 0) : 
                     null
                   }
-                  disabledTime={() => {
-                    const { timeRanges } = getReservedTimeSlots(selectedEndDate || selectedStartDate);
-                    return {
-                      disabledHours: () => {
-                        const hours = [...Array(24)].map((_, i) => i);
-                        return hours.filter(h => {
-                          // Disable hours outside business hours
-                          if (h < 5 || h >= 20) return true;
-                          
-                          // If same day, disable hours before start time
-                          if (isSameDay(selectedStartDate, selectedEndDate) && 
-                              h <= (selectedTimes.startTime || 0)) return true;
-                          
-                          // Check if hour conflicts with any reservation
-                          const checkTime = new Date(selectedEndDate || selectedStartDate);
-                          checkTime.setHours(h, 0, 0, 0);
-                          
-                          return timeRanges.some(range => {
-                            return checkTime >= range.start && checkTime <= range.end;
-                          });
-                        });
-                      },
-                      disabledMinutes: (h) => {
-                        if (!h) return [];
-                        
-                        const minutes = [...Array(60)].map((_, i) => i);
-                        return minutes.filter(m => {
-                          const checkTime = new Date(selectedEndDate || selectedStartDate);
-                          checkTime.setHours(h, m, 0, 0);
-                          
-                          return timeRanges.some(range => {
-                            return checkTime >= range.start && checkTime <= range.end;
-                          });
-                        });
-                      },
-                      disabledSeconds: () => []
-                    };
-                  }}
+                  disabledTime={() => ({
+                    disabledHours: () => [...Array(24)].map((_, i) => i).filter(h => h < 5 || h >= 20),
+                    disabledMinutes: (selectedHour) => {
+                      if (isSameDay(selectedStartDate, selectedEndDate) &&
+                          selectedHour === selectedTimes.startTime) {
+                        return [...Array(60)].map((_, i) => i)
+                          .filter(m => m <= selectedTimes.startMinute);
+                      }
+                      return [];
+                    }
+                  })}
                   onChange={(time) => {
                     if (time) {
                       setSelectedTimes(prev => ({
@@ -1265,6 +1267,7 @@ const validateDateTime = (dates, times) => {
             </div>
           </div>
 
+          {/* Action Buttons */}
           <div className="mt-4 sm:mt-6 flex gap-2 sm:gap-3">
             <button
               className="flex-1 px-3 py-2 text-xs sm:text-sm font-medium text-gray-600 bg-gray-100 
@@ -1276,8 +1279,54 @@ const validateDateTime = (dates, times) => {
             <button
               className="flex-1 px-3 py-2 text-xs sm:text-sm font-medium text-white bg-blue-500 
                        hover:bg-blue-600 rounded-lg transition-colors disabled:opacity-50"
-              onClick={handleTimeSelection}
-              disabled={!isSelectionValid()}
+              onClick={() => {
+                // Validate date selection
+                if (!selectedStartDate || !selectedEndDate) {
+                  toast.error('Please select both start and end dates');
+                  return;
+                }
+
+                // Validate time selection
+                if (!selectedTimes.startTime || !selectedTimes.endTime) {
+                  toast.error('Please select both start and end times');
+                  return;
+                }
+
+                const startDateTime = dayjs(selectedStartDate)
+                  .hour(selectedTimes.startTime)
+                  .minute(selectedTimes.startMinute || 0)
+                  .toDate();
+
+                const endDateTime = dayjs(selectedEndDate)
+                  .hour(selectedTimes.endTime)
+                  .minute(selectedTimes.endMinute || 0)
+                  .toDate();
+
+                // Validate date-time combination
+                if (endDateTime <= startDateTime) {
+                  toast.error('End date-time must be after start date-time');
+                  return;
+                }
+
+                // Check for conflicts
+                const conflicts = checkTimeSlotConflicts(startDateTime, endDateTime, reservations);
+                if (conflicts.length > 0) {
+                  setConflictDetails({
+                    conflicts,
+                    attemptedBooking: {
+                      start: dayjs(startDateTime).format('MMM DD, YYYY HH:mm'),
+                      end: dayjs(endDateTime).format('MMM DD, YYYY HH:mm')
+                    }
+                  });
+                  setShowConflictModal(true);
+                  return;
+                }
+
+                // If all validations pass, proceed with the selection
+                onDateSelect(startDateTime, endDateTime);
+                setIsDatePickerModalOpen(false);
+              }}
+              disabled={!selectedStartDate || !selectedEndDate || !selectedTimes.startTime || !selectedTimes.endTime}
             >
               Confirm
             </button>
@@ -1450,6 +1499,5 @@ const renderTimeSelectionModal = () => (
 };
 
 export default ReservationCalendar;
-
 
 
