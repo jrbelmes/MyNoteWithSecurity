@@ -227,7 +227,7 @@ const handleAddEquipment = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        if (user_level_id !== '3') {
+        if (user_level_id !== '5' && user_level_id !== '6') {
           localStorage.clear();
           navigate('/gsd');
           return;
@@ -1159,7 +1159,7 @@ const handleAddReservation = async () => {
       const venuePayload = {
         operation: 'venueReservation',
         user_id: parseInt(userId),
-        user_type: 'user',
+        user_type: 'dean',
         dept_id: parseInt(deptId),
         venue_id: parseInt(formData.venue),
         form_data: {
@@ -1209,7 +1209,7 @@ const handleAddReservation = async () => {
       const vehiclePayload = {
         operation: 'vehicleReservation',
         user_id: parseInt(userId),
-        user_type: 'user',
+        user_type: 'dean',
         dept_id: parseInt(deptId),
         vehicles: selectedModels.map(id => id.toString()),
         form_data: {
@@ -1390,7 +1390,7 @@ const renderReviewSection = () => {
                 {Object.keys(selectedVenueEquipment).length > 0 && (
                   <div className="mt-4">
                     <p className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium mb-2`}>Equipment</p>
-                    <div className={`grid ${isMobile ? 'grid-cols-1 gap-2' : 'grid-cols-2 gap-4'}`}>
+                    <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
                       {Object.entries(selectedVenueEquipment).map(([equipId, quantity]) => {
                         const equip = equipment.find(e => e.equipment_id.toString() === equipId.toString());
                         if (!equip) return null;
@@ -1440,7 +1440,7 @@ const renderReviewSection = () => {
                 {/* Vehicles - Compact grid */}
                 <div className="mt-4">
                   <p className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium mb-2`}>Vehicles</p>
-                  <div className={`grid ${isMobile ? 'grid-cols-1 gap-2' : 'grid-cols-2 gap-4'}`}>
+                  <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
                     {selectedVehicleDetails.map(vehicle => (
                       <div key={vehicle.vehicle_id} className="bg-white rounded p-2 flex gap-2">
                         <img
@@ -2119,23 +2119,17 @@ const [newPassenger, setNewPassenger] = useState('');
 // Add fetchDrivers function
 const fetchDrivers = async (startDate, endDate) => {
   setIsLoadingDrivers(true);
-  const userDepartmentId = localStorage.getItem("department_id");
 
   try {
-    // Determine which departments to fetch based on selectedDriverDept
-    const departmentIds = selectedDriverDept === 'gsd' ? [27] : [userDepartmentId];
-
     const response = await axios.post('http://localhost/coc/gsd/user.php', {
       operation: 'fetchDriver',
       startDateTime: format(startDate, 'yyyy-MM-dd HH:mm:ss'),
-      endDateTime: format(endDate, 'yyyy-MM-dd HH:mm:ss'),
-      departmentIds: departmentIds
+      endDateTime: format(endDate, 'yyyy-MM-dd HH:mm:ss')
     });
 
     if (response.data.status === 'success') {
       const driversData = response.data.data.map(driver => ({
         ...driver,
-        department_id: departmentIds[0].toString(),
         displayName: `${driver.driver_full_name} (${driver.departments_name || 'Department Driver'})`
       }));
       setAvailableDrivers(driversData);
@@ -2157,7 +2151,7 @@ useEffect(() => {
   if (formData.startDate && formData.endDate && formData.resourceType === 'vehicle') {
     fetchDrivers(formData.startDate, formData.endDate);
   }
-}, [formData.startDate, formData.endDate, formData.resourceType, selectedDriverDept]); // Add selectedDriverDept
+}, [formData.startDate, formData.endDate, formData.resourceType]); // Add selectedDriverDept
 
 // Add PassengerModal component
 const PassengerModal = ({ visible, onHide }) => {
@@ -2174,8 +2168,9 @@ const PassengerModal = ({ visible, onHide }) => {
   const handleSubmit = () => {
     if (localPassengerName.trim()) {
       handleAddPassenger(localPassengerName.trim());
-      setLocalPassengerName('');
-      inputRef.current?.focus(); // Refocus input for adding multiple passengers
+      setLocalPassengerName(''); // Clear input
+      inputRef.current?.focus(); // Refocus input for next passenger
+      // Removed onHide() to keep modal open
     }
   };
 
@@ -2187,20 +2182,20 @@ const PassengerModal = ({ visible, onHide }) => {
         <div className="flex items-center gap-3 px-4 py-2">
           <UserOutlined className="text-blue-500 text-xl" />
           <div>
-            <h3 className="text-lg font-semibold text-gray-800">Add Passenger</h3>
+            <h3 className="text-lg font-semibold text-gray-800">Add Passengers</h3>
             <p className="text-sm text-gray-500">Enter passenger details below</p>
           </div>
         </div>
       }
       modal
       className="w-[90vw] md:w-[500px]"
-      closeOnEscapef
+      closeOnEscape
       dismissableMask
       footer={
         <div className="flex justify-end gap-2">
           <Button
-            label="Cancel"
-            icon="pi pi-times"
+            label="Done"
+            icon="pi pi-check"
             onClick={onHide}
             className="p-button-text"
           />
@@ -2219,7 +2214,7 @@ const PassengerModal = ({ visible, onHide }) => {
           <label className="block text-sm font-medium text-gray-700">
             Passenger Name <span className="text-red-500">*</span>
           </label>
-          <div className="relative">
+          <div className="relative"></div>
             <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <UserOutlined className="text-gray-400" />
             </span>
@@ -2278,9 +2273,10 @@ const PassengerModal = ({ visible, onHide }) => {
           <ul className="list-disc ml-5 mt-1 text-blue-600">
             <li>Press Enter to quickly add multiple passengers</li>
             <li>Click the trash icon to remove a passenger</li>
+            <li>Click Done when finished adding all passengers</li>
           </ul>
         </div>
-      </div>
+
     </Dialog>
   );
 };
@@ -2508,148 +2504,75 @@ const EquipmentSelectionModal = () => {
 
 // Add this with other function declarations
 const renderDriverDropdown = () => {
-  const userDepartmentId = localStorage.getItem('department_id');
-  
-  // Filter drivers based on selected department
-  const filteredDrivers = availableDrivers.filter(driver => {
-    if (selectedDriverDept === 'current') {
-      return driver.department_id === userDepartmentId;
-    }
-    return driver.department_id === '27'; // GSD department ID
-  });
-
   return (
-    <div className="space-y-4">
-      <Form.Item
-        label={<span>Driver Source <span className="text-red-500">*</span></span>}
-        required
-      >
-        <Radio.Group
-          value={selectedDriverDept}
-          onChange={(e) => {
-            setSelectedDriverDept(e.target.value);
-            // Reset driver selection when changing departments
-            handleInputChange({
-              target: { name: 'driverName', value: null }
-            });
-            // Trigger driver fetch with new department selection
-            if (formData.startDate && formData.endDate) {
-              fetchDrivers(formData.startDate, formData.endDate);
-            }
-          }}
-          className="driver-dept-selection"
-        >
-          <Card className="mb-4 w-full">
-            <Radio.Button 
-              value="current" 
-              className="w-full h-full"
+    <Form.Item
+      label={<span className="text-sm">Select Driver <span className="text-red-500">*</span></span>}
+      required
+    >
+      <div className="space-y-3">
+        {isLoadingDrivers ? (
+          <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+            <Spin size="small" />
+            <span className="text-gray-500">Loading available drivers...</span>
+          </div>
+        ) : (
+          <>
+            <Select
+              value={formData.driverName}
+              onChange={(value) => handleInputChange({
+                target: { name: 'driverName', value }
+              })}
+              placeholder="Select a driver"
+              className="w-full"
+              disabled={availableDrivers.length === 0}
+              showSearch
+              filterOption={(input, option) =>
+                option.children?.toString().toLowerCase().indexOf(input.toLowerCase()) >= 0
+              }
+              notFoundContent={
+                <Empty
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  description="No drivers available for the selected time slot."
+                />
+              }
             >
-              <div className="flex items-center gap-3 p-2">
-                <BankOutlined className="text-xl text-blue-500" />
-                <div>
-                  <div className="font-medium">Current Department</div>
-                  <div className="text-sm text-gray-500">
-                    Your department's drivers for the selected time slot
-                  </div>
-                </div>
-              </div>
-            </Radio.Button>
-          </Card>
-
-          <Card>
-            <Radio.Button 
-              value="gsd" 
-              className="w-full h-full"
-            >
-              <div className="flex items-center gap-3 p-2">
-                <CarOutlined className="text-xl text-green-500" />
-                <div>
-                  <div className="font-medium">GSD Driver</div>
-                  <div className="text-sm text-gray-500">
-                    Professional drivers from General Services Department
-                  </div>
-                </div>
-              </div>
-            </Radio.Button>
-          </Card>
-        </Radio.Group>
-      </Form.Item>
-
-      <Form.Item
-        label={<span>Select Driver <span className="text-red-500">*</span></span>}
-        required
-      >
-        <div className="space-y-3">
-          {isLoadingDrivers ? (
-            <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-              <Spin size="small" />
-              <span className="text-gray-500">Loading available drivers...</span>
-            </div>
-          ) : (
-            <>
-              <Select
-                value={formData.driverName}
-                onChange={(value) => handleInputChange({
-                  target: { name: 'driverName', value }
-                })}
-                placeholder="Select a driver"
-                className="w-full"
-                disabled={filteredDrivers.length === 0}
-                showSearch
-                filterOption={(input, option) =>
-                  option.children?.toString().toLowerCase().indexOf(input.toLowerCase()) >= 0
-                }
-                notFoundContent={
-                  <Empty
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                    description={selectedDriverDept === 'current'
-                      ? `No drivers available from   for the selected time slot.`
-                      : 'No GSD drivers available for the selected time slot.'}
-                  />
-                }
-              >
-                {filteredDrivers.map(driver => (
-                  <Select.Option 
-                    key={driver.driver_id} 
-                    value={driver.driver_id}
-                  >
+              {availableDrivers.map(driver => (
+                <Select.Option 
+                  key={driver.driver_id} 
+                  value={driver.driver_id}
+                >
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <UserOutlined className="text-gray-400" />
                       <span>{driver.driver_full_name}</span>
-                      {driver.license_type && (
-                        <Tag color="blue" className="ml-2">
-                          {driver.license_type}
-                        </Tag>
-                      )}
                     </div>
-                  </Select.Option>
-                ))}
-              </Select>
+                    
+                  </div>
+                </Select.Option>
+              ))}
+            </Select>
 
-              
-
-              {formData.driverName && (
-                <Card className="bg-blue-50 border-blue-200">
-                  <div className="flex items-center gap-4">
-                    <div className="p-2 bg-blue-100 rounded-full">
-                      <UserOutlined className="text-xl text-blue-500" />
+            {formData.driverName && (
+              <Card className="bg-blue-50 border-blue-200">
+                <div className="flex items-center gap-4">
+                  <div className="p-2 bg-blue-100 rounded-full">
+                    <UserOutlined className="text-xl text-blue-500" />
+                  </div>
+                  <div>
+                    <div className="font-medium text-blue-700">
+                      {availableDrivers.find(d => d.driver_id === formData.driverName)?.driver_full_name}
                     </div>
-                    <div>
-                      <div className="font-medium text-blue-700">
-                        {availableDrivers.find(d => d.driver_id === formData.driverName)?.driver_full_name}
-                      </div>
-                      <div className="text-sm text-blue-600">
-                        {selectedDriverDept === 'gsd' ? 'GSD Driver' : 'Department Driver'}
-                      </div>
+                    <div className="text-sm text-blue-600">
+                      {availableDrivers.find(d => d.driver_id === formData.driverName)?.departments_name || 'Driver'}
                     </div>
                   </div>
-                </Card>
-              )}
-            </>
-          )}
-        </div>
-      </Form.Item>
-    </div>
+                </div>
+              </Card>
+            )}
+          </>
+        )}
+      </div>
+    </Form.Item>
   );
 };
 

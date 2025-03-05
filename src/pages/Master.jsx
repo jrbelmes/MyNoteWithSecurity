@@ -30,8 +30,8 @@ const Master = () => {
   const [categories, setCategories] = useState([]);
   const [makes, setMakes] = useState([]);
   const [message, setMessage] = useState('');
-  const [setIsSuccess] = useState(false);
-  const [setLoading] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [popupMessage, setPopupMessage] = useState('');
 
   const user_level_id = localStorage.getItem('user_level_id');
@@ -210,7 +210,7 @@ const Master = () => {
           transition={{ duration: 0.5 }}
           className="text-4xl font-bold mb-8 text-green-800"
         >
-          Vehicle Master Dashboard
+           Masters
         </motion.h1>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">

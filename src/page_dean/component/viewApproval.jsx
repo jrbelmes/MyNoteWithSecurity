@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import DeanSidebar from './component/dean_sidebar';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiFilter, FiRefreshCw, FiCheck, FiX, FiEye, FiCalendar, FiMapPin, FiUser } from 'react-icons/fi';
 import { Modal, Descriptions, Badge, Timeline, Card, Tabs, Button, Tag, Space, Divider, Alert, Table, List, Avatar } from 'antd';
@@ -317,9 +316,11 @@ const ViewApproval = () => {
           <div className="flex items-center justify-between">
             <span className="text-xl font-semibold">Vehicle Request Details</span>
             <Space>
-              <Tag color="purple">{request.vehicle.license}</Tag>
-              <Badge status={request.status === 'pending' ? 'processing' : request.status === 'approved' ? 'success' : 'error'} 
-                    text={request.status?.toUpperCase()} />
+              <Tag color="purple">{request.vehicle.license || 'No License'}</Tag>
+              <Badge 
+                status={request.status === 'pending' ? 'processing' : request.status === 'approved' ? 'success' : 'error'} 
+                text={request.status?.toUpperCase()} 
+              />
             </Space>
           </div>
         }
@@ -329,62 +330,66 @@ const ViewApproval = () => {
         ]}
       >
         <div className="space-y-6">
-          {/* Trip Information Card */}
-          <Card title="Trip Information" className="shadow-sm">
+          {/* Basic Information */}
+          <Card title="Request Information" className="shadow-sm">
             <Descriptions bordered column={2}>
+              <Descriptions.Item label="Requester" span={2}>{request.vehicle.requester}</Descriptions.Item>
               <Descriptions.Item label="Purpose" span={2}>{request.vehicle.purpose}</Descriptions.Item>
-              <Descriptions.Item label="Requester">{request.vehicle.requester}</Descriptions.Item>
-              <Descriptions.Item label="Destination">{request.vehicle.destination}</Descriptions.Item>
-              <Descriptions.Item label="Start Date">
+              <Descriptions.Item label="Destination" span={2}>{request.vehicle.destination}</Descriptions.Item>
+            </Descriptions>
+          </Card>
+  
+          {/* Schedule Information */}
+          <Card title="Schedule Details" className="shadow-sm">
+            <Descriptions bordered column={2}>
+              <Descriptions.Item label="Start Date & Time">
                 {new Date(request.vehicle.start_date).toLocaleString()}
               </Descriptions.Item>
-              <Descriptions.Item label="End Date">
+              <Descriptions.Item label="End Date & Time">
                 {new Date(request.vehicle.end_date).toLocaleString()}
               </Descriptions.Item>
             </Descriptions>
           </Card>
   
-          {/* Vehicle Details Card */}
-          <Card title="Vehicle Details" className="shadow-sm">
+          {/* Vehicle Details */}
+          <Card title="Vehicle Information" className="shadow-sm">
             <Descriptions bordered>
-              <Descriptions.Item label="License Plate" span={2}>{request.vehicle.license}</Descriptions.Item>
-              <Descriptions.Item label="Status">
+              <Descriptions.Item label="License Plate">{request.vehicle.license}</Descriptions.Item>
+              <Descriptions.Item label="Make">{request.vehicle.make}</Descriptions.Item>
+              <Descriptions.Item label="Model">{request.vehicle.model}</Descriptions.Item>
+              <Descriptions.Item label="Category">{request.vehicle.category}</Descriptions.Item>
+              <Descriptions.Item label="Status" span={2}>
                 <Tag color={getAvailabilityStatus('vehicle', request.vehicle.vehicle_id) ? 'success' : 'error'}>
                   {getAvailabilityStatus('vehicle', request.vehicle.vehicle_id) ? 'Available' : 'Unavailable'}
                 </Tag>
               </Descriptions.Item>
-              <Descriptions.Item label="Make">{request.vehicle.make}</Descriptions.Item>
-              <Descriptions.Item label="Model">{request.vehicle.model}</Descriptions.Item>
-              <Descriptions.Item label="Category">{request.vehicle.category}</Descriptions.Item>
             </Descriptions>
           </Card>
   
           {/* Drivers Section */}
-          {request.vehicle.driver_ids.length > 0 && (
-            <Card title="Assigned Drivers" className="shadow-sm">
-              <List
-                dataSource={request.vehicle.driver_ids.map((id, index) => ({
-                  id,
-                  name: request.vehicle.driver_names[index]
-                }))}
-                renderItem={item => (
-                  <List.Item>
-                    <List.Item.Meta
-                      avatar={<Avatar icon={<FiUser />} />}
-                      title={item.name}
-                      description={
-                        <Tag color={getAvailabilityStatus('driver', item.id) ? 'success' : 'error'}>
-                          {getAvailabilityStatus('driver', item.id) ? 'Available' : 'Unavailable'}
-                        </Tag>
-                      }
-                    />
-                  </List.Item>
-                )}
-              />
-            </Card>
-          )}
+          <Card title="Assigned Driver" className="shadow-sm">
+            <List
+              dataSource={request.vehicle.driver_ids.map((id, index) => ({
+                id,
+                name: request.vehicle.driver_names[index]
+              }))}
+              renderItem={item => (
+                <List.Item>
+                  <List.Item.Meta
+                    avatar={<Avatar icon={<FiUser />} />}
+                    title={item.name}
+                    description={
+                      <Tag color={getAvailabilityStatus('driver', item.id) ? 'success' : 'error'}>
+                        {getAvailabilityStatus('driver', item.id) ? 'Available' : 'Unavailable'}
+                      </Tag>
+                    }
+                  />
+                </List.Item>
+              )}
+            />
+          </Card>
   
-          {/* Passengers List if any */}
+          {/* Passengers Section */}
           {request.passengers && request.passengers.length > 0 && (
             <Card title="Passengers" className="shadow-sm">
               <List
@@ -393,7 +398,7 @@ const ViewApproval = () => {
                   <List.Item>
                     <List.Item.Meta
                       avatar={<Avatar icon={<FiUser />} />}
-                      title={passenger.name}
+                      title={passenger.passenger_name}
                     />
                   </List.Item>
                 )}
@@ -406,153 +411,137 @@ const ViewApproval = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <DeanSidebar />
-      
-      <main className="flex-1 overflow-hidden">
-        <div className="h-full flex flex-col">
-          {/* Header Section */}
-          <header className="bg-white shadow-sm px-8 py-6">
-            <div className="max-w-7xl mx-auto">
-              <h1 className="text-2xl font-bold text-gray-900">Approval Requests Dashboard</h1>
-              <p className="mt-1 text-sm text-gray-500">Manage and process department requests</p>
-            </div>
-          </header>
-
-          {/* Filters Section */}
-          <div className="bg-white border-b px-8 py-4">
-            <div className="max-w-7xl mx-auto flex flex-wrap items-center gap-4">
-              <div className="flex-1 min-w-[200px]">
-                <input
-                  type="text"
-                  placeholder="Search requests..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-
-              <div className="flex items-center gap-4">
-                <select
-                  value={requestType}
-                  onChange={handleRequestTypeChange}
-                  className="px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="all">All Types</option>
-                  <option value="venue">Venue</option>
-                  <option value="vehicle">Vehicle</option>
-                </select>
-
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="all">All Status</option>
-                  <option value="pending">Pending</option>
-                  <option value="approved">Approved</option>
-                  <option value="declined">Declined</option>
-                </select>
-
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="newest">Newest First</option>
-                  <option value="oldest">Oldest First</option>
-                </select>
-
-                <button
-                  onClick={fetchApprovalRequests}
-                  disabled={loading}
-                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  <FiRefreshCw className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
-                  Refresh
-                </button>
-              </div>
-            </div>
+    <div className="flex flex-col">
+      {/* Filters Section */}
+      <div className="bg-white border-b py-4">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex-1 min-w-[200px]">
+            <input
+              type="text"
+              placeholder="Search requests..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
           </div>
 
-          {/* Content Section */}
-          <div className="flex-1 overflow-y-auto px-8 py-6">
-            <div className="max-w-7xl mx-auto">
-              <AnimatePresence>
-                {loading ? (
-                  <div className="flex items-center justify-center h-64">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-                  </div>
-                ) : sortedRequests.length === 0 ? (
-                  <div className="text-center py-12">
-                    <p className="text-gray-500">No requests found matching your criteria</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 gap-6">
-                    {sortedRequests.map((request) => (
-                      <motion.div
-                        key={request.approval_id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow"
-                      >
-                        {/* Enhanced Request Card Layout */}
-                        <div className="p-6">
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <h3 className="text-lg font-semibold text-gray-900">
-                                {request.vehicle?.form_name || request.venue?.form_name || 'Unnamed Request'}
-                              </h3>
-                              <div className="mt-2 flex items-center gap-4 text-sm text-gray-600">
-                                <span className="flex items-center">
-                                  <FiCalendar className="mr-2" />
-                                  {new Date(request.approval_created_at).toLocaleDateString()}
-                                </span>
-                                <span className="flex items-center">
-                                  <FiMapPin className="mr-2" />
-                                  {request.vehicle?.destination || request.venue?.name || 'N/A'}
-                                </span>
-                                <span className="flex items-center">
-                                  <FiUser className="mr-2" />
-                                  {request.vehicle?.requester || request.venue?.requester || 'Unknown'}
-                                </span>
-                              </div>
-                            </div>
-                            
-                            <div className="flex items-center gap-4">
-                              <span className={`px-3 py-1 rounded-full text-sm ${
-                                request.vehicle?.license ? 
-                                'bg-blue-100 text-blue-800' : 
-                                'bg-green-100 text-green-800'
-                              }`}>
-                                {request.vehicle?.license ? 'Vehicle' : 'Venue'}
-                              </span>
-                              <button
-                                onClick={() => handleViewDetails(request)}
-                                className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
-                              >
-                                <FiEye className="mr-2" />
-                                View Details
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
-              </AnimatePresence>
-            </div>
+          <div className="flex items-center gap-4">
+            <select
+              value={requestType}
+              onChange={handleRequestTypeChange}
+              className="px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Types</option>
+              <option value="venue">Venue</option>
+              <option value="vehicle">Vehicle</option>
+            </select>
+
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="declined">Declined</option>
+            </select>
+
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="newest">Newest First</option>
+              <option value="oldest">Oldest First</option>
+            </select>
+
+            <button
+              onClick={fetchApprovalRequests}
+              disabled={loading}
+              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              <FiRefreshCw className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
           </div>
         </div>
-      </main>
+      </div>
+
+      {/* Content Section */}
+      <div className="flex-1 overflow-y-auto py-6">
+        <AnimatePresence>
+          {loading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+            </div>
+          ) : sortedRequests.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500">No requests found matching your criteria</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-6">
+              {sortedRequests.map((request) => (
+                <motion.div
+                  key={request.approval_id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow"
+                >
+                  {/* Enhanced Request Card Layout */}
+                  <div className="p-6">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          {request.vehicle?.form_name || request.venue?.form_name || 'Unnamed Request'}
+                        </h3>
+                        <div className="mt-2 flex items-center gap-4 text-sm text-gray-600">
+                          <span className="flex items-center">
+                            <FiCalendar className="mr-2" />
+                            {new Date(request.approval_created_at).toLocaleDateString()}
+                          </span>
+                          <span className="flex items-center">
+                            <FiMapPin className="mr-2" />
+                            {request.vehicle?.destination || request.venue?.name || 'N/A'}
+                          </span>
+                          <span className="flex items-center">
+                            <FiUser className="mr-2" />
+                            {request.vehicle?.requester || request.venue?.requester || 'Unknown'}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-4">
+                        <span className={`px-3 py-1 rounded-full text-sm ${
+                          request.vehicle?.license ? 
+                          'bg-blue-100 text-blue-800' : 
+                          'bg-green-100 text-green-800'
+                        }`}>
+                          {request.vehicle?.license ? 'Vehicle' : 'Venue'}
+                        </span>
+                        <button
+                          onClick={() => handleViewDetails(request)}
+                          className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                        >
+                          <FiEye className="mr-2" />
+                          View Details
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </AnimatePresence>
+      </div>
 
       {/* Enhanced Modal */}
       <AnimatePresence>
         {selectedRequest && (
-          selectedRequest.venue ? (
-            <VenueRequestModal
+          selectedRequest.vehicle ? (
+            <VehicleRequestModal
               request={selectedRequest}
               visible={!!selectedRequest}
               onClose={handleCloseDetails}
@@ -561,7 +550,7 @@ const ViewApproval = () => {
               availabilityData={availabilityData}
             />
           ) : (
-            <VehicleRequestModal
+            <VenueRequestModal
               request={selectedRequest}
               visible={!!selectedRequest}
               onClose={handleCloseDetails}

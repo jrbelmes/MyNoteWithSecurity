@@ -162,7 +162,6 @@ const Dashboard = () => {
                 toast.error("Error fetching venues: " + response.data.message);
             }
         } catch {
-            toast.error("An error occurred while fetching venues.");
         }
     }, []);
 
@@ -175,7 +174,6 @@ const Dashboard = () => {
                 toast.error("Error fetching vehicles: " + response.data.message);
             }
         } catch {
-            toast.error("An error occurred while fetching vehicles.");
         }
     }, []);
 
@@ -188,7 +186,6 @@ const Dashboard = () => {
                 toast.error("Error fetching equipment: " + response.data.message);
             }
         } catch {
-            toast.error("An error occurred while fetching equipment.");
         }
     }, []);
 
@@ -214,7 +211,6 @@ const Dashboard = () => {
                 });
                 setOngoingReservations(ongoing);
             } else {
-                toast.error('No reservations found.');
             }
         } catch (error) {
             toast.error('Error fetching reservations.');
@@ -232,7 +228,6 @@ const Dashboard = () => {
                 setSelectedReservation(response.data.data);
                 setModalOpen(true);
             } else {
-                toast.error('Error fetching reservation details.');
             }
         } catch (error) {
             toast.error('Error fetching reservation details.');
@@ -249,10 +244,8 @@ const Dashboard = () => {
                 console.log('Release Facilities Data:', response.data.data);
                 setReleaseFacilities(response.data.data);
             } else {
-                toast.error('Error fetching release facilities: ' + response.data.message);
             }
         } catch (error) {
-            toast.error('An error occurred while fetching release facilities.');
             console.error('Fetch release facilities error:', error);
         }
     }, []);
@@ -266,7 +259,6 @@ const Dashboard = () => {
             if (response.data.status === 'success') {
                 setPersonnel(response.data.data);
             } else {
-                toast.error("Error fetching personnel: " + response.data.message);
             }
         } catch (error) {
             toast.error("An error occurred while fetching personnel.");
@@ -283,7 +275,6 @@ const Dashboard = () => {
                 console.log('Return Facilities Data:', response.data.data);
                 setReturnFacilities(response.data.data);
             } else {
-                toast.error('Error fetching return facilities: ' + response.data.message);
             }
         } catch (error) {
             toast.error('An error occurred while fetching return facilities.');
@@ -524,19 +515,8 @@ const Dashboard = () => {
                     {/* Main Content */}
                     <div className="flex-1 overflow-y-auto p-6 space-y-6">
                         {/* Statistics Overview */}
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                            <StatCard
-                                title="Total Reservations"
-                                value={totals.reservations}
-                                icon={<FaClipboardList />}
-                                color="bg-blue-500"
-                            />
-                            <StatCard
-                                title="Pending Approval"
-                                value={totals.pending_requests}
-                                icon={<FaClock />}
-                                color="bg-yellow-500"
-                            />
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                            
                             <StatCard
                                 title="Venues"
                                 value={totals.venues}

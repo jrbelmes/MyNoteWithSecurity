@@ -29,7 +29,7 @@ export const sanitizeInput = (input) => {
     });
 
     // Remove dangerous special characters but allow spaces, dots, and hyphens
-    sanitized = sanitized.replace(/[<>{}()$#@!%^&*+=\[\]|~`\\]/g, '');
+    sanitized = sanitized.replace(/[<>{}()$#@!%^&*+='"\[\]|~`\\]/g, '');
 
     // Check if significant changes were made (ignoring whitespace changes)
     if (sanitized.trim() !== input.trim()) {
