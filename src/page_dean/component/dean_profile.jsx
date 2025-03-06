@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import {
+  Box,
   Avatar,
   Typography,
   IconButton,
   Grid,
+  useTheme,
   styled,
 } from '@mui/material';
 import { 
@@ -14,9 +16,10 @@ import {
   PhoneOutlined,
   IdcardOutlined,
   UserOutlined,
+  LockOutlined,
 } from '@ant-design/icons';
-import { Modal, Input, message, Spin, Tooltip } from 'antd';
-import { motion} from 'framer-motion';
+import { Modal, Input, message, Spin, Tooltip, Tabs, Switch } from 'antd';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const StyledInput = styled(Input)`
   &.ant-input-affix-wrapper {
@@ -45,6 +48,13 @@ const ProfileModal = ({ visible, onClose }) => {
     department: '',
     userLevel: ''
   });
+  const [activeTab, setActiveTab] = useState('1');
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -58,7 +68,7 @@ const ProfileModal = ({ visible, onClose }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          operation: 'fetchUsersById',
+          operation: 'fetchDeanSecById',
           id: localStorage.getItem('user_id')
         })
       });
@@ -68,18 +78,19 @@ const ProfileModal = ({ visible, onClose }) => {
       if (result.status === 'success' && result.data.length > 0) {
         const userData = result.data[0];
         setPersonalInfo({
-          firstName: userData.users_fname,
-          middleName: userData.users_mname,
-          lastName: userData.users_lname,
-          schoolId: userData.users_school_id,
-          email: userData.users_email,
-          phoneNumber: userData.users_contact_number || '',
+          firstName: userData.dept_fname,
+          middleName: userData.dept_mname,
+          lastName: userData.dept_lname,
+          schoolId: userData.dept_school_id,
+          email: userData.dept_email,
+          phoneNumber: userData.dept_contact_number || '',
           department: userData.departments_name,
           userLevel: userData.user_level_name
         });
         if (userData.users_pic) {
           setProfileImage(`data:image/jpeg;base64,${userData.users_pic}`);
         }
+        setTwoFactorEnabled(userData.is_2FAactive === "1");
       }
     } catch (err) {
       message.error('Failed to fetch profile data');
@@ -110,7 +121,120 @@ const ProfileModal = ({ visible, onClose }) => {
     }));
   };
 
-  const modalContent = (
+  const handlePasswordChange = () => {
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      message.error('New passwords do not match');
+      return;
+    }
+    // Add your password change logic here
+    message.success('Password updated successfully');
+    setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  };
+
+  const handleTwoFactorToggle = async (checked) => {
+    try {
+      const userId = localStorage.getItem('user_id');
+      const response = await fetch('http://localhost/coc/gsd/fetchMaster.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          operation: checked ? 'enable2FA' : 'unenable2FA',
+          id: userId,
+          userType: 'dean'
+        })
+      });
+
+      const result = await response.json();
+      if (result.status === 'success') {
+        setTwoFactorEnabled(checked);
+        message.success(`Two-factor authentication ${checked ? 'enabled' : 'disabled'}`);
+      } else {
+        message.error('Failed to update 2FA status');
+        setTwoFactorEnabled(!checked);
+      }
+    } catch (error) {
+      console.error('Error updating 2FA:', error);
+      message.error('Failed to update 2FA status');
+      setTwoFactorEnabled(!checked);
+    }
+  };
+
+  const renderSettingsTab = () => {
+    const isPasswordValid = 
+      passwordForm.currentPassword && 
+      passwordForm.newPassword && 
+      passwordForm.confirmPassword && 
+      passwordForm.newPassword === passwordForm.confirmPassword;
+
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
+      >
+        <Box sx={{ p: 2 }}>
+          <Typography variant="h6" className="mb-4">Change Password</Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <StyledInput
+                type="password"
+                placeholder="Current Password"
+                prefix={<LockOutlined />}
+                value={passwordForm.currentPassword}
+                onChange={(e) => setPasswordForm(prev => ({ ...prev, currentPassword: e.target.value }))}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <StyledInput
+                type="password"
+                placeholder="New Password"
+                prefix={<LockOutlined />}
+                value={passwordForm.newPassword}
+                onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <StyledInput
+                type="password"
+                placeholder="Confirm New Password"
+                prefix={<LockOutlined />}
+                value={passwordForm.confirmPassword}
+                onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <button
+                className={`${isPasswordValid ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 cursor-not-allowed'} text-white px-4 py-2 rounded-lg`}
+                onClick={handlePasswordChange}
+                disabled={!isPasswordValid}
+              >
+                Update Password
+              </button>
+            </Grid>
+          </Grid>
+
+          <Box sx={{ mt: 4 }}>
+            <Typography variant="h6" className="mb-4">Two-Factor Authentication</Typography>
+            <div className="flex items-center justify-between">
+              <div>
+                <Typography variant="body1">Enable 2FA</Typography>
+                <Typography variant="body2" className="text-gray-500">
+                  Add an extra layer of security to your account
+                </Typography>
+              </div>
+              <Switch
+                checked={twoFactorEnabled}
+                onChange={handleTwoFactorToggle}
+                className="bg-gray-300"
+              />
+            </div>
+          </Box>
+        </Box>
+      </motion.div>
+    );
+  };
+
+  const renderInformationTab = () => (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -200,16 +324,18 @@ const ProfileModal = ({ visible, onClose }) => {
       title={
         <div className="flex justify-between items-center">
           <Typography variant="h6" className="text-gray-800">
-            Profile Information
+            Profile Settings
           </Typography>
-          <Tooltip title={editMode ? "Save Changes" : "Edit Profile"}>
-            <IconButton
-              onClick={() => editMode ? handleSave() : setEditMode(true)}
-              style={{ color: editMode ? '#4caf50' : '#666' }}
-            >
-              {editMode ? <SaveOutlined /> : <EditOutlined />}
-            </IconButton>
-          </Tooltip>
+          {activeTab === '1' && (
+            <Tooltip title={editMode ? "Save Changes" : "Edit Profile"}>
+              <IconButton
+                onClick={() => editMode ? handleSave() : setEditMode(true)}
+                style={{ color: editMode ? '#4caf50' : '#666' }}
+              >
+                {editMode ? <SaveOutlined /> : <EditOutlined />}
+              </IconButton>
+            </Tooltip>
+          )}
         </div>
       }
       centered
@@ -219,7 +345,22 @@ const ProfileModal = ({ visible, onClose }) => {
           <Spin size="large" />
         </div>
       ) : (
-        modalContent
+        <Tabs
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          items={[
+            {
+              key: '1',
+              label: 'Information',
+              children: renderInformationTab(),
+            },
+            {
+              key: '2',
+              label: 'Settings',
+              children: renderSettingsTab(),
+            },
+          ]}
+        />
       )}
     </Modal>
   );

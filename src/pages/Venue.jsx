@@ -39,16 +39,11 @@ const VenueEntry = () => {
     const [operatingHoursStart, setOperatingHoursStart] = useState(null);
     const [operatingHoursEnd, setOperatingHoursEnd] = useState(null);
     const [previewUrl, setPreviewUrl] = useState(null);
-    const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
-    const [maintenanceDate, setMaintenanceDate] = useState(null);
-    const [maintenanceDescription, setMaintenanceDescription] = useState('');
-    const [selectedStatus, setSelectedStatus] = useState('1'); // Add this state
-    const [statusOptions, setStatusOptions] = useState([]); // Add this state
+    const [selectedStatus, setSelectedStatus] = useState('1');
+    const [statusOptions, setStatusOptions] = useState([]);
     const navigate = useNavigate();
     const user_id = localStorage.getItem('user_id');
     const fileUploadRef = useRef(null);
-
-   
 
     useEffect(() => {
         if (user_level_id !== '1' && user_level_id !== '2' && user_level_id !== '4') {
@@ -294,7 +289,8 @@ const VenueEntry = () => {
                         name: validatedData.name,
                         occupancy: validatedData.occupancy,
                         operating_hours: validatedData.hours,
-                        user_admin_id: parseInt(user_id),
+                        user_admin_id: user_level_id === '1' ? user_id : null,  // Set for user admin (level 1)
+                        super_admin_id: user_level_id === '4' ? user_id : null,
                         status_availability_id: parseInt(selectedStatus),
                         ven_pic: imageBase64
                     }
@@ -342,26 +338,35 @@ const VenueEntry = () => {
         }
     };
 
-    const handleDeleteVenue = async (venueId) => {
-        const confirmDelete = window.confirm("Are you sure you want to delete this venue?");
-        if (!confirmDelete) return;
+    const handleArchiveVenue = async (venueId) => {
+        const confirmArchive = window.confirm("Are you sure you want to archive this venue?");
+        if (!confirmArchive) return;
 
         setLoading(true);
         try {
-            const response = await axios.post("http://localhost/coc/gsd/delete_master.php", new URLSearchParams({
-                operation: "deleteVenue",
-                venue_id: venueId // Ensure this matches the expected key
-            }));
+            const response = await axios.post(
+                "http://localhost/coc/gsd/delete_master.php",
+                {
+                    operation: "archiveResource",
+                    resourceType: "venue",
+                    resourceId: venueId
+                },
+                {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
 
             if (response.data.status === 'success') {
-                toast.success("Venue successfully deleted!");
-                fetchVenues(); // Refresh the venue list
+                toast.success("Venue successfully archived!");
+                fetchVenues();
             } else {
-                toast.error("Failed to delete venue: " + response.data.message);
+                toast.error("Failed to archive venue: " + response.data.message);
             }
         } catch (error) {
-            console.error("Error deleting venue:", error);
-            toast.error("An error occurred while deleting the venue.");
+            console.error("Error archiving venue:", error);
+            toast.error("An error occurred while archiving the venue.");
         } finally {
             setLoading(false);
         }
@@ -393,38 +398,6 @@ const VenueEntry = () => {
         setPreviewUrl(null);
         if (fileUploadRef.current) {
             fileUploadRef.current.clear();
-        }
-    };
-
-    const handleMaintenanceSubmit = async () => {
-        if (!maintenanceDate || !maintenanceDescription) {
-            toast.error("Please fill in all maintenance details!");
-            return;
-        }
-
-        setLoading(true);
-        try {
-            const response = await axios.post("http://localhost/coc/gsd/user.php", new URLSearchParams({
-                operation: "scheduleMaintenanceVenue",
-                venue_id: currentVenueId,
-                maintenance_date: dayjs(maintenanceDate).format('YYYY-MM-DD HH:mm:ss'),
-                description: maintenanceDescription
-            }));
-
-            if (response.data.status === 'success') {
-                toast.success("Maintenance schedule set successfully!");
-                setShowMaintenanceModal(false);
-                setMaintenanceDate(null);
-                setMaintenanceDescription('');
-                fetchVenues();
-            } else {
-                toast.error("Failed to set maintenance schedule");
-            }
-        } catch (error) {
-            console.error("Error scheduling maintenance:", error);
-            toast.error("An error occurred while scheduling maintenance");
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -527,23 +500,11 @@ const VenueEntry = () => {
                                 <motion.button 
                                     whileHover={{ scale: 1.05 }}
                                     whileTap={{ scale: 0.95 }}
-                                    onClick={() => handleDeleteVenue(venue.ven_id)}
-                                    className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-full transition-colors duration-300"
+                                    onClick={() => handleArchiveVenue(venue.ven_id)}
+                                    className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-full transition-colors duration-300"
                                 >
-                                    <FontAwesomeIcon icon={faTrashAlt} />
-                                    <span>Delete</span>
-                                </motion.button>
-                                <motion.button 
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    onClick={() => {
-                                        setCurrentVenueId(venue.ven_id);
-                                        setShowMaintenanceModal(true);
-                                    }}
-                                    className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-full transition-colors duration-300"
-                                >
-                                    <i className="pi pi-calendar-plus"></i>
-                                    <span>Schedule Maintenance</span>
+                                    <i className="pi pi-inbox"></i>
+                                    <span>Archive</span>
                                 </motion.button>
                             </div>
                         </div>
@@ -737,42 +698,6 @@ const VenueEntry = () => {
                                 </Select.Option>
                             ))}
                         </Select>
-                    </Form.Item>
-                </Form>
-            </Modal>
-
-            {/* Maintenance Modal */}
-            <Modal
-                title="Schedule Maintenance"
-                open={showMaintenanceModal}
-                onCancel={() => setShowMaintenanceModal(false)}
-                onOk={handleMaintenanceSubmit}
-                confirmLoading={loading}
-            >
-                <Form layout="vertical">
-                    <Form.Item 
-                        label="Maintenance Date" 
-                        required
-                        tooltip="Select the date and time for maintenance"
-                    >
-                        <Input
-                            type="datetime-local"
-                            value={maintenanceDate}
-                            onChange={(e) => setMaintenanceDate(e.target.value)}
-                            min={dayjs().format('YYYY-MM-DDTHH:mm')}
-                        />
-                    </Form.Item>
-                    <Form.Item
-                        label="Maintenance Description"
-                        required
-                        tooltip="Provide details about the maintenance"
-                    >
-                        <Input.TextArea
-                            value={maintenanceDescription}
-                            onChange={(e) => setMaintenanceDescription(e.target.value)}
-                            placeholder="Enter maintenance details"
-                            rows={4}
-                        />
                     </Form.Item>
                 </Form>
             </Modal>

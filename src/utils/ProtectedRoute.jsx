@@ -1,27 +1,46 @@
+import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
+import NotAuthorize from '../components/NotAuthorize';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
+    const [showModal, setShowModal] = useState(false);
+    const [shouldNavigate, setShouldNavigate] = useState(false);
     const isLoggedIn = localStorage.getItem('loggedIn') === 'true';
     const userRole = localStorage.getItem('user_level');
+
+    useEffect(() => {
+        if (allowedRoles && !allowedRoles.includes(userRole)) {
+            setShowModal(true);
+        }
+    }, [allowedRoles, userRole]);
+
+    const handleModalClose = () => {
+        setShowModal(false);
+        // Delay navigation until after modal closes
+        setTimeout(() => {
+            setShouldNavigate(true);
+        }, 300); // 300ms delay to match modal animation
+    };
 
     if (!isLoggedIn) {
         return <Navigate to="/gsd" replace />;
     }
 
-    if (allowedRoles && !allowedRoles.includes(userRole)) {
-        // Redirect to appropriate dashboard based on user role
-        if (userRole === 'Super Admin' || userRole === 'Admin') {
-            return <Navigate to="/adminDashboard" replace />;
-        } else if (userRole === 'Personnel') {
-            return <Navigate to="/personnelDashboard" replace />;
-        } else if (userRole === 'Dean') {
-            return <Navigate to="/deanDashboard" replace />;
-        }else if (userRole === 'Secretary') {
-            return <Navigate to="/deanDashboard" replace />;
+    const getRedirectPath = () => {
+        if (userRole === 'Super Admin' || userRole === 'Admin') return '/adminDashboard';
+        if (userRole === 'Personnel') return '/personnelDashboard';
+        if (userRole === 'Dean' || userRole === 'Secretary') return '/deanDashboard';
+        if (userRole === 'user') return '/dashboard';
+        return '/gsd';
+    };
 
-        }else if (userRole === 'user') {
-            return <Navigate to="/dashboard" replace />;
-        }
+    if (!allowedRoles.includes(userRole)) {
+        return (
+            <>
+                <NotAuthorize open={showModal} onClose={handleModalClose} />
+                {shouldNavigate && <Navigate to={getRedirectPath()} replace />}
+            </>
+        );
     }
 
     return children;

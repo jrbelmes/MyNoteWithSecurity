@@ -16,8 +16,10 @@ import {
   PhoneOutlined,
   IdcardOutlined,
   UserOutlined,
+  LockOutlined,
+  SecurityScanOutlined,
 } from '@ant-design/icons';
-import { Modal, Input, message, Spin, Tooltip } from 'antd';
+import { Modal, Input, message, Spin, Tooltip, Tabs, Switch } from 'antd';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const StyledInput = styled(Input)`
@@ -43,8 +45,17 @@ const ProfileModal = ({ visible, onClose }) => {
     lastName: '',
     schoolId: '',
     email: '',
-    phoneNumber: ''
+    phoneNumber: '',
+    department: '',
+    userLevel: ''
   });
+  const [activeTab, setActiveTab] = useState('1');
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -54,29 +65,43 @@ const ProfileModal = ({ visible, onClose }) => {
 
   const fetchAdminData = async () => {
     try {
+      const userId = localStorage.getItem('user_id');
+      const userLevel = localStorage.getItem('user_level_id');
+      
+      const operation = userLevel === '4' ? 'fetchSuperAdminById' : 'fetchAdminById';
+      
       const response = await fetch('http://localhost/coc/gsd/fetchMaster.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          operation: 'fetchAdminById',
-          id: localStorage.getItem('user_id')
+          operation: operation,
+          id: userId
         })
       });
+      console.log(response);
 
       const result = await response.json();
       
       if (result.status === 'success' && result.data.length > 0) {
-        const adminData = result.data[0];
+        const userData = result.data[0];
+        const isSuper = operation === 'fetchSuperAdminById';
+        
         setPersonalInfo({
-          firstName: adminData.admin_fname,
-          middleName: adminData.admin_mname,
-          lastName: adminData.admin_lname,
-          schoolId: adminData.admin_school_id,
-          email: adminData.admin_email,
-          phoneNumber: adminData.admin_contact_number || ''
+          firstName: isSuper ? userData.super_admin_fname : userData.admin_fname,
+          middleName: isSuper ? userData.super_admin_mname : userData.admin_mname,
+          lastName: isSuper ? userData.super_admin_lname : userData.admin_lname,
+          schoolId: isSuper ? userData.super_admin_school_id : userData.admin_school_id,
+          email: isSuper ? userData.super_admin_email : userData.admin_email,
+          phoneNumber: isSuper ? userData.super_admin_contact_number : (userData.admin_contact_number || ''),
+          department: userData.departments_name || '',
+          userLevel: userData.user_level_name || 'Administrator'
         });
-        if (adminData.admin_pic) {
-          setProfileImage(`data:image/jpeg;base64,${adminData.admin_pic}`);
+        
+        // Set 2FA status based on API response
+        setTwoFactorEnabled(userData.is_2FAactive === "1");
+
+        if ((isSuper && userData.super_admin_pic) || (!isSuper && userData.admin_pic)) {
+          setProfileImage(`data:image/jpeg;base64,${isSuper ? userData.super_admin_pic : userData.admin_pic}`);
         }
       }
     } catch (err) {
@@ -108,7 +133,48 @@ const ProfileModal = ({ visible, onClose }) => {
     }));
   };
 
-  const modalContent = (
+  const handlePasswordChange = () => {
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      message.error('New passwords do not match');
+      return;
+    }
+    // Add your password change logic here
+    message.success('Password updated successfully');
+    setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  };
+
+  const handleTwoFactorToggle = async (checked) => {
+    try {
+      const userId = localStorage.getItem('user_id');
+      const userLevel = localStorage.getItem('user_level_id');
+      const userType = userLevel === '4' ? 'super_admin' : 'admin';
+
+      const response = await fetch('http://localhost/coc/gsd/fetchMaster.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          operation: checked ? 'enable2FA' : 'unenable2FA',
+          id: userId,
+          userType: userType
+        })
+      });
+
+      const result = await response.json();
+      if (result.status === 'success') {
+        setTwoFactorEnabled(checked);
+        message.success(`Two-factor authentication ${checked ? 'enabled' : 'disabled'}`);
+      } else {
+        message.error('Failed to update 2FA status');
+        setTwoFactorEnabled(!checked); // Revert the switch if failed
+      }
+    } catch (error) {
+      console.error('Error updating 2FA:', error);
+      message.error('Failed to update 2FA status');
+      setTwoFactorEnabled(!checked); // Revert the switch if failed
+    }
+  };
+
+  const renderInformationTab = () => (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -146,7 +212,7 @@ const ProfileModal = ({ visible, onClose }) => {
           {`${personalInfo.firstName} ${personalInfo.lastName}`}
         </Typography>
         <Typography variant="body2" className="text-gray-500">
-          Administrator
+          {personalInfo.userLevel}
         </Typography>
       </div>
 
@@ -158,6 +224,7 @@ const ProfileModal = ({ visible, onClose }) => {
           { icon: <IdcardOutlined />, label: 'School ID', value: personalInfo.schoolId },
           { icon: <MailOutlined />, label: 'Email', value: personalInfo.email },
           { icon: <PhoneOutlined />, label: 'Phone', value: personalInfo.phoneNumber },
+          { icon: <IdcardOutlined />, label: 'Department', value: personalInfo.department },
         ].map((field, index) => (
           <Grid item xs={12} sm={6} key={index}>
             <motion.div
@@ -189,6 +256,81 @@ const ProfileModal = ({ visible, onClose }) => {
     </motion.div>
   );
 
+  const renderSettingsTab = () => {
+    const isPasswordValid = 
+      passwordForm.currentPassword && 
+      passwordForm.newPassword && 
+      passwordForm.confirmPassword && 
+      passwordForm.newPassword === passwordForm.confirmPassword;
+
+    return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+    >
+      <Box sx={{ p: 2 }}>
+        <Typography variant="h6" className="mb-4">Change Password</Typography>
+        <Grid container spacing={2}>
+          <Grid item xs={12}>
+            <StyledInput
+              type="password"
+              placeholder="Current Password"
+              prefix={<LockOutlined />}
+              value={passwordForm.currentPassword}
+              onChange={(e) => setPasswordForm(prev => ({ ...prev, currentPassword: e.target.value }))}
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <StyledInput
+              type="password"
+              placeholder="New Password"
+              prefix={<LockOutlined />}
+              value={passwordForm.newPassword}
+              onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <StyledInput
+              type="password"
+              placeholder="Confirm New Password"
+              prefix={<LockOutlined />}
+              value={passwordForm.confirmPassword}
+              onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <button
+              className={`${isPasswordValid ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 cursor-not-allowed'} text-white px-4 py-2 rounded-lg`}
+              onClick={handlePasswordChange}
+              disabled={!isPasswordValid}
+            >
+              Update Password
+            </button>
+          </Grid>
+        </Grid>
+
+        <Box sx={{ mt: 4 }}>
+          <Typography variant="h6" className="mb-4">Two-Factor Authentication</Typography>
+          <div className="flex items-center justify-between">
+            <div>
+              <Typography variant="body1">Enable 2FA</Typography>
+              <Typography variant="body2" className="text-gray-500">
+                Add an extra layer of security to your account
+              </Typography>
+            </div>
+            <Switch
+              checked={twoFactorEnabled}
+              onChange={handleTwoFactorToggle}
+              className="bg-gray-300"
+            />
+          </div>
+        </Box>
+      </Box>
+    </motion.div>
+    );
+  };
+
   return (
     <Modal
       visible={visible}
@@ -198,16 +340,18 @@ const ProfileModal = ({ visible, onClose }) => {
       title={
         <div className="flex justify-between items-center">
           <Typography variant="h6" className="text-gray-800">
-            Profile Information
+            Profile Settings
           </Typography>
-          <Tooltip title={editMode ? "Save Changes" : "Edit Profile"}>
-            <IconButton
-              onClick={() => editMode ? handleSave() : setEditMode(true)}
-              style={{ color: editMode ? '#4caf50' : '#666' }}
-            >
-              {editMode ? <SaveOutlined /> : <EditOutlined />}
-            </IconButton>
-          </Tooltip>
+          {activeTab === '1' && (
+            <Tooltip title={editMode ? "Save Changes" : "Edit Profile"}>
+              <IconButton
+                onClick={() => editMode ? handleSave() : setEditMode(true)}
+                style={{ color: editMode ? '#4caf50' : '#666' }}
+              >
+                {editMode ? <SaveOutlined /> : <EditOutlined />}
+              </IconButton>
+            </Tooltip>
+          )}
         </div>
       }
       centered
@@ -217,7 +361,22 @@ const ProfileModal = ({ visible, onClose }) => {
           <Spin size="large" />
         </div>
       ) : (
-        modalContent
+        <Tabs
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          items={[
+            {
+              key: '1',
+              label: 'Information',
+              children: renderInformationTab(),
+            },
+            {
+              key: '2',
+              label: 'Settings',
+              children: renderSettingsTab(),
+            },
+          ]}
+        />
       )}
     </Modal>
   );

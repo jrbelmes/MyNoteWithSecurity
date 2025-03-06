@@ -1,5 +1,5 @@
-import React, { useState, createContext, useCallback } from 'react';
-import { Route, Routes, Navigate } from 'react-router-dom';
+import React, { useState, createContext, useCallback, useEffect } from 'react';
+import { Route, Routes, Navigate, useNavigate, useLocation } from 'react-router-dom';
 // import Sidebar from './pages/Sidebar';
 // import Login from './pages/Login';
 import VehicleEntry from './pages/VehicleEntry';
@@ -39,7 +39,7 @@ import ProtectedRoute from './utils/ProtectedRoute';
 import AssignPersonnel from './pages/AssignPersonnel';
 import LandCalendar from './pages/landCalendar';
 import Archive from './pages/archive';
-
+import NotFound from './components/NotFound';
 
 export const ThemeContext = createContext();
 
@@ -64,10 +64,43 @@ const App = () => {
         });
     }, []);
 
+    const [isNotFoundVisible, setIsNotFoundVisible] = useState(false);
+    const navigate = useNavigate();
+    const location = useLocation();
+
+    // Add URL validation
+    useEffect(() => {
+        const validPaths = [
+            '/gsd', '/Admin', '/adminDashboard', '/VehicleEntry',
+            '/Equipment', '/Faculty', '/departments', '/master',
+            '/vehiclemake', '/vehiclecategory', '/position',
+            '/equipmentCategory', '/condition', '/vehiclemodel',
+            '/AssignPersonnel', '/LandCalendar', '/record',
+            '/ViewRequest', '/Reports', '/Venue', '/equipmentCat',
+            '/archive', '/deanDashboard', '/deanViewReserve',
+            '/deanAddReservation', '/viewApproval', '/dashboard',
+            '/viewReserve', '/addReservation', '/profile1',
+            '/settings', '/calendar', '/chat', '/personnelDashboard',
+            '/viewTask', '/'
+        ];
+
+        if (!validPaths.includes(location.pathname)) {
+            setIsNotFoundVisible(true);
+            setTimeout(() => {
+                setIsNotFoundVisible(false);
+                navigate(-1);
+            }, 2000);
+        }
+    }, [location, navigate]);
+
     return (
         <ThemeContext.Provider value={{ theme, toggleTheme }}>
             <div className={`app-container ${theme}`}>
                 <Toaster richColors position='top-center' duration={1500} />
+                <NotFound 
+                    isVisible={isNotFoundVisible} 
+                    onClose={() => setIsNotFoundVisible(false)} 
+                />
                 <main className="main-content">
                     <Routes>
                         <Route path="/" element={<Navigate to="/gsd" replace />} />
@@ -96,8 +129,8 @@ const App = () => {
                         <Route path="/Venue" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><Venue /></ProtectedRoute>} />
                         <Route path="/equipmentCat" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><Equipmentc /></ProtectedRoute>} />
                         <Route path="/archive" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><Archive /></ProtectedRoute>} />
-                                                
-                                                {/* Dean/Secretary Routes */}
+                                                            
+                        {/* Dean/Secretary Routes */}
                         <Route path="/deanDashboard" element={<ProtectedRoute allowedRoles={['Dean', 'Secretary']}><DeanDashboard /></ProtectedRoute>} />
                         <Route path="/deanViewReserve" element={<ProtectedRoute allowedRoles={['Dean', 'Secretary']}><DeanViewReserve /></ProtectedRoute>} />
                         <Route path="/deanAddReservation" element={<ProtectedRoute allowedRoles={['Dean', 'Secretary']}><DeanAddReservation /></ProtectedRoute>} />
@@ -118,7 +151,6 @@ const App = () => {
                         <Route path="/personnelDashboard" element={<ProtectedRoute allowedRoles={['Personnel']}><PersonnelDashboard /></ProtectedRoute>} />
                         <Route path="/viewTask" element={<ProtectedRoute allowedRoles={['Personnel']}><ViewTask /></ProtectedRoute>} />
                         
-                        <Route path="*" element={<div>404 Not Found</div>} />
                     </Routes>
                 </main>
             </div>

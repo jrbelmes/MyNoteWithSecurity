@@ -1071,7 +1071,6 @@ const FacultyModal = ({
                 jsonData = {
                     operation: operation,
                     data: {
-                        adminId: localStorage.getItem("user_id"),
                         firstName: formData.users_firstname,
                         middleName: formData.users_middlename,
                         lastName: formData.users_lastname,

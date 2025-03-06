@@ -227,7 +227,7 @@ const handleAddEquipment = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        if (user_level_id !== '5' && user_level_id !== '6') {
+        if (user_level_id !== '3' && user_level_id !== '3') {
           localStorage.clear();
           navigate('/gsd');
           return;
@@ -1159,7 +1159,7 @@ const handleAddReservation = async () => {
       const venuePayload = {
         operation: 'venueReservation',
         user_id: parseInt(userId),
-        user_type: 'dean',
+        user_type: 'user',
         dept_id: parseInt(deptId),
         venue_id: parseInt(formData.venue),
         form_data: {
@@ -1209,7 +1209,7 @@ const handleAddReservation = async () => {
       const vehiclePayload = {
         operation: 'vehicleReservation',
         user_id: parseInt(userId),
-        user_type: 'dean',
+        user_type: 'user',
         dept_id: parseInt(deptId),
         vehicles: selectedModels.map(id => id.toString()),
         form_data: {

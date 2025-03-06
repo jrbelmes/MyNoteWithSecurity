@@ -98,12 +98,7 @@ const Sidebar = () => {
             </button>
           </div>
 
-          {isSidebarOpen && (
-            <div className="px-4 py-3 border-b border-green-200 bg-green-50">
-              <div className="text-lg font-bold text-green-600">{formattedTime}</div>
-              <div className="text-sm text-green-500">{formattedDate}</div>
-            </div>
-          )}
+
 
           <div className="flex-grow overflow-y-auto">
             <nav className="mt-5 px-2">
@@ -121,7 +116,6 @@ const Sidebar = () => {
                 {isSidebarOpen && (
                   <div className="flex-1 text-left">
                     <p className="font-medium text-gray-700">{name}</p>
-                    <p className="text-sm text-gray-500">Faculty</p>
                   </div>
                 )}
               </Popover.Button>
@@ -146,13 +140,7 @@ const Sidebar = () => {
                       <FaUserCircle />
                       <span>Profile</span>
                     </button>
-                    <button 
-                      onClick={() => navigate('/settings')}
-                      className="w-full text-left px-4 py-2 hover:bg-green-50 text-gray-700 rounded flex items-center space-x-2"
-                    >
-                      <FaCog />
-                      <span>Settings</span>
-                    </button>
+                    
                     <button
                       onClick={handleLogout}
                       className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 rounded flex items-center space-x-2"

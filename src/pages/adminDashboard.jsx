@@ -87,6 +87,9 @@ const Dashboard = () => {
     const [releaseConfirmation, setReleaseConfirmation] = useState({ show: false, success: false, message: '' });
     const [recentRequests, setRecentRequests] = useState([]);
     const [completedTasks, setCompletedTasks] = useState([]);
+    const [requestsPage, setRequestsPage] = useState(1);
+    const [tasksPage, setTasksPage] = useState(1);
+    const itemsPerPage = 3;
 
     // Read dark mode preference from localStorage
     useEffect(() => {
@@ -463,6 +466,45 @@ const Dashboard = () => {
         }
     };
 
+    const paginateItems = (items, page, perPage) => {
+        const startIndex = (page - 1) * perPage;
+        return items.slice(startIndex, startIndex + perPage);
+    };
+
+    const PaginationControls = ({ currentPage, totalItems, setPage }) => {
+        const totalPages = Math.ceil(totalItems / itemsPerPage);
+        
+        return (
+            <div className="flex justify-center items-center space-x-2 mt-4">
+                <button
+                    onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className={`px-3 py-1 rounded ${
+                        currentPage === 1 
+                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed' 
+                            : 'bg-green-500 text-white hover:bg-green-600'
+                    }`}
+                >
+                    Prev
+                </button>
+                <span className="text-sm text-gray-600">
+                    Page {currentPage} of {totalPages}
+                </span>
+                <button
+                    onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className={`px-3 py-1 rounded ${
+                        currentPage === totalPages 
+                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed' 
+                            : 'bg-green-500 text-white hover:bg-green-600'
+                    }`}
+                >
+                    Next
+                </button>
+            </div>
+        );
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-screen bg-gray-100">
@@ -560,7 +602,7 @@ const Dashboard = () => {
                                     <span className="text-sm text-gray-500">{recentRequests.length} requests</span>
                                 </div>
                                 <div className="space-y-4">
-                                    {recentRequests.map((request, index) => (
+                                    {paginateItems(recentRequests, requestsPage, itemsPerPage).map((request, index) => (
                                         <motion.div
                                             key={index}
                                             className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all duration-200 cursor-pointer border border-gray-100"
@@ -592,6 +634,13 @@ const Dashboard = () => {
                                             No recent requests found
                                         </div>
                                     )}
+                                    {recentRequests.length > 0 && (
+                                        <PaginationControls
+                                            currentPage={requestsPage}
+                                            totalItems={recentRequests.length}
+                                            setPage={setRequestsPage}
+                                        />
+                                    )}
                                 </div>
                             </motion.div>
 
@@ -613,37 +662,44 @@ const Dashboard = () => {
                                 </div>
                                 <div className="space-y-4">
                                     {completedTasks.length > 0 ? (
-                                        completedTasks.map((task, index) => (
-                                            <motion.div
-                                                key={index}
-                                                className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-100 hover:bg-gray-100 transition-all duration-200"
-                                                variants={itemVariants}
-                                                whileHover={{ scale: 1.01 }}
-                                                whileTap={{ scale: 0.99 }}
-                                            >
-                                                <div className="flex items-center space-x-4">
-                                                    <div className="bg-green-100 p-2 rounded-full">
-                                                        <FaUserTie className="text-green-600 text-lg" />
-                                                    </div>
-                                                    <div>
-                                                        <h3 className="font-medium text-gray-800">
-                                                            {task.personnel_full_name}
-                                                        </h3>
-                                                        <div className="flex items-center space-x-2 mt-1">
-                                                            <span className="flex items-center text-sm text-green-600">
-                                                                <FaCheckCircle className="mr-1" />
-                                                                {task.status_name}
-                                                            </span>
+                                        <>
+                                            {paginateItems(completedTasks, tasksPage, itemsPerPage).map((task, index) => (
+                                                <motion.div
+                                                    key={index}
+                                                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-100 hover:bg-gray-100 transition-all duration-200"
+                                                    variants={itemVariants}
+                                                    whileHover={{ scale: 1.01 }}
+                                                    whileTap={{ scale: 0.99 }}
+                                                >
+                                                    <div className="flex items-center space-x-4">
+                                                        <div className="bg-green-100 p-2 rounded-full">
+                                                            <FaUserTie className="text-green-600 text-lg" />
+                                                        </div>
+                                                        <div>
+                                                            <h3 className="font-medium text-gray-800">
+                                                                {task.personnel_full_name}
+                                                            </h3>
+                                                            <div className="flex items-center space-x-2 mt-1">
+                                                                <span className="flex items-center text-sm text-green-600">
+                                                                    <FaCheckCircle className="mr-1" />
+                                                                    {task.status_name}
+                                                                </span>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                                <div className="flex items-center">
-                                                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                        Completed
-                                                    </span>
-                                                </div>
-                                            </motion.div>
-                                        ))
+                                                    <div className="flex items-center">
+                                                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                            Completed
+                                                        </span>
+                                                    </div>
+                                                </motion.div>
+                                            ))}
+                                            <PaginationControls
+                                                currentPage={tasksPage}
+                                                totalItems={completedTasks.length}
+                                                setPage={setTasksPage}
+                                            />
+                                        </>
                                     ) : (
                                         <div className="text-center py-6">
                                             <FaClipboardCheck className="mx-auto text-gray-400 text-3xl mb-2" />

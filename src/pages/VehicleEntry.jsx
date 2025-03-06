@@ -234,11 +234,12 @@ const VehicleEntry = () => {
                     operation: "saveVehicle",
                     data: {
                         vehicle_model_id: vehicleModelId,
-                        vehicle_license: sanitizedLicense, // Use sanitized value
+                        vehicle_license: sanitizedLicense,
                         year: dayjs(year).format('YYYY'),
                         vehicle_pic: vehicleImage,
-                        user_admin_id: user_id,  // Add this line
-                        status_availability_id: selectedStatus  // Add this line
+                        user_admin_id: user_level_id === '2' ? user_id : null,  // Set user_admin_id if user_level_id is 2
+                        super_admin_id: user_level_id === '4' ? user_id : null, // Set super_admin_id if user_level_id is 1
+                        status_availability_id: selectedStatus
                     }
                 });
     
@@ -266,15 +267,23 @@ const VehicleEntry = () => {
         }
     };
 
-    const handleDeleteVehicle = async (vehicle) => {
-        if (window.confirm("Are you sure you want to delete this vehicle?")) {
+    const handleArchiveVehicle = async (vehicle) => {
+        if (window.confirm("Are you sure you want to archive this vehicle?")) {
             try {
-                const response = await axios.post("http://localhost/coc/gsd/delete_master.php", new URLSearchParams({
-                    operation: "deleteVehicle",
-                    vehicle_id: vehicle.vehicle_id,
-                }));
+                const response = await axios.post("http://localhost/coc/gsd/delete_master.php", 
+                    JSON.stringify({
+                        operation: "archiveResource",
+                        resourceType: "vehicle",
+                        resourceId: vehicle.vehicle_id
+                    }), {
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
+                
                 if (response.data.status === 'success') {
-                    toast.success("Vehicle successfully deleted!");
+                    toast.success("Vehicle successfully archived!");
                     fetchVehicles();
                 } else {
                     toast.error(response.data.message);
@@ -444,11 +453,11 @@ const VehicleEntry = () => {
                                 <motion.button 
                                     whileHover={{ scale: 1.05 }}
                                     whileTap={{ scale: 0.95 }}
-                                    onClick={() => handleDeleteVehicle(vehicle)}
-                                    className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-full transition-colors duration-300"
+                                    onClick={() => handleArchiveVehicle(vehicle)}
+                                    className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-full transition-colors duration-300"
                                 >
-                                    <FontAwesomeIcon icon={faTrashAlt} />
-                                    <span>Delete</span>
+                                    <i className="pi pi-inbox"></i>
+                                    <span>Archive</span>
                                 </motion.button>
                             </div>
                         </div>

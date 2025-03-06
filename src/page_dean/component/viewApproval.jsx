@@ -410,6 +410,17 @@ const ViewApproval = () => {
     );
   };
 
+  // Add this new function to determine the request type
+  const getRequestType = (request) => {
+    if (request?.venue?.ven_id) {
+      return 'venue';
+    } else if (request?.vehicle?.vehicle_id) {
+      return 'vehicle';
+    }
+    return null;
+  };
+
+  // Modify the modal rendering section
   return (
     <div className="flex flex-col">
       {/* Filters Section */}
@@ -540,25 +551,28 @@ const ViewApproval = () => {
       {/* Enhanced Modal */}
       <AnimatePresence>
         {selectedRequest && (
-          selectedRequest.vehicle ? (
-            <VehicleRequestModal
-              request={selectedRequest}
-              visible={!!selectedRequest}
-              onClose={handleCloseDetails}
-              onApprove={() => handleApproval(selectedRequest.approval_id, 'approved')}
-              onDecline={() => handleDecline(selectedRequest.approval_id)}
-              availabilityData={availabilityData}
-            />
-          ) : (
-            <VenueRequestModal
-              request={selectedRequest}
-              visible={!!selectedRequest}
-              onClose={handleCloseDetails}
-              onApprove={() => handleApproval(selectedRequest.approval_id, 'approved')}
-              onDecline={() => handleDecline(selectedRequest.approval_id)}
-              availabilityData={availabilityData}
-            />
-          )
+          <>
+            {getRequestType(selectedRequest) === 'venue' && (
+              <VenueRequestModal
+                request={selectedRequest}
+                visible={!!selectedRequest}
+                onClose={handleCloseDetails}
+                onApprove={() => handleApproval(selectedRequest.approval_id, 'approved')}
+                onDecline={() => handleDecline(selectedRequest.approval_id)}
+                availabilityData={availabilityData}
+              />
+            )}
+            {getRequestType(selectedRequest) === 'vehicle' && (
+              <VehicleRequestModal
+                request={selectedRequest}
+                visible={!!selectedRequest}
+                onClose={handleCloseDetails}
+                onApprove={() => handleApproval(selectedRequest.approval_id, 'approved')}
+                onDecline={() => handleDecline(selectedRequest.approval_id)}
+                availabilityData={availabilityData}
+              />
+            )}
+          </>
         )}
       </AnimatePresence>
     </div>

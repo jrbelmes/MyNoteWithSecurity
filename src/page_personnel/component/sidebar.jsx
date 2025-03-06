@@ -134,13 +134,6 @@ const Sidebar = () => {
               </button>
             </div>
 
-            {isSidebarOpen && (
-              <div className="px-4 py-3 border-b border-green-200 bg-green-50">
-                <div className="text-lg font-bold text-green-600">{formattedTime}</div>
-                <div className="text-sm text-green-500">{formattedDate}</div>
-              </div>
-            )}
-
             <div className="flex-grow overflow-y-auto">
               <nav className="mt-5 px-2">
                 <SidebarItem icon={FaTachometerAlt} text="Dashboard" link="/dashboard" active={activeItem === '/dashboard'} />
@@ -150,12 +143,11 @@ const Sidebar = () => {
 
             <div className="border-t border-green-200 p-4">
               <Popover className="relative">
-                <Popover.Button className="flex items-center space-x-3 w-full hover:bg-green-50 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                <Popover.Button className="flex items-center space-x-3 w-full hover:bg-green-50 p-2 rounded-lg foc</nav>us:outline-none focus:ring-2 focus:ring-green-500">
                   <FaUserCircle className="text-2xl text-green-600" />
                   {isSidebarOpen && (
                     <div className="flex-1 text-left">
                       <p className="font-medium text-gray-700">{name}</p>
-                      <p className="text-sm text-gray-500">General Service Department</p>
                     </div>
                   )}
                 </Popover.Button>
@@ -169,7 +161,6 @@ const Sidebar = () => {
                   >
                     <div className="p-4 border-b border-gray-200 bg-green-50">
                       <p className="font-semibold text-green-600">{name}</p>
-                      <p className="text-sm text-gray-500">Personnel</p>
                     </div>
                     
                     <div className="p-2">
@@ -179,13 +170,6 @@ const Sidebar = () => {
                       >
                         <FaUserCircle />
                         <span>Profile</span>
-                      </button>
-                      <button 
-                        onClick={() => navigate('/settings')}
-                        className="w-full text-left px-4 py-2 hover:bg-green-50 text-gray-700 rounded flex items-center space-x-2"
-                      >
-                        <FaCog />
-                        <span>Settings</span>
                       </button>
                       <button
                         onClick={handleLogout}

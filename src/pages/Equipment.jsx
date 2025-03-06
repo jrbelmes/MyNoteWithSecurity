@@ -155,6 +155,7 @@ const EquipmentEntry = () => {
         }
 
         const user_admin_id = localStorage.getItem('user_id');
+        const user_level = localStorage.getItem('user_level_id');
 
         let requestData;
         if (editingEquipment) {
@@ -166,8 +167,9 @@ const EquipmentEntry = () => {
                     quantity: newEquipmentQuantity,
                     categoryId: selectedCategory,
                     statusId: selectedStatus,
-                    equip_pic: equipmentImage || null,  // Send the base64 image or null
-                    user_admin_id: user_admin_id
+                    equip_pic: equipmentImage || null,
+                    user_admin_id: user_level === '1' ? user_admin_id : null,  // Set for user admin (level 1)
+                    super_admin_id: user_level === '4' ? user_admin_id : null  // Set for super admin (level 4)
                 }
             };
         } else {
@@ -178,16 +180,17 @@ const EquipmentEntry = () => {
                     quantity: newEquipmentQuantity,
                     categoryId: selectedCategory,
                     equip_pic: equipmentImage,
-                    user_admin_id: user_admin_id, // Add this line
-                    status_availability_id: selectedStatus
+                    status_availability_id: selectedStatus,
+                    user_admin_id: user_level === '1' ? user_admin_id : null,  // Set for user admin (level 1)
+                    super_admin_id: user_level === '4' ? user_admin_id : null  // Set for super admin (level 4)
                 }
             };
         }
-    
+
         const url = editingEquipment 
             ? "http://localhost/coc/gsd/update_master1.php"
             : "http://localhost/coc/gsd/insert_master.php";
-    
+
         setLoading(true);
         try {
             // Update the request to send data as JSON
@@ -199,9 +202,13 @@ const EquipmentEntry = () => {
             
             if (response.data.status === 'success') {
                 toast.success(`Equipment successfully ${editingEquipment ? "updated" : "added"}!`);
+                console.log(requestData);
+                console.log(user_level_id);
                 fetchEquipments();
                 resetForm();
             } else {
+                console.log(requestData);
+                console.log(user_level_id);
                 toast.error(`Failed to ${editingEquipment ? "update" : "add"} equipment: ` + (response.data.message || "Unknown error"));
             }
         } catch (error) {
@@ -279,23 +286,32 @@ const EquipmentEntry = () => {
     };
 
     const handleDeleteClick = async (equip_id) => {
-        const confirmation = window.confirm("Are you sure you want to delete this equipment?");
+        const confirmation = window.confirm("Are you sure you want to archive this equipment?");
         if (!confirmation) return;
 
-        const jsonData = { operation: "deleteEquipment", equipment_id: equip_id };
+        const requestData = {
+            operation: "archiveResource",
+            resourceType: "equipment",
+            resourceId: equip_id
+        };
+
         setLoading(true);
         try {
             const url = "http://localhost/coc/gsd/delete_master.php";
-            const response = await axios.post(url, new URLSearchParams(jsonData));
+            const response = await axios.post(url, JSON.stringify(requestData), {
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
 
             if (response.data.status === 'success') {
-                toast.success("Equipment deleted successfully!");
+                toast.success("Equipment archived successfully!");
                 fetchEquipments();
             } else {
-                toast.error("Failed to delete equipment: " + response.data.message);
+                toast.error("Failed to archive equipment: " + response.data.message);
             }
         } catch (error) {
-            toast.error("An error occurred while deleting equipment: " + error.message);
+            toast.error("An error occurred while archiving equipment: " + error.message);
         } finally {
             setLoading(false);
         }
@@ -397,10 +413,10 @@ const EquipmentEntry = () => {
                                     whileHover={{ scale: 1.05 }}
                                     whileTap={{ scale: 0.95 }}
                                     onClick={() => handleDeleteClick(equipment.equip_id)}
-                                    className="flex items-center gap-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-4 py-2 rounded-full transition-all duration-300 shadow-md hover:shadow-lg"
+                                    className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white px-4 py-2 rounded-full transition-all duration-300 shadow-md hover:shadow-lg"
                                 >
-                                    <FontAwesomeIcon icon={faTrashAlt} className="text-sm" />
-                                    <span>Delete</span>
+                                    <i className="pi pi-inbox text-sm"></i>
+                                    <span>Archive</span>
                                 </motion.button>
                             </div>
                         </div>

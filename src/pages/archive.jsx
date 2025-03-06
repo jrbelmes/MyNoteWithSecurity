@@ -88,10 +88,24 @@ const TabPanel = ({ children, value, index }) => {
 const Archive = () => {
   const [value, setValue] = useState(0);
   const [users, setUsers] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
+  const [venues, setVenues] = useState([]);
+  const [equipment, setEquipment] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const handleChange = (event, newValue) => {
     setValue(newValue);
+  };
+
+  const convertUserType = (userType) => {
+    const typeMapping = {
+      'Dean': 'dept',
+      'Admin': 'admin',
+      'Driver': 'driver',
+      'Personnel': 'personel',
+      'User': 'user'
+    };
+    return typeMapping[userType] || userType.toLowerCase();
   };
 
   const fetchUsers = async () => {
@@ -116,7 +130,7 @@ const Archive = () => {
           users_pic: user.pic,
           departments_name: user.departments_name,
           user_level_name: user.user_level_name,
-          users_user_level_id: user.user_level_desc,
+          role: convertUserType(user.user_level_desc), // Convert the user type
           user_type: user.type
         }));
         setUsers(allUsers);
@@ -131,26 +145,141 @@ const Archive = () => {
     }
   };
 
+  const fetchVehicles = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.post("http://localhost/coc/gsd/delete_master.php",
+        { operation: "fetchAllVehicles" },
+        { headers: { 'Content-Type': 'application/json' } }
+      );
+      if (response.data.status === 'success') {
+        setVehicles(response.data.data);
+      }
+    } catch (error) {
+      toast.error("Error fetching vehicles");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchVenues = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.post("http://localhost/coc/gsd/delete_master.php",
+        { operation: "fetchVenue" },
+        { headers: { 'Content-Type': 'application/json' } }
+      );
+      if (response.data.status === 'success') {
+        setVenues(response.data.data);
+      }
+    } catch (error) {
+      toast.error("Error fetching venues");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchEquipment = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.post("http://localhost/coc/gsd/delete_master.php",
+        { operation: "fetchEquipmentsWithStatus" },
+        { headers: { 'Content-Type': 'application/json' } }
+      );
+      if (response.data.status === 'success') {
+        setEquipment(response.data.data);
+      }
+    } catch (error) {
+      toast.error("Error fetching equipment");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
+    fetchVehicles();
+    fetchVenues();
+    fetchEquipment();
   }, []);
 
-  const handleRestore = async (record, type) => {
+  const handleRestoreUser = async (record) => {
     try {
-      const response = await axios.post("http://localhost/coc/gsd/restore_master.php", {
-        operation: `restore${type}`,
-        id: record.id
+      const response = await axios.post("http://localhost/coc/gsd/delete_master.php", {
+        operation: "unarchiveUser",
+        userType: convertUserType(record.user_level_name),
+        userId: record.users_id
       });
 
       if (response.data.status === 'success') {
-        message.success(`${type} restored successfully`);
-        fetchUsers(); // Refresh the data
+        message.success(`User restored successfully`);
+        fetchUsers();
       } else {
-        message.error(`Failed to restore ${type}`);
+        message.error(`Failed to restore user`);
       }
     } catch (error) {
-      console.error(`Error restoring ${type}:`, error);
-      message.error(`An error occurred while restoring ${type}`);
+      console.error('Error restoring user:', error);
+      message.error(`An error occurred while restoring user`);
+    }
+  };
+
+  const handleRestoreVehicle = async (record) => {
+    try {
+      const response = await axios.post("http://localhost/coc/gsd/delete_master.php", {
+        operation: "unarchiveResource",
+        resourceType: "vehicle",
+        resourceId: record.vehicle_id
+      });
+
+      if (response.data.status === 'success') {
+        message.success(`Vehicle restored successfully`);
+        fetchVehicles();
+      } else {
+        message.error(`Failed to restore vehicle`);
+      }
+    } catch (error) {
+      console.error('Error restoring vehicle:', error);
+      message.error(`An error occurred while restoring vehicle`);
+    }
+  };
+
+  const handleRestoreVenue = async (record) => {
+    try {
+      const response = await axios.post("http://localhost/coc/gsd/delete_master.php", {
+        operation: "unarchiveResource",
+        resourceType: "venue",
+        resourceId: record.ven_id
+      });
+
+      if (response.data.status === 'success') {
+        message.success(`Venue restored successfully`);
+        fetchVenues();
+      } else {
+        message.error(`Failed to restore venue`);
+      }
+    } catch (error) {
+      console.error('Error restoring venue:', error);
+      message.error(`An error occurred while restoring venue`);
+    }
+  };
+
+  const handleRestoreEquipment = async (record) => {
+    try {
+      const response = await axios.post("http://localhost/coc/gsd/delete_master.php", {
+        operation: "unarchiveResource",
+        resourceType: "equipment",
+        resourceId: record.equip_id
+      });
+
+      if (response.data.status === 'success') {
+        message.success(`Equipment restored successfully`);
+        fetchEquipment();
+      } else {
+        message.error(`Failed to restore equipment`);
+      }
+    } catch (error) {
+      console.error('Error restoring equipment:', error);
+      message.error(`An error occurred while restoring equipment`);
     }
   };
 
@@ -182,7 +311,7 @@ const Archive = () => {
         <Space>
           <Popconfirm
             title="Are you sure you want to restore this user?"
-            onConfirm={() => handleRestore(record, 'User')}
+            onConfirm={() => handleRestoreUser(record)}
             okText="Yes"
             cancelText="No"
           >
@@ -193,6 +322,81 @@ const Archive = () => {
         </Space>
       ),
     },
+  ];
+
+  const vehicleColumns = [
+    { title: 'License', dataIndex: 'vehicle_license', key: 'license' },
+    { title: 'Make', dataIndex: 'vehicle_make_name', key: 'make' },
+    { title: 'Model', dataIndex: 'vehicle_model_name', key: 'model' },
+    { title: 'Category', dataIndex: 'vehicle_category_name', key: 'category' },
+    { title: 'Year', dataIndex: 'year', key: 'year' },
+    {
+      title: 'Action',
+      key: 'action',
+      render: (_, record) => (
+        <Space>
+          <Popconfirm
+            title="Are you sure you want to restore this vehicle?"
+            onConfirm={() => handleRestoreVehicle(record)}
+            okText="Yes"
+            cancelText="No"
+          >
+            <StyledButton type="primary" icon={<UndoOutlined />}>
+              Restore
+            </StyledButton>
+          </Popconfirm>
+        </Space>
+      ),
+    }
+  ];
+
+  const venueColumns = [
+    { title: 'Name', dataIndex: 'ven_name', key: 'name' },
+    { title: 'Occupancy', dataIndex: 'ven_occupancy', key: 'occupancy' },
+    { title: 'Operating Hours', dataIndex: 'ven_operating_hours', key: 'hours' },
+    {
+      title: 'Action',
+      key: 'action',
+      render: (_, record) => (
+        <Space>
+          <Popconfirm
+            title="Are you sure you want to restore this venue?"
+            onConfirm={() => handleRestoreVenue(record)}
+            okText="Yes"
+            cancelText="No"
+          >
+            <StyledButton type="primary" icon={<UndoOutlined />}>
+              Restore
+            </StyledButton>
+          </Popconfirm>
+        </Space>
+      ),
+    }
+  ];
+
+  const equipmentColumns = [
+    { title: 'Name', dataIndex: 'equip_name', key: 'name' },
+    { title: 'Quantity', dataIndex: 'equip_quantity', key: 'quantity' },
+    { title: 'Created At', dataIndex: 'equip_created_at', key: 'created' },
+    { title: 'Updated At', dataIndex: 'equip_updated_at', key: 'updated' },
+    {
+      title: 'Action',
+      key: 'action',
+      render: (_, record) => (
+        <Space>
+          <Popconfirm
+            title="Are you sure you want to restore this equipment?"
+            onConfirm={() => handleRestoreEquipment(record)}
+            okText="Yes"
+            cancelText="No"
+          >
+            <StyledButton type="primary" icon={<UndoOutlined />}>
+              Restore
+            </StyledButton>
+          </Popconfirm>
+        </Space>
+      ),
+    }
   ];
 
   return (
@@ -248,12 +452,14 @@ const Archive = () => {
               <StyledPaper elevation={2} sx={{ p: 2 }}>
                 <Typography variant="h6" gutterBottom>Vehicles Archive</Typography>
                 <Table
-                  columns={[]} // Add vehicle columns here
-                  dataSource={[]}
+                  columns={vehicleColumns}
+                  dataSource={vehicles}
                   loading={loading}
+                  rowKey="vehicle_id"
                   pagination={{
                     pageSize: 10,
-                    showSizeChanger: true
+                    showSizeChanger: true,
+                    showTotal: (total) => `Total ${total} items`
                   }}
                 />
               </StyledPaper>
@@ -264,7 +470,17 @@ const Archive = () => {
             <Grid item xs={12}>
               <StyledPaper elevation={2} sx={{ p: 2 }}>
                 <Typography variant="h6" gutterBottom>Venues Archive</Typography>
-                {/* Add your venues archive content here */}
+                <Table
+                  columns={venueColumns}
+                  dataSource={venues}
+                  loading={loading}
+                  rowKey="ven_id"
+                  pagination={{
+                    pageSize: 10,
+                    showSizeChanger: true,
+                    showTotal: (total) => `Total ${total} items`
+                  }}
+                />
               </StyledPaper>
             </Grid>
           </TabPanel>
@@ -273,7 +489,17 @@ const Archive = () => {
             <Grid item xs={12}>
               <StyledPaper elevation={2} sx={{ p: 2 }}>
                 <Typography variant="h6" gutterBottom>Equipment Archive</Typography>
-                {/* Add your equipment archive content here */}
+                <Table
+                  columns={equipmentColumns}
+                  dataSource={equipment}
+                  loading={loading}
+                  rowKey="equip_id"
+                  pagination={{
+                    pageSize: 10,
+                    showSizeChanger: true,
+                    showTotal: (total) => `Total ${total} items`
+                  }}
+                />
               </StyledPaper>
             </Grid>
           </TabPanel>

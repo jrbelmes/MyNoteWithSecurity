@@ -331,8 +331,8 @@ function Logins() {
         setLoading(true);
     
         try {
-            // First, check if the password is correct
-            const passwordCheckResponse = await axios.post(`${localStorage.getItem("url")}login.php`, {
+            // Step 1: Verify username and password
+            const loginResponse = await axios.post(`${localStorage.getItem("url")}login.php`, {
                 operation: "login",
                 json: { 
                     username: username, 
@@ -340,29 +340,56 @@ function Logins() {
                 }
             });
     
-            if (passwordCheckResponse.data.status === "success") {
-                // Password is correct, now check if OTP is needed
-                const authCheckResponse = await axios.post(`${localStorage.getItem("url")}update_master2.php`, {
-                    operation: "sendLoginOTP",
-                    json: { 
-                        id: username
-                    }
-                });
+            if (loginResponse.data.status === "success") {
+                const userData = loginResponse.data.data;
     
-                if (authCheckResponse.data.status === "info" && authCheckResponse.data.authenticated) {
-                    // User is already authenticated, proceed with login
-                    const loginResponse = await axios.post(`${localStorage.getItem("url")}login.php`, {
-                        operation: "login",
+                // Step 2: Check if 2FA is active
+                const is2FAactive = userData.is_2FAactive === "1";
+    
+                if (is2FAactive && !showLoginOTP) {
+                    // Step 3: If 2FA is active and OTP input is not shown, send OTP
+                    const otpResponse = await axios.post(`${localStorage.getItem("url")}update_master2.php`, {
+                        operation: "sendLoginOTP",
                         json: { 
-                            username: username, 
-                            password: password 
+                            id: username
                         }
                     });
     
-                    if (loginResponse.data.status === "success") {
-                        const userData = loginResponse.data.data;
-                        
-                        // Clear existing storage
+                    if (otpResponse.data.status === "success") {
+                        // Show OTP input form
+                        setShowLoginOTP(true);
+                        notify("OTP has been sent to your email. Please verify.");
+                    } else {
+                        notify("Failed to send OTP. Please try again.", 'error');
+                    }
+                } else if (is2FAactive && showLoginOTP) {
+                    // Step 4: If 2FA is active and OTP input is shown, verify OTP
+                    const otpValue = loginOtpDigits.join('');
+                    if (otpValue.length !== 8) {
+                        notify("Please enter complete OTP", 'error');
+                        return;
+                    }
+    
+                    const otpResponse = await axios.post(`${localStorage.getItem("url")}update_master2.php`, {
+                        operation: "validateLoginOTP",
+                        json: { 
+                            id: username,
+                            otp: otpValue
+                        }
+                    });
+    
+                    if (otpResponse.data.status === "success" && otpResponse.data.authenticated) {
+                        // If user opted for 7-day authentication, update auth period
+                        if (allowSevenDayAuth) {
+                            await axios.post(`${localStorage.getItem("url")}update_master2.php`, {
+                                operation: "updateAuthPeriod",
+                                json: { 
+                                    user_id: userData.user_id
+                                }
+                            });
+                        }
+    
+                        // Complete login
                         localStorage.clear();
                         sessionStorage.clear();
     
@@ -376,7 +403,7 @@ function Logins() {
                         localStorage.setItem("department_id", userData.department_id);
                         localStorage.setItem("profile_pic", userData.profile_pic || "");
                         localStorage.setItem("loggedIn", "true");
-                    
+    
                         // Set sessionStorage items
                         sessionStorage.setItem("user_id", userData.user_id);
                         sessionStorage.setItem("name", `${userData.firstname} ${userData.middlename} ${userData.lastname}`.trim());
@@ -419,12 +446,66 @@ function Logins() {
                                 navigateTo("/dashboard");
                         }
                     } else {
-                        notify("Login failed. Please check your credentials.", 'error');
+                        notify("Invalid OTP. Please try again.", 'error');
+                        setLoginOtpDigits(Array(8).fill(''));
                     }
                 } else {
-                    // User needs OTP verification
-                    setShowLoginOTP(true);
-                    notify("Please enter the OTP sent to your email");
+                    // Step 5: If 2FA is not active, proceed with direct login
+                    localStorage.clear();
+                    sessionStorage.clear();
+    
+                    // Set localStorage items
+                    localStorage.setItem("user_id", userData.user_id);
+                    localStorage.setItem("name", `${userData.firstname} ${userData.middlename} ${userData.lastname}`.trim());
+                    localStorage.setItem("school_id", userData.school_id);
+                    localStorage.setItem("contact_number", userData.contact_number);
+                    localStorage.setItem("user_level", userData.user_level_name);
+                    localStorage.setItem("user_level_id", userData.user_level_id);
+                    localStorage.setItem("department_id", userData.department_id);
+                    localStorage.setItem("profile_pic", userData.profile_pic || "");
+                    localStorage.setItem("loggedIn", "true");
+    
+                    // Set sessionStorage items
+                    sessionStorage.setItem("user_id", userData.user_id);
+                    sessionStorage.setItem("name", `${userData.firstname} ${userData.middlename} ${userData.lastname}`.trim());
+                    sessionStorage.setItem("school_id", userData.school_id);
+                    sessionStorage.setItem("contact_number", userData.contact_number);
+                    sessionStorage.setItem("user_level", userData.user_level_name);
+                    sessionStorage.setItem("user_level_id", userData.user_level_id);
+                    sessionStorage.setItem("department_id", userData.department_id);
+                    sessionStorage.setItem("profile_pic", userData.profile_pic || "");
+                    sessionStorage.setItem("loggedIn", "true");
+    
+                    // Handle "Remember Me" functionality
+                    if (rememberMe) {
+                        localStorage.setItem("rememberedUsername", username);
+                    } else {
+                        localStorage.removeItem("rememberedUsername");
+                    }
+    
+                    // Navigate based on user level
+                    const userLevel = userData.user_level_name;
+                    switch(userLevel) {
+                        case "Super Admin":
+                            notify("Super Admin Login Successful");
+                            navigateTo("/adminDashboard");
+                            break;
+                        case "Personnel":
+                            notify("Personnel Login Successful");
+                            navigateTo("/personnelDashboard");
+                            break;
+                        case "Admin":
+                            notify("Admin Login Successful");
+                            navigateTo("/adminDashboard");
+                            break;
+                        case "Dean":
+                            notify("Dean Login Successful");
+                            navigateTo("/deanDashboard");
+                            break;
+                        default:
+                            notify("User Login Successful");
+                            navigateTo("/dashboard");
+                    }
                 }
             } else {
                 // Password is incorrect

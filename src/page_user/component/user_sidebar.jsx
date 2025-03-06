@@ -151,13 +151,7 @@ const Sidebar = () => {
                       <FaUserCircle />
                       <span>Profile</span>
                     </button>
-                    <button 
-                      onClick={() => navigate('/settings')}
-                      className="w-full text-left px-4 py-2 hover:bg-green-50 text-gray-700 rounded flex items-center space-x-2"
-                    >
-                      <FaCog />
-                      <span>Settings</span>
-                    </button>
+                    
                     <button
                       onClick={handleLogout}
                       className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 rounded flex items-center space-x-2"
