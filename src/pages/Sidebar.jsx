@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   FaSignOutAlt, FaTachometerAlt, FaCar, FaCog, FaFileAlt, FaHeadset,
   FaChevronDown, FaBars, FaHome, FaTools, FaUserCircle, FaFolder,
-  FaCalendarAlt, FaChartBar
+  FaCalendarAlt, FaChartBar, FaArchive,
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
@@ -151,19 +151,17 @@ const Sidebar = () => {
                 <SidebarSubItem icon={FaCar} text="Vehicle" link="/VehicleEntry" active={activeItem === '/VehicleEntry'} />
                 <SidebarSubItem icon={FaTools} text="Equipments" link="/Equipment" active={activeItem === '/Equipment'} />
               </SidebarDropdown>
-
+              <SidebarItem icon={FaUserCircle} text="Assign Personnel" link="/AssignPersonnel" active={activeItem === '/AssignPersonnel'} />
               <SidebarItem icon={FaFolder} text="Master" link="/Master" active={activeItem === '/Master'} />
-
               <SidebarItem icon={FaUserCircle} text="Users" link="/Faculty" active={activeItem === '/Faculty'} />
-
               <SidebarDropdown icon={FaCar} text="Reservations" active={['/viewReservation', '/ViewRequest', '/AddReservation'].includes(activeItem)}>
                 <SidebarSubItem icon={FaHeadset} text="View Requests" link="/ViewRequest" active={activeItem === '/ViewRequest'} />
                 <SidebarSubItem icon={FaCar} text="Add Reservation" link="/AddReservation" active={activeItem === '/AddReservation'} />
               </SidebarDropdown>
 
               <SidebarItem icon={FaFileAlt} text="Records" link="/record" active={activeItem === '/record'} />
+              <SidebarItem icon={FaArchive} text="Archive" link="/archive" active={activeItem === '/archive'} />        
               
-              <SidebarItem icon={FaUserCircle} text="Assign Personnel" link="/AssignPersonnel" active={activeItem === '/AssignPersonnel'} />
             </nav>
           </div>
 

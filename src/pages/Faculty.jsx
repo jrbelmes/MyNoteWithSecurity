@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Sidebar from './Sidebar';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faEdit, faTrashAlt, faSearch, faPlus, faUser } from '@fortawesome/free-solid-svg-icons';
+import { faEdit, faArchive, faSearch, faPlus, faUser } from '@fortawesome/free-solid-svg-icons';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import axios from 'axios';
@@ -336,25 +336,55 @@ const Faculty = () => {
         }
     };
 
-    const deleteUser = async (userId) => {
+    const archiveUser = async (userId, userLevelName) => {
         try {
-            const response = await axios.post("http://localhost/coc/gsd/delete_master.php", 
-                new URLSearchParams({ 
-                    operation: "deleteUser",
-                    user_id: userId
-                }),
-                { headers: { 'Content-Type': 'application/json' } }
+            // Map the user level name to the correct API type
+            let apiUserType;
+            switch (userLevelName) {
+                case 'Admin':
+                    apiUserType = 'admin';
+                    break;
+                case 'Dean':
+                case 'Secretary':
+                    apiUserType = 'dept';
+                    break;
+                case 'Driver':
+                    apiUserType = 'driver';
+                    break;
+                case 'Personnel':
+                    apiUserType = 'personel';
+                    break;
+                default:
+                    apiUserType = 'user';
+            }
+
+            console.log('Sending archive request:', {
+                userType: apiUserType,
+                userId: userId
+            });
+
+            const response = await axios.post(
+                "http://localhost/coc/gsd/delete_master.php",
+                {
+                    operation: 'archiveUser',
+                    userType: apiUserType,
+                    userId: userId
+                },
+                { 
+                    headers: { 'Content-Type': 'application/json' } 
+                }
             );
+
             if (response.data.status === 'success') {
-                toast.success("Faculty deleted successfully!");
-                fetchUsers();
+                toast.success("User archived successfully!");
+                fetchUsers(); // Refresh the users list
+                setModalState({ isOpen: false, type: '', user: null });
             } else {
-                toast.error("Error deleting faculty: " + response.data.message);
+                throw new Error(response.data.message || "Failed to archive user");
             }
         } catch (error) {
-            toast.error("An error occurred while deleting the faculty.");
-        } finally {
-            setModalState({ isOpen: false, type: '', user: null });
+            console.error('Archive Error:', error);
+            toast.error("An error occurred while archiving the user: " + error.message);
         }
     };
 
@@ -405,14 +435,27 @@ const Faculty = () => {
 
     const actionsBodyTemplate = (rowData) => {
         const handleEditClick = async () => {
-            console.log('Clicked row data:', rowData); // Log initial row data
-
             const userDetails = await getUserDetails(rowData.users_id);
-            console.log('Fetched user details:', userDetails); // Log fetched user details
-            
             if (userDetails) {
                 setModalState({ isOpen: true, type: 'edit', user: userDetails });
             }
+        };
+
+        const handleArchiveClick = () => {
+            // Log the data we're passing to ensure it's correct
+            console.log('Archive data:', {
+                id: rowData.users_id,
+                type: rowData.user_level_name
+            });
+            
+            setModalState({ 
+                isOpen: true, 
+                type: 'archive', 
+                user: {
+                    users_id: rowData.users_id,
+                    user_level_name: rowData.user_level_name // Make sure we pass the user level name
+                }
+            });
         };
 
         return (
@@ -428,10 +471,10 @@ const Faculty = () => {
                 <motion.button 
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
-                    onClick={() => setModalState({ isOpen: true, type: 'delete', user: rowData })}
-                    className="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded-full"
+                    onClick={handleArchiveClick}
+                    className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-1 px-3 rounded-full"
                 >
-                    <FontAwesomeIcon icon={faTrashAlt} />
+                    <FontAwesomeIcon icon={faArchive} />
                 </motion.button>
             </div>
         );
@@ -563,18 +606,13 @@ const Faculty = () => {
                             className="font-semibold"
                         />
                         <Column 
-                            field="users_fname" 
-                            header="First Name" 
-                            filter 
-                            filterPlaceholder="Search first name"
-                            sortable 
-                        />
-                        <Column 
-                            field="users_lname" 
-                            header="Last Name" 
-                            filter 
-                            filterPlaceholder="Search last name"
-                            sortable 
+                            field="users_name" 
+                            header="Full Name" 
+                            body={(rowData) => `${rowData.users_fname} ${rowData.users_mname ? rowData.users_mname + ' ' : ''}${rowData.users_lname}`}
+                            filter
+                            filterField="global"
+                            filterPlaceholder="Search name"
+                            sortable
                         />
                         <Column 
                             field="departments_name" 
@@ -619,7 +657,7 @@ const Faculty = () => {
                 user={modalState.user}
                 departments={departments}
                 onSubmit={handleSubmit}
-                onDelete={deleteUser}
+                onDelete={archiveUser}
                 userLevels={userLevels} // Pass userLevels to FacultyModal
                 getUserDetails={getUserDetails} // Add this line
                 generateAvatarColor={generateAvatarColor} // Add this prop
@@ -640,7 +678,7 @@ const FacultyModal = ({
     user, 
     departments, 
     onSubmit, 
-    onDelete, 
+    onDelete: onArchive, // Rename this prop
     userLevels,
     getUserDetails,
     generateAvatarColor,
@@ -695,14 +733,16 @@ const FacultyModal = ({
                 return '';
             case 'users_email':
                 return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? '' : 'Invalid email address';
-            case 'users_school_id':
-                if (!value.trim()) {
-                    return 'School ID is required';
-                }
-                if (!/^[0-9-]+$/.test(value)) {
-                    return 'School ID can only contain numbers and minus sign (-)';
-                }
-                return '';
+                case 'users_school_id':
+                    if (!value.trim()) {
+                        return 'School ID is required';
+                    }
+                    // Regex to ensure the format is something like 'x1-x1-x1', where 'x1' can be alphanumeric
+                    if (!/^[a-zA-Z0-9]+-[a-zA-Z0-9]+-[a-zA-Z0-9]+$/.test(value)) {
+                        return 'School ID must be in the format x1-x1-x1 (e.g., abc-123-xyz)';
+                    }
+                    return '';
+                
             case 'users_contact_number':
                 return /^\d{11}$/.test(value) ? '' : 'Contact number must be 11 digits';
             case 'users_password':
@@ -1197,8 +1237,12 @@ const FacultyModal = ({
                 </Modal.Title>
             </Modal.Header>
             <Modal.Body className="bg-green-50 px-4 py-4">
-                {type === 'delete' ? (
-                    <p>Are you sure you want to delete this faculty member?</p>
+                {type === 'archive' ? (
+                    <div className="text-center">
+                        <FontAwesomeIcon icon={faArchive} className="text-4xl text-yellow-500 mb-4" />
+                        <p className="text-lg">Are you sure you want to archive this user?</p>
+                        <p className="text-gray-600">This action will move the user to the archive.</p>
+                    </div>
                 ) : (
                     <Form onSubmit={handleSubmit} noValidate>
                         {/* Add image preview at the top of the form */}
@@ -1403,9 +1447,13 @@ const FacultyModal = ({
                 <Button variant="secondary" onClick={onHide}>
                     Close
                 </Button>
-                {type === 'delete' ? (
-                    <Button variant="danger" onClick={() => onDelete(user.users_id)}>
-                        Delete
+                {type === 'archive' ? (
+                    <Button 
+                        variant="warning" 
+                        onClick={() => onArchive(user.users_id, user.user_level_name)}
+                        className="bg-yellow-500 hover:bg-yellow-600 text-white"
+                    >
+                        Archive
                     </Button>
                 ) : (
                     <Button 
