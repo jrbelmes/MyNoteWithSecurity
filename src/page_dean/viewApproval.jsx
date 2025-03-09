@@ -47,32 +47,33 @@ const ViewApproval = () => {
     }
   };
 
-  // Approve or Disapprove a request
-  const handleApproval = async (approvalId, status) => {
-    if (status === 'approved' && isAnyResourceUnavailable(availabilityData, selectedRequest)) {
+  // Modified handleApproval function
+  const handleApproval = async (reservationId, isAccepted) => {
+    if (isAccepted && isAnyResourceUnavailable(availabilityData, selectedRequest)) {
       alert('Cannot approve: One or more resources are unavailable');
       return;
     }
 
+    // Get the correct reservation_id from the request
+    const actualReservationId = selectedRequest.reservation_id;
+
     try {
       const response = await axios.post('http://localhost/coc/gsd/process_reservation.php', {
-        operation: 'approveRequest',
-        approval_id: approvalId,
-        status: status,
+        operation: 'handleApproval',
+        reservation_id: actualReservationId,
+        is_accepted: isAccepted
       });
 
       if (response.data.status === 'success') {
         alert(response.data.message);
-        // Refresh the list after successful approval
         fetchApprovalRequests();
-        // Close the details modal
         handleCloseDetails();
       } else {
-        alert('Failed to update approval status');
+        alert(response.data.message || 'Failed to update approval status');
       }
     } catch (error) {
       console.error('Error updating approval status:', error);
-      alert('Error occurred while updating approval status');
+      alert('Network error occurred while updating approval status');
     }
   };
 
@@ -91,29 +92,6 @@ const ViewApproval = () => {
   const handleCloseDetails = () => {
     setSelectedRequest(null);
     setAvailabilityData(null);
-  };
-
-  // Decline the selected request
-  const handleDecline = async (approvalId) => {
-    try {
-      const response = await axios.post('http://localhost/coc/gsd/process_reservation.php', {
-        operation: 'declineRequest',
-        approval_id: approvalId,
-      });
-
-      if (response.data.status === 'success') {
-        alert(response.data.message);
-        // Refresh the list after successful decline
-        fetchApprovalRequests();
-        // Close the details modal
-        handleCloseDetails();
-      } else {
-        alert('Failed to decline the request');
-      }
-    } catch (error) {
-      console.error('Error declining request:', error);
-      alert('Error occurred while declining the request');
-    }
   };
 
   useEffect(() => {
@@ -551,25 +529,25 @@ const ViewApproval = () => {
       {/* Enhanced Modal */}
       <AnimatePresence>
         {selectedRequest && (
-          selectedRequest.venue ? (
-            <VenueRequestModal
-              request={selectedRequest}
-              visible={!!selectedRequest}
-              onClose={handleCloseDetails}
-              onApprove={() => handleApproval(selectedRequest.approval_id, 'approved')}
-              onDecline={() => handleDecline(selectedRequest.approval_id)}
-              availabilityData={availabilityData}
-            />
-          ) : (
+          selectedRequest.vehicle?.vehicle_id ? (
             <VehicleRequestModal
               request={selectedRequest}
               visible={!!selectedRequest}
               onClose={handleCloseDetails}
-              onApprove={() => handleApproval(selectedRequest.approval_id, 'approved')}
-              onDecline={() => handleDecline(selectedRequest.approval_id)}
+              onApprove={() => handleApproval(selectedRequest.reservation_id, true)}
+              onDecline={() => handleApproval(selectedRequest.reservation_id, false)}
               availabilityData={availabilityData}
             />
-          )
+          ) : selectedRequest.venue?.ven_id ? (
+            <VenueRequestModal
+              request={selectedRequest}
+              visible={!!selectedRequest}
+              onClose={handleCloseDetails}
+              onApprove={() => handleApproval(selectedRequest.reservation_id, true)}
+              onDecline={() => handleApproval(selectedRequest.reservation_id, false)}
+              availabilityData={availabilityData}
+            />
+          ) : null
         )}
       </AnimatePresence>
     </div>

@@ -1135,9 +1135,10 @@ const renderResourceTypeSelection = () => (
   </motion.div>
 );
 
-// Modify handleAddReservation to handle vehicle-only or venue-only reservations
 const handleAddReservation = async () => {
   try {
+    setLoading(true); // Start loading
+
     const userId = localStorage.getItem('user_id');
     const deptId = localStorage.getItem('department_id');
     const storedName = localStorage.getItem('name');
@@ -1146,6 +1147,9 @@ const handleAddReservation = async () => {
       toast.error('User session invalid. Please log in again.');
       return false;
     }
+
+    // Simulate a 5-second delay
+    await new Promise((resolve) => setTimeout(resolve, 5000));
 
     // Validate required fields based on resource type
     if (formData.resourceType === 'venue') {
@@ -1157,7 +1161,7 @@ const handleAddReservation = async () => {
 
       // Create the venue reservation payload
       const venuePayload = {
-        operation: 'venueReservation',
+        operation: 'venuereservation',
         user_id: parseInt(userId),
         user_type: 'user',
         dept_id: parseInt(deptId),
@@ -1207,44 +1211,53 @@ const handleAddReservation = async () => {
       }
 
       const vehiclePayload = {
-        operation: 'vehicleReservation',
+        operation: 'vehiclereservation',
         user_id: parseInt(userId),
         user_type: 'user',
         dept_id: parseInt(deptId),
-        vehicles: selectedModels.map(id => id.toString()),
+        vehicles: selectedModels.map(id => parseInt(id)),  // Convert to integers
         form_data: {
           name: storedName,
-          purpose: formData.purpose,
-          destination: formData.destination,
+          purpose: formData.purpose.trim(), 
+          destination: formData.destination.trim(),
           start_date: format(new Date(formData.startDate), 'yyyy-MM-dd HH:mm:ss'),
           end_date: format(new Date(formData.endDate), 'yyyy-MM-dd HH:mm:ss'),
-          driver_id: formData.driverName || "1",
-          passengers: formData.passengers.map(p => p.name)
+          driver_id: parseInt(formData.driverName),  // Convert to integer
+          passengers: formData.passengers.map(p => p.name.trim())
         }
       };
 
-      const response = await axios.post(
-        'http://localhost/coc/gsd/insert_reservation.php',
-        vehiclePayload,
-        {
-          headers: {
-            'Content-Type': 'application/json'
+      try {
+        const response = await axios.post(
+          'http://localhost/coc/gsd/insert_reservation.php',
+          vehiclePayload,
+          {
+            headers: {
+              'Content-Type': 'application/json'
+            }
           }
-        }
-      );
+        );
 
-      if (response.data.status === 'success') {
-        toast.success('Vehicle reservation submitted successfully!');   
-        setCurrentStep(5); // Move to success state
-        return true;
-      } else {
-        throw new Error(response.data.message || 'Failed to submit reservation');
+        console.log('Vehicle reservation response:', response.data); // Debug log
+
+        if (response.data.status === 'success') {
+          toast.success('Vehicle reservation submitted successfully!');
+          setCurrentStep(5);
+          return true;
+        } else {
+          throw new Error(response.data.message || 'Failed to submit vehicle reservation');
+        }
+      } catch (error) {
+        console.error('Vehicle reservation error:', error);
+        throw error;
       }
     }
   } catch (error) {
     console.error('Submission error:', error);
     toast.error(error.message || 'An error occurred while submitting the reservation');
     return false;
+  } finally {
+    setLoading(false); // Stop loading
   }
 };
 
@@ -2656,13 +2669,14 @@ return (
                   {currentStep === 4 ? (
                     <AntButton
                       type="primary"
-                      icon={<CheckCircleOutlined />}
+                      icon={loading ? <Spin className="mr-2" /> : <CheckCircleOutlined />}
                       onClick={handleAddReservation}
                       size="large"
                       className={`${isMobile ? 'w-full' : ''} p-button-success`}
+                      disabled={loading} // Disable button when loading
                     >
-                      Submit
-                    </AntButton>
+                      {loading ? 'Submitting...' : 'Submit'}
+                  </AntButton>
                   ) : (
                     <AntButton
                       type="primary"

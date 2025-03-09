@@ -376,8 +376,8 @@ const Calendar = () => {
         url: 'http://localhost/coc/gsd/records&reports.php',
         data: JSON.stringify({
           operation: 'getReservationDetailsById',
-          json: {  // Add this nested json object
-            approval_id: reservation.approval_id
+          json: {
+            reservation_id: reservation.reservation_id
           }
         }),
         headers: {

@@ -47,7 +47,6 @@ const ReservationRequests = () => {
     const [startDate, endDate] = dateRange;
     const [isAccepting, setIsAccepting] = useState(false);
     const [isDeclining, setIsDeclining] = useState(false);
-    const [availabilityData, setAvailabilityData] = useState(null);
     const navigate = useNavigate();
     const user_level_id = localStorage.getItem('user_level_id');
 
@@ -85,124 +84,81 @@ const ReservationRequests = () => {
 
     const fetchReservationDetails = async (reservationId) => {
         try {
-            const response = await axios.post('http://localhost/coc/gsd/process_reservation.php', {
-                operation: 'fetchRequestById',
-                approval_id: reservationId
-            }, {
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-    
-            if (response.data?.status === 'success') {
-                const details = response.data.data[0];
-                // Handle case where equipment is undefined or null
-                if (!details.equipment) {
-                    details.equipment = {
-                        equipment_name: "No Equipment added",
-                        reservation_equipment_quantity: 0,
-                        equip_id: null
-                    };
-                }
-                setReservationDetails(details);
-                setCurrentRequest({
-                    approval_id: details.approval_id,
-                    reservation_id: details.reservation_id
-                });
-                
-                // Immediately check availability after setting details
-                const startDate = details.venue?.venue_form_start_date || details.vehicle?.vehicle_form_start_date;
-                const endDate = details.venue?.venue_form_end_date || details.vehicle?.vehicle_form_end_date;
-                
-                if (startDate && endDate) {
-                    const availabilityResponse = await axios.post('http://localhost/coc/gsd/process_reservation.php', {
-                        operation: 'doubleCheckAvailability',
-                        start_datetime: startDate,
-                        end_datetime: endDate
-                    });
-
-                    if (availabilityResponse.data?.status === 'success') {
-                        setAvailabilityData(availabilityResponse.data.data);
+            const response = await axios.post('http://localhost/coc/gsd/process_reservation.php', 
+                {
+                    operation: 'fetchRequestById',
+                    reservation_id: reservationId
+                },
+                {
+                    headers: {
+                        'Content-Type': 'application/json'
                     }
                 }
+            );
+
+            if (response.data?.status === 'success' && response.data.data) {
+                const details = response.data.data;
                 
+                // Format equipment data with null checks
+                let formattedEquipment = [];
+                if (details.equipment && Array.isArray(details.equipment)) {
+                    formattedEquipment = details.equipment;
+                } else if (details.equipment && details.equipment.name) {
+                    try {
+                        const names = details.equipment.name.split(',');
+                        const quantities = details.equipment.quantity ? details.equipment.quantity.split(',') : [];
+                        const ids = details.equipment.equipment_ids ? details.equipment.equipment_ids.split(',') : [];
+                        
+                        formattedEquipment = names.map((name, index) => ({
+                            equip_id: ids[index] || '',
+                            equipment_name: name.trim(),
+                            reservation_equipment_quantity: quantities[index] || '1'
+                        }));
+                    } catch (error) {
+                        console.warn('Error formatting equipment:', error);
+                        formattedEquipment = [];
+                    }
+                }
+
+                // Create a formatted details object
+                const formattedDetails = {
+                    ...details,
+                    equipment: formattedEquipment,
+                    // Format venue data with null checks
+                    venue: details.venue ? {
+                        ...details.venue,
+                        venue_name: details.venue.name || 'N/A',
+                        venue_form_name: details.venue.form_name || 'N/A',
+                        venue_form_event_title: details.venue.event_title || 'N/A',
+                        venue_form_description: details.venue.description || 'N/A',
+                        venue_participants: details.venue.participants || '0',
+                        venue_form_start_date: details.venue.start_date,
+                        venue_form_end_date: details.venue.end_date
+                    } : null,
+                    // Format vehicle data with null checks
+                    vehicle: details.vehicle ? {
+                        ...details.vehicle,
+                        vehicle_form_name: details.vehicle.form_name || 'N/A',
+                        vehicle_form_purpose: details.vehicle.purpose || 'N/A',
+                        vehicle_form_destination: details.vehicle.destination || 'N/A',
+                        vehicle_form_start_date: details.vehicle.start_date,
+                        vehicle_form_end_date: details.vehicle.end_date,
+                        drivers: details.vehicle.driver_names || []
+                    } : null
+                };
+
+                setReservationDetails(formattedDetails);
+                setCurrentRequest({
+                    reservation_id: reservationId
+                });
                 setIsDetailModalOpen(true);
             } else {
-                toast.error('Failed to fetch reservation details.');
+                toast.error('Failed to fetch reservation details');
             }
         } catch (error) {
-            toast.error('Error fetching reservation details. Please try again later.');
+            console.error('API Error:', error);
+            toast.error(`Error: ${error.response?.data?.message || 'Failed to fetch reservation details'}`);
         }
-    };
-
-    const checkAvailability = async (details) => {
-        try {
-            // Determine the correct start and end dates based on the reservation type
-            let startDate, endDate;
-            
-            if (details.venue) {
-                startDate = details.venue.venue_form_start_date;
-                endDate = details.venue.venue_form_end_date;
-            } else if (details.vehicle) {
-                startDate = details.vehicle.vehicle_form_start_date;
-                endDate = details.vehicle.vehicle_form_end_date;
-            }
-
-            console.log('Checking availability with dates:', { startDate, endDate });
-
-            const response = await axios.post('http://localhost/coc/gsd/process_reservation.php', {
-                operation: 'doubleCheckAvailability',
-                start_datetime: startDate,
-                end_datetime: endDate
-            }, {
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (response.data?.status === 'success') {
-                console.log('Availability response:', response.data.data);
-                setAvailabilityData(response.data.data);
-            }
-        } catch (error) {
-            console.error('Error checking availability:', error);
-            toast.error('Error checking resource availability.');
-        }
-    };
-
-    const isAnyResourceUnavailable = (availabilityData, details) => {
-        if (!availabilityData) return false;
-
-        let isUnavailable = false;
-
-        // Check venue availability
-        if (details.venue) {
-            const isVenueUnavailable = availabilityData.unavailable_venues?.some(
-                v => v.ven_id === details.venue.venue_id
-            );
-            console.log('Venue unavailable:', isVenueUnavailable);
-            if (isVenueUnavailable) isUnavailable = true;
-        }
-
-        // Check vehicle availability
-        if (details.vehicle) {
-            const isVehicleUnavailable = availabilityData.unavailable_vehicles?.some(
-                v => v.vehicle_id === details.vehicle.vehicle_id
-            );
-            console.log('Vehicle unavailable:', isVehicleUnavailable);
-            if (isVehicleUnavailable) isUnavailable = true;
-        }
-
-        // Check equipment availability
-        if (details.equipment) {
-            const isEquipmentUnavailable = availabilityData.unavailable_equipment?.some(
-                e => e.equip_id === details.equipment.equip_id
-            );
-            console.log('Equipment unavailable:', isEquipmentUnavailable);
-            if (isEquipmentUnavailable) isUnavailable = true;
-        }
-
-        return isUnavailable;
     };
 
     useEffect(() => {
@@ -384,7 +340,7 @@ const ReservationRequests = () => {
                             {filteredReservations.length > 0 ? (
                                 filteredReservations.map((reservation, index) => (
                                     <motion.div 
-                                        key={reservation.approval_id}
+                                        key={reservation.reservation_id}
                                         initial={{ opacity: 0, y: 20 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         exit={{ opacity: 0, y: -20 }}
@@ -394,9 +350,6 @@ const ReservationRequests = () => {
                                         <div className="p-6">
                                             <div className="flex flex-col gap-4">
                                                 {/* Status Badge */}
-                                                <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusStyle(reservation.approval_status)}`}>
-                                                    {reservation.approval_status || 'Unknown Status'}
-                                                </div>
                                                 
                                                 {/* Request ID, Form Name, and Type */}
                                                 <div>
@@ -429,8 +382,8 @@ const ReservationRequests = () => {
                                                 <button
                                                     className="w-full mt-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
                                                     onClick={() => {
-                                                        setCurrentRequest(reservation.approval_id);
-                                                        fetchReservationDetails(reservation.approval_id);
+                                                        // Fix: Pass the reservation_id directly
+                                                        fetchReservationDetails(reservation.reservation_id);
                                                     }}
                                                 >
                                                     View Details
@@ -458,12 +411,10 @@ const ReservationRequests = () => {
                     visible={isDetailModalOpen}
                     onClose={() => {
                         setIsDetailModalOpen(false);
-                        setAvailabilityData(null);
                         setCurrentRequest(null);
                         setReservationDetails(null);
                     }}
                     reservationDetails={reservationDetails}
-                    availabilityData={availabilityData}
                     onAccept={handleAccept}
                     onDecline={() => setIsDeclineModalOpen(true)}
                     isAccepting={isAccepting}
@@ -522,193 +473,12 @@ const formatDateRange = (startDate, endDate) => {
     }
 };
 
-const DetailModal = ({ visible, onClose, reservationDetails, availabilityData, onAccept, onDecline, isAccepting, isDeclining }) => {
-    const { TabPane } = Tabs;
-    const [isResourceAvailable, setIsResourceAvailable] = useState(true);
-
-    useEffect(() => {
-        const checkResourceAvailability = () => {
-            if (!availabilityData || !reservationDetails) return true;
-
-            let isAvailable = true;
-
-            // If it's a vehicle request, check both vehicle and driver availability
-            if (reservationDetails.vehicle) {
-                // Check vehicle availability
-                const isVehicleUnavailable = availabilityData.unavailable_vehicles?.some(
-                    v => v.vehicle_id === reservationDetails.vehicle.vehicle_id
-                );
-
-                // Check driver availability if driver is assigned
-                const isDriverUnavailable = reservationDetails.vehicle.driver_id && 
-                    availabilityData.unavailable_drivers?.some(
-                        driver => driver.driver_id === reservationDetails.vehicle.driver_id
-                    );
-
-                // If either vehicle or driver is unavailable, the resource is not available
-                if (isVehicleUnavailable || isDriverUnavailable) {
-                    isAvailable = false;
-                }
-            }
-
-            // Check venue availability
-            if (reservationDetails.venue) {
-                const isVenueUnavailable = availabilityData.unavailable_venues?.some(
-                    v => v.ven_id === reservationDetails.venue.ven_id
-                );
-                if (isVenueUnavailable) {
-                    isAvailable = false;
-                }
-            }
-
-            // Check equipment availability
-            if (reservationDetails.equipment?.equip_id) {
-                const isEquipmentUnavailable = availabilityData.unavailable_equipment?.some(
-                    e => e.equip_id === reservationDetails.equipment.equip_id
-                );
-                if (isEquipmentUnavailable) {
-                    isAvailable = false;
-                }
-            }
-
-            setIsResourceAvailable(isAvailable);
-        };
-
-        checkResourceAvailability();
-    }, [availabilityData, reservationDetails]);
-
+const DetailModal = ({ visible, onClose, reservationDetails, onAccept, onDecline, isAccepting, isDeclining }) => {
     if (!reservationDetails) return null;
 
-    // Enhanced debug logging
-    console.log('DetailModal Reservation Details:', {
-        vehicle: reservationDetails.vehicle,
-        venue: reservationDetails.venue,
-        dates: {
-            vehicleStartDate: reservationDetails.vehicle?.vehicle_form_start_date,
-            vehicleEndDate: reservationDetails.vehicle?.vehicle_form_end_date,
-            venueStartDate: reservationDetails.venue?.venue_form_start_date,
-            venueEndDate: reservationDetails.venue?.venue_form_end_date,
-            rootStartDate: reservationDetails.start,
-            rootEndDate: reservationDetails.end
-        }
-    });
-
-    // Revised availability check functions
-    const isVenueAvailable = (venueId) => {
-        return !availabilityData?.unavailable_venues?.some(
-            venue => venue.ven_id === venueId
-        );
-    };
-
-    const isVehicleAvailable = (vehicleId) => {
-        return !availabilityData?.unavailable_vehicles?.some(
-            vehicle => vehicle.vehicle_id === vehicleId
-        );
-    };
-
-    const isEquipmentAvailable = (equipId) => {
-        return !availabilityData?.unavailable_equipment?.some(
-            equip => equip.equip_id === equipId
-        );
-    };
-
-    const isDriverAvailable = (driverId, driverName) => {
-        const isUnavailable = availabilityData?.unavailable_drivers?.some(
-            driver => driver.driver_id === driverId
-        );
-        console.log('Driver availability check:', {
-            driverId,
-            driverName,
-            unavailableDrivers: availabilityData?.unavailable_drivers,
-            isAvailable: !isUnavailable
-        });
-        return !isUnavailable;
-    };
-
-    const getDriverDetails = (driverId) => {
-        return availabilityData?.unavailable_drivers?.find(
-            driver => driver.driver_id === driverId
-        );
-    };
-
-    // Updated badge renderer
-    const getAvailabilityBadge = (isAvailable) => (
-        <Tag color={isAvailable ? 'success' : 'error'}>
-            {isAvailable ? 'Available' : 'Not Available On Schedule'}
-        </Tag>
-    );
-
-    const isResourceUnavailable = () => {
-        if (!availabilityData || !reservationDetails) return false;
-
-        // Check venue availability
-        if (reservationDetails.venue) {
-            const isUnavailable = availabilityData.unavailable_venues?.some(
-                venue => venue.ven_id === reservationDetails.venue.ven_id
-            );
-            console.log('Venue availability check:', {
-                requestedVenueId: reservationDetails.venue.ven_id,
-                unavailableVenues: availabilityData.unavailable_venues,
-                isUnavailable
-            });
-            if (isUnavailable) return true;
-        }
-
-        // Check vehicle availability
-        if (reservationDetails.vehicle) {
-            const isVehicleUnavailable = availabilityData.unavailable_vehicles?.some(
-                v => v.vehicle_id === reservationDetails.vehicle.vehicle_id
-            );
-            if (isVehicleUnavailable) return true;
-        }
-
-        // Check equipment availability
-        if (reservationDetails.equipment) {
-            const isEquipmentUnavailable = availabilityData.unavailable_equipment?.some(
-                e => e.equip_id === reservationDetails.equipment.equip_id
-            );
-            if (isEquipmentUnavailable) return true;
-        }
-
-        return false;
-    };
-
-    const getUnavailabilityMessage = () => {
-        const messages = [];
-        
-        if (!availabilityData) return null;
-
-        // Check driver availability first
-        if (reservationDetails.vehicle?.driver_id) {
-            const driverUnavailable = availabilityData.unavailable_drivers?.find(
-                driver => driver.driver_id === reservationDetails.vehicle.driver_id
-            );
-            if (driverUnavailable) {
-                messages.push(`Driver ${driverUnavailable.driver_full_name} is not available for the requested schedule`);
-            }
-        }
-
-        // Then check other resources
-        if (reservationDetails.venue) {
-            const venueUnavailable = availabilityData.unavailable_venues?.find(
-                v => v.ven_id === reservationDetails.venue.ven_id
-            );
-            if (venueUnavailable) {
-                messages.push(`Venue ${venueUnavailable.ven_name} is not available`);
-            }
-        }
-
-        if (reservationDetails.equipment) {
-            const equipmentUnavailable = availabilityData.unavailable_equipment?.find(
-                e => e.equip_id === reservationDetails.equipment.equip_id
-            );
-            if (equipmentUnavailable) {
-                messages.push(`Equipment ${equipmentUnavailable.equip_name} is not available`);
-            }
-        }
-
-       
-    };
+    // Determine the request type based on the response data
+    const isVenueRequest = reservationDetails.venue && reservationDetails.venue.form_name;
+    const isVehicleRequest = reservationDetails.vehicle && reservationDetails.vehicle.form_name;
 
     return (
         <Modal
@@ -732,180 +502,111 @@ const DetailModal = ({ visible, onClose, reservationDetails, availabilityData, o
                     type="primary" 
                     loading={isAccepting}
                     onClick={onAccept}
-                    disabled={!isResourceAvailable}
-                    style={{ 
-                        backgroundColor: isResourceAvailable ? '#52c41a' : '#d9d9d9',
-                        cursor: !isResourceAvailable ? 'not-allowed' : 'pointer'
-                    }}
+                    style={{ backgroundColor: '#52c41a' }}
                 >
-                    {!isResourceAvailable ? 'Resources Unavailable' : 'Reserve'}
+                    Reserve
                 </Button>,
             ]}
-            title={
-                <Space>
-                    <span>
-                        {reservationDetails.vehicle ? 
-                            `Vehicle Form: ${reservationDetails.vehicle.vehicle_form_name}` : 
-                            reservationDetails.venue ? 
-                            `Venue Form: ${reservationDetails.venue.venue_form_name}` : 
-                            'Request Details'}
-                    </span>
-                    <Badge 
-                        status={reservationDetails.status_request === 'pending' ? 'processing' : 'success'} 
-                        text={reservationDetails.status_request}
-                    />
-                </Space>
-            }
         >
-            {getUnavailabilityMessage()}
-            <Tabs defaultActiveKey="1">
-                {reservationDetails.vehicle?.vehicle_form_name && (
-                    <TabPane
-                        tab={
-                            <span>
-                                <CarOutlined />
-                                Vehicle Details
-                            </span>
-                        }
-                        key="1"
+            {isVenueRequest ? (
+                // Venue request content
+                <Descriptions bordered column={2}>
+                    <Descriptions.Item 
+                        label="Venue Name" 
+                        span={2}
                     >
-                        <Descriptions bordered column={2}>
-                            <Descriptions.Item 
-                                label={
-                                    <Space>
-                                        Vehicle Status
-                                        {getAvailabilityBadge(isVehicleAvailable(reservationDetails.vehicle.vehicle_id))}
-                                    </Space>
-                                } 
-                                span={2}
-                            >
-                                {reservationDetails.vehicle.license} - {reservationDetails.vehicle.model} {reservationDetails.vehicle.make}
-                            </Descriptions.Item>
-                            <Descriptions.Item label="Model">
-                                {reservationDetails.vehicle.model}
-                            </Descriptions.Item>
-                            <Descriptions.Item label="Make">
-                                {reservationDetails.vehicle.make}
-                            </Descriptions.Item>
-                            <Descriptions.Item label="Category" span={2}>
-                                <Tag color="blue">{reservationDetails.vehicle.category}</Tag>
-                            </Descriptions.Item>
-                            
-                            <Descriptions.Item label="Purpose" span={2}>
-                                {reservationDetails.vehicle.vehicle_form_purpose}
-                            </Descriptions.Item>
-                            <Descriptions.Item label="Destination" span={2}>
-                                <Space>
-                                    <EnvironmentOutlined />
-                                    {reservationDetails.vehicle.vehicle_form_destination}
-                                </Space>
-                            </Descriptions.Item>
-                            <Descriptions.Item label="Schedule" span={2}>
-                                <Space direction="vertical">
-                                    <CalendarOutlined />
-                                    {formatDateRange(
-                                        reservationDetails.vehicle?.vehicle_form_start_date,
-                                        reservationDetails.vehicle?.vehicle_form_end_date
-                                    )}
-                                </Space>
-                            </Descriptions.Item>
-                            <Descriptions.Item label="Driver Status" span={2}>
-                                <Space>
-                                    <UserOutlined />
-                                    {(() => {
-                                        const driverId = reservationDetails.vehicle.driver_id;
-                                        const driverName = reservationDetails.vehicle.drivers?.[0] || 'No driver assigned';
-                                        return (
-                                            <>
-                                                Driver: {driverName}
-                                                {getAvailabilityBadge(isDriverAvailable(driverId, driverName))}
-                                            </>
-                                        );
-                                    })()}
-                                </Space>
-                            </Descriptions.Item>
-                        </Descriptions>
+                        {reservationDetails.venue.venue_name}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Event Title" span={2}>
+                        {reservationDetails.venue.venue_form_event_title}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Description" span={2}>
+                        {reservationDetails.venue.venue_form_description}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Participants">
+                        <Space>
+                            <TeamOutlined />
+                            {reservationDetails.venue.venue_participants}
+                        </Space>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Schedule" span={2}>
+                        <Space direction="vertical">
+                            <CalendarOutlined />
+                            {formatDateRange(
+                                reservationDetails.venue?.venue_form_start_date,
+                                reservationDetails.venue?.venue_form_end_date
+                            )}
+                        </Space>
+                    </Descriptions.Item>
 
-                        {/* Remove the Timeline component since we're handling a single driver */}
-                    </TabPane>
-                )}
-
-                {reservationDetails.venue?.venue_form_name && (
-                    <TabPane
-                        tab={
-                            <span>
-                                <BuildOutlined />
-                                Venue Details
-                            </span>
-                        }
-                        key="2"
-                    >
-                        <Descriptions bordered column={2}>
-                            <Descriptions.Item 
-                                label={
-                                    <Space>
-                                        Venue Name
-                                        {getAvailabilityBadge(isVenueAvailable(reservationDetails.venue.ven_id))}
-                                    </Space>
-                                } 
-                                span={2}
-                            >
-                                {reservationDetails.venue.venue_name}
-                            </Descriptions.Item>
-                            <Descriptions.Item label="Event Title" span={2}>
-                                {reservationDetails.venue.venue_form_event_title}
-                            </Descriptions.Item>
-                            <Descriptions.Item label="Description" span={2}>
-                                {reservationDetails.venue.venue_form_description}
-                            </Descriptions.Item>
-                            <Descriptions.Item label="Participants">
-                                <Space>
-                                    <TeamOutlined />
-                                    {reservationDetails.venue.venue_participants}
-                                </Space>
-                            </Descriptions.Item>
-                            <Descriptions.Item label="Schedule" span={2}>
-                                <Space direction="vertical">
-                                    <CalendarOutlined />
-                                    {formatDateRange(
-                                        reservationDetails.venue?.venue_form_start_date,
-                                        reservationDetails.venue?.venue_form_end_date
-                                    )}
-                                </Space>
-                            </Descriptions.Item>
-                        </Descriptions>
-
-                        {/* Equipment section with null check */}
-                        <div className="mt-4">
-                            <Descriptions bordered column={1}>
-                                <Descriptions.Item 
-                                    label={
-                                        <Space>
-                                            <ToolOutlined />
-                                            Equipment Requested
-                                        </Space>
-                                    }
-                                >
-                                    {reservationDetails.equipment && 
-                                     reservationDetails.equipment.equip_id === null && 
-                                     reservationDetails.equipment.equipment_name === null && 
-                                     reservationDetails.equipment.reservation_equipment_quantity === null ? (
-                                        <Tag color="default">No Equipment Added</Tag>
-                                    ) : (
-                                        <>
-                                            {reservationDetails.equipment.equipment_name}
-                                            <Tag color="orange" className="ml-2">
-                                                Quantity: {reservationDetails.equipment.reservation_equipment_quantity}
+                    {/* Equipment section */}
+                    <Descriptions.Item label="Equipment Requested" span={2}>
+                        {!reservationDetails.equipment || reservationDetails.equipment.length === 0 ? (
+                            <Tag color="default">No Equipment Added</Tag>
+                        ) : (
+                            <div className="space-y-2">
+                                {Array.isArray(reservationDetails.equipment) ? (
+                                    reservationDetails.equipment.map((item, index) => (
+                                        <div key={index} className="flex items-center gap-2">
+                                            <span>{item.equipment_name}</span>
+                                            <Tag color="orange">
+                                                Quantity: {item.reservation_equipment_quantity}
                                             </Tag>
-                                            {getAvailabilityBadge(isEquipmentAvailable(reservationDetails.equipment.equip_id))}
-                                        </>
-                                    )}
-                                </Descriptions.Item>
-                            </Descriptions>
-                        </div>
-                    </TabPane>
-                )}
-            </Tabs>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <Tag color="default">Invalid Equipment Data</Tag>
+                                )}
+                            </div>
+                        )}
+                    </Descriptions.Item>
+                </Descriptions>
+            ) : isVehicleRequest ? (
+                <Descriptions bordered column={2}>
+                    <Descriptions.Item 
+                        label="Vehicle Details" 
+                        span={2}
+                    >
+                        <Tag color="blue">{reservationDetails.vehicle.license}</Tag>
+                        <Tag color="green">{reservationDetails.vehicle.model} {reservationDetails.vehicle.make}</Tag>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Category" span={2}>
+                        <Tag color="blue">{reservationDetails.vehicle.category}</Tag>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Purpose" span={2}>
+                        {reservationDetails.vehicle.vehicle_form_purpose}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Destination" span={2}>
+                        <Space>
+                            <EnvironmentOutlined />
+                            {reservationDetails.vehicle.vehicle_form_destination}
+                        </Space>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Schedule" span={2}>
+                        <Space direction="vertical">
+                            <CalendarOutlined />
+                            {formatDateRange(
+                                reservationDetails.vehicle.vehicle_form_start_date,
+                                reservationDetails.vehicle.vehicle_form_end_date
+                            )}
+                        </Space>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Assigned Driver" span={2}>
+                        <Space>
+                            <UserOutlined />
+                            {Array.isArray(reservationDetails.vehicle.drivers) && reservationDetails.vehicle.drivers.length > 0
+                                ? reservationDetails.vehicle.drivers[0]
+                                : 'No driver assigned'}
+                        </Space>
+                    </Descriptions.Item>
+                </Descriptions>
+            ) : (
+                <Alert
+                    message="Unknown Request Type"
+                    description="Could not determine the type of request."
+                    type="warning"
+                />
+            )}
         </Modal>
     );
 };

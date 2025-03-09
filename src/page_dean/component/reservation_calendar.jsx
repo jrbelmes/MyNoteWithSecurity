@@ -155,9 +155,7 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
         {
           operation: 'fetchAvailability',
           itemType: selectedResource.type,
-          itemId: selectedResource.type === 'venue' 
-            ? selectedResource.id 
-            : selectedResource.id  // Now this will be an array for vehicles
+          itemId: selectedResource.id
         },
         {
           headers: {
@@ -165,17 +163,15 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
           }
         }
       );
-  
+
       if (response.data.status === 'success') {
-        // Format reservations data, now grouping by vehicle
         const formattedReservations = response.data.data.map(res => ({
           id: res.reservation_form_venue_id || res.reservation_form_vehicle_id,
           startDate: new Date(res.reservation_form_start_date),
           endDate: new Date(res.reservation_form_end_date),
-          vehicleId: res.vehicle_id, // Add vehicle ID
-          vehicleLicense: res.vehicle_license, // Add vehicle license
-          status: res.reservation_status_status_reservation_id,
-          isReserved: res.reservation_status_status_reservation_id === '3'
+          status: res.reservation_status_status_id,
+          isReserved: res.reservation_status_status_id === '6',
+          name: res.ven_name // Venue name if available
         }));
         setReservations(formattedReservations);
       }

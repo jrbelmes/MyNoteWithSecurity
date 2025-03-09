@@ -1,11 +1,19 @@
 import React from 'react';
 import { Modal, Result } from 'antd';
+import { useNavigate } from 'react-router-dom';
 
 const NotFound = ({ isVisible, onClose }) => {
+  const navigate = useNavigate();
+
+  const handleClose = () => {
+    onClose();
+    navigate(-1);
+  };
+
   return (
     <Modal
       open={isVisible}
-      onCancel={onClose}
+      onCancel={handleClose}
       footer={null}
       closable={true}
       maskClosable={false}

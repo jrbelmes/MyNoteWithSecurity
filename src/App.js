@@ -86,12 +86,8 @@ const App = () => {
 
         if (!validPaths.includes(location.pathname)) {
             setIsNotFoundVisible(true);
-            setTimeout(() => {
-                setIsNotFoundVisible(false);
-                navigate(-1);
-            }, 2000);
         }
-    }, [location, navigate]);
+    }, [location]);
 
     return (
         <ThemeContext.Provider value={{ theme, toggleTheme }}>

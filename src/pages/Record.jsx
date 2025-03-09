@@ -83,13 +83,13 @@ const DetailModal = ({ visible, record, onClose, theme }) => {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (visible && record?.approval_id) {
+      if (visible && record?.reservation_id) {
         setIsLoading(true);
         try {
           const response = await axios.post('http://localhost/coc/gsd/records&reports.php', {
             operation: 'getReservationDetailsById',
             json: {
-              approval_id: record.approval_id
+              reservation_id: record.reservation_id
             }
           }, {
             headers: {
@@ -320,29 +320,43 @@ const Record = () => {
   };
 
   const consolidateReservations = (data) => {
-    const consolidated = data.map(item => ({
-      approval_id: item.approval_id,
-      form_name: item.venue_form_name || item.vehicle_form_name || 'N/A',
-      form_type: item.venue_form_name ? 'Venue' : item.vehicle_form_name ? 'Vehicle' : 'N/A',
-      approval_created_at: item.approval_created_at,
-      approval_status: item.approval_status,
-      reservation_status: item.reservation_status
-    }));
-    console.log('Consolidated data:', consolidated);
-    return consolidated;
+    // Group by reservation_id
+    const groupedData = data.reduce((acc, item) => {
+      if (!acc[item.reservation_id]) {
+        acc[item.reservation_id] = [];
+      }
+      acc[item.reservation_id].push(item);
+      return acc;
+    }, {});
+  
+    // Consolidate each group
+    return Object.values(groupedData).map(group => {
+      const approvedStatus = group.find(item => item.reservation_status === 'Approved');
+      const reservedStatus = group.find(item => item.reservation_status === 'Reserved');
+      const item = approvedStatus || group[0]; // Use approved status item if exists, otherwise first item
+  
+      return {
+        reservation_id: item.reservation_id,
+        form_name: item.venue_form_name || item.vehicle_form_name || 'N/A',
+        form_type: item.venue_form_name ? 'Venue' : item.vehicle_form_name ? 'Vehicle' : 'N/A',
+        created_at: item.reservation_created_at,
+        approval_status: approvedStatus ? 'Approved' : item.reservation_status,
+        reservation_status: reservedStatus ? 'Reserved' : item.reservation_status,
+        details: item.venue_details || item.vehicle_details || 'N/A'
+      };
+    });
   };
-
+  
   const columns = [
     {
-      title: 'Approval ID',
-      dataIndex: 'approval_id',
-      sorter: (a, b) => a.approval_id - b.approval_id,
+      title: 'Reservation ID',
+      dataIndex: 'reservation_id',
+      sorter: (a, b) => a.reservation_id - b.reservation_id,
     },
     {
       title: 'Form Name',
       dataIndex: 'form_name',
       sorter: (a, b) => a.form_name.localeCompare(b.form_name),
-      filterable: true,
     },
     {
       title: 'Type',
@@ -354,24 +368,35 @@ const Record = () => {
       onFilter: (value, record) => record.form_type === value,
     },
     {
+      title: 'Details',
+      dataIndex: 'details',
+      ellipsis: true,
+    },
+    {
       title: 'Created Date',
-      dataIndex: 'approval_created_at',
+      dataIndex: 'created_at',
       render: (date) => moment(date).format('MMM DD, YYYY hh:mm A'),
-      sorter: (a, b) => moment(a.approval_created_at).unix() - moment(b.approval_created_at).unix(),
+      sorter: (a, b) => moment(a.created_at).unix() - moment(b.created_at).unix(),
     },
     {
       title: 'Approval Status',
       dataIndex: 'approval_status',
+      render: (status) => (
+        <Tag color={getStatusColor(status)}>{status}</Tag>
+      ),
       filters: [
-        { text: 'Approved', value: 'approve' },
-        { text: 'Pending', value: 'pending' },
-        { text: 'Declined', value: 'decline' },
+        { text: 'Approved', value: 'Approved' },
+        { text: 'Pending', value: 'Pending' },
+        { text: 'Declined', value: 'Declined' },
       ],
       onFilter: (value, record) => record.approval_status === value,
     },
     {
       title: 'Reservation Status',
       dataIndex: 'reservation_status',
+      render: (status) => (
+        <Tag color={getStatusColor(status)}>{status}</Tag>
+      ),
       filters: [
         { text: 'Reserved', value: 'Reserved' },
         { text: 'Cancelled', value: 'Cancelled' },
