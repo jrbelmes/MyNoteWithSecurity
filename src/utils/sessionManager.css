@@ -1,0 +1,581 @@
+/* Session Manager Styles */
+
+.session-warning {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 16px 20px;
+  background: #fff;
+  color: #000;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 9999;
+  max-width: 350px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  animation: slide-in 0.3s ease-out forwards;
+  display: flex;
+  flex-direction: column;
+  border-left: 4px solid #f97316;
+}
+
+.session-warning-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.session-warning-icon {
+  background-color: #fff7ed;
+  color: #f97316;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+}
+
+.session-warning-title {
+  font-weight: 600;
+  font-size: 16px;
+  color: #1e293b;
+}
+
+.session-warning-message {
+  margin: 0 0 16px 0;
+  color: #475569;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.session-warning-timer {
+  font-weight: 700;
+  color: #f97316;
+  margin-bottom: 16px;
+  font-size: 18px;
+  text-align: center;
+}
+
+.session-warning-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-extend-session {
+  background-color: #f97316;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-extend-session:hover {
+  background-color: #ea580c;
+}
+
+.session-logout-message {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 16px 20px;
+  background: white;
+  color: #15803d;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 9999;
+  max-width: 350px;
+  font-weight: 600;
+  animation: slide-in 0.3s ease-out forwards;
+  display: flex;
+  align-items: center;
+  border-left: 4px solid #15803d;
+}
+
+.session-logout-icon {
+  color: #15803d;
+  margin-right: 12px;
+}
+
+/* New info message style */
+.session-info-message {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 16px 20px;
+  background: white;
+  color: #0284c7;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 9999;
+  max-width: 350px;
+  font-weight: 500;
+  animation: slide-in 0.3s ease-out forwards;
+  display: flex;
+  align-items: center;
+  border-left: 4px solid #0284c7;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+}
+
+.session-info-icon {
+  color: #0284c7;
+  margin-right: 12px;
+}
+
+/* Debug indicator */
+.session-debug {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  z-index: 9998;
+  max-width: 300px;
+  animation: slide-in 0.3s ease-out forwards;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  font-size: 12px;
+}
+
+.debug-header {
+  font-weight: 600;
+  color: #94a3b8;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.debug-item {
+  margin-bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.debug-item .red {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+.debug-item .green {
+  color: #10b981;
+  font-weight: 600;
+}
+
+/* Toast variant for smaller notifications */
+.session-toast {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  z-index: 9997;
+  max-width: 300px;
+  animation: slide-in-bottom 0.3s ease-out forwards;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+}
+
+.session-toast-icon {
+  margin-right: 8px;
+}
+
+@keyframes slide-in {
+  0% {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-bottom {
+  0% {
+    transform: translateY(100px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-out {
+  0% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+}
+
+/* Add to the end of the file before the keyframes */
+
+.debug-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.debug-btn {
+  background: #475569;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.debug-btn:hover {
+  background: #64748b;
+}
+
+.debug-btn.warning {
+  background: #ef4444;
+}
+
+.debug-btn.warning:hover {
+  background: #dc2626;
+}
+
+.cookie-item {
+  font-size: 10px;
+  word-break: break-all;
+  max-width: 270px;
+  opacity: 0.7;
+}
+
+/* Countdown Modal */
+.session-countdown-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+}
+
+.session-modal-content {
+  background-color: white;
+  border-radius: 8px;
+  padding: 24px;
+  width: 400px;
+  max-width: 90%;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  animation: modal-pop 0.3s ease-out forwards;
+}
+
+.session-modal-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.session-modal-icon {
+  color: #ef4444;
+  margin-right: 12px;
+}
+
+.session-modal-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.session-modal-message {
+  color: #4b5563;
+  margin-bottom: 16px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.session-modal-countdown {
+  background-color: #fee2e2;
+  color: #b91c1c;
+  padding: 12px;
+  border-radius: 6px;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 16px;
+  font-size: 16px;
+}
+
+.session-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.session-modal-button {
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  font-size: 14px;
+}
+
+.session-modal-button.primary {
+  background-color: #2563eb;
+  color: white;
+}
+
+.session-modal-button.primary:hover {
+  background-color: #1d4ed8;
+}
+
+.session-modal-button.secondary {
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+.session-modal-button.secondary:hover {
+  background-color: #e5e7eb;
+}
+
+@keyframes modal-pop {
+  0% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Session Timeout Overlay */
+.session-timeout-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+  backdrop-filter: blur(4px);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+}
+
+.session-timeout-overlay.visible {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.session-overlay-content {
+  background-color: white;
+  border-radius: 12px;
+  padding: 28px;
+  width: 420px;
+  max-width: 90%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: popup 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform: translateY(20px);
+}
+
+.session-overlay-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.session-overlay-header svg {
+  color: #dc2626;
+  margin-right: 15px;
+  flex-shrink: 0;
+}
+
+.session-overlay-header h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.session-overlay-body {
+  margin-bottom: 24px;
+}
+
+.session-overlay-body p {
+  color: #4b5563;
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.session-overlay-countdown {
+  background-color: #fee2e2;
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+#session-countdown-number {
+  font-size: 36px;
+  font-weight: 700;
+  color: #b91c1c;
+  line-height: 1;
+  margin-bottom: 5px;
+}
+
+.session-overlay-countdown span:last-child {
+  font-size: 14px;
+  color: #991b1b;
+}
+
+.session-overlay-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.session-overlay-btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.session-overlay-btn.primary {
+  background-color: #2563eb;
+  color: white;
+}
+
+.session-overlay-btn.primary:hover {
+  background-color: #1d4ed8;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.session-overlay-btn.secondary {
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+.session-overlay-btn.secondary:hover {
+  background-color: #e5e7eb;
+}
+
+/* Session Logout Notification */
+.session-logout-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background-color: white;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  transform: translateX(calc(100% + 40px));
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 9999;
+  max-width: 380px;
+  border-left: 4px solid #2563eb;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+}
+
+.session-logout-notification.show {
+  transform: translateX(0);
+}
+
+.session-logout-icon {
+  color: #2563eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.session-logout-text {
+  font-size: 15px;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+/* Session Info Notification */
+.session-info-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background-color: white;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  z-index: 9998;
+  max-width: 380px;
+  border-left: 4px solid #0ea5e9;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+}
+
+.session-info-notification.fade-out {
+  opacity: 0;
+}
+
+.session-info-icon {
+  color: #0ea5e9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.session-info-text {
+  font-size: 15px;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+@keyframes popup {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+} 
