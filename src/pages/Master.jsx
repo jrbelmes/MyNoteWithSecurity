@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { FaCar, FaPlus, FaTools, FaCogs, FaListAlt, FaEye } from 'react-icons/fa';
 import axios from 'axios';
 import Sidebar from './Sidebar';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { SecureStorage } from '../utils/encryption';
 import { sanitizeInput, validateInput } from '../utils/sanitize';
 
 const Master = () => {
@@ -33,13 +34,14 @@ const Master = () => {
   const [isSuccess, setIsSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [popupMessage, setPopupMessage] = useState('');
+  const encryptedUrl = SecureStorage.getLocalItem("url");
 
   const user_level_id = localStorage.getItem('user_level_id');
 
-  const fetchCategoriesAndMakes = async () => {
+  const fetchCategoriesAndMakes = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await axios.post('http://localhost/coc/gsd/vehicle_master.php', {
+      const response = await axios.post(`${encryptedUrl}vehicle_master.php`, {
         operation: 'fetchCategoriesAndMakes',
       });
       const data = response.data;
@@ -57,18 +59,20 @@ const Master = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [setLoading, setIsSuccess]);
 
   useEffect(() => {
     fetchCategoriesAndMakes();
-  }, []);
+  }, [fetchCategoriesAndMakes]);
 
   useEffect(() => {
-    if (user_level_id !== '1' && user_level_id !== '2' && user_level_id !== '4') {
-        localStorage.clear();
-        navigate('/gsd');
-    }
-  }, [user_level_id, navigate]);
+            const encryptedUserLevel = SecureStorage.getSessionItem("user_level_id"); 
+            console.log("this is encryptedUserLevel", encryptedUserLevel);
+            if (encryptedUserLevel !== '1' && encryptedUserLevel !== '2' && encryptedUserLevel !== '4') {
+                localStorage.clear();
+                navigate('/gsd');
+            }
+        }, [navigate]);
 
   const handleSaveData = async (operation, data) => {
     const isValid = Object.values(data).every(value => validateInput(value));
@@ -83,7 +87,7 @@ const Master = () => {
     );
 
     try {
-      const response = await axios.post('http://localhost/coc/gsd/vehicle_master.php', {
+      const response = await axios.post(`${encryptedUrl}vehicle_master.php`, {
         operation,
         json: JSON.stringify(sanitizedData),
       });

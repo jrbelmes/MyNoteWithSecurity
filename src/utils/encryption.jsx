@@ -30,8 +30,10 @@ export const SecureStorage = {
         
         try {
             const bytes = CryptoJS.AES.decrypt(encrypted, ENCRYPTION_KEY);
-            return JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
-        } catch {
+            const decryptedStr = bytes.toString(CryptoJS.enc.Utf8);
+            return JSON.parse(decryptedStr);
+        } catch (error) {
+            console.error('Error decrypting local storage value:', error);
             return null;
         }
     },

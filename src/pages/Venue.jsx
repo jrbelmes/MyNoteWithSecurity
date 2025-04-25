@@ -5,11 +5,11 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faEdit, faTrashAlt, faSearch, faPlus } from '@fortawesome/free-solid-svg-icons';
+import { faEdit, faSearch, faPlus } from '@fortawesome/free-solid-svg-icons';
 import '../vehicle.css';
 import { Modal, Input, Form, TimePicker, Select } from 'antd';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { FileUpload } from 'primereact/fileupload';
 import 'primereact/resources/themes/lara-light-indigo/theme.css';
 import 'primereact/resources/primereact.min.css';
@@ -19,15 +19,16 @@ import { Tag } from 'primereact/tag';
 import { Card } from 'primereact/card';
 import { Divider } from 'primereact/divider';
 import { sanitizeInput, validateInput } from '../utils/sanitize';
+import { SecureStorage } from '../utils/encryption';
 
 const VenueEntry = () => {
-    const adminId = localStorage.getItem('adminId') || '';
+
     const user_level_id = localStorage.getItem('user_level_id');
     const [venues, setVenues] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
-    const [entriesPerPage, setEntriesPerPage] = useState(10);
+    const [entriesPerPage] = useState(10);
     const [showModal, setShowModal] = useState(false);
     const [venueName, setVenueName] = useState('');
     const [maxOccupancy, setMaxOccupancy] = useState('');
@@ -42,15 +43,19 @@ const VenueEntry = () => {
     const [selectedStatus, setSelectedStatus] = useState('1');
     const [statusOptions, setStatusOptions] = useState([]);
     const navigate = useNavigate();
-    const user_id = localStorage.getItem('user_id');
+    const user_id = SecureStorage.getSessionItem('user_id');
     const fileUploadRef = useRef(null);
+    const encryptedUrl = SecureStorage.getLocalItem("url");
+    const encryptedUserLevel = SecureStorage.getSessionItem("user_level_id"); 
+
 
     useEffect(() => {
-        if (user_level_id !== '1' && user_level_id !== '2' && user_level_id !== '4') {
+        console.log("this is encryptedUserLevel", encryptedUserLevel);
+        if (encryptedUserLevel !== '1' && encryptedUserLevel !== '2' && encryptedUserLevel !== '4') {
             localStorage.clear();
             navigate('/gsd');
         }
-    }, [user_level_id, navigate]);
+    }, [navigate]);
 
     useEffect(() => {
         fetchVenues();
@@ -62,11 +67,8 @@ const VenueEntry = () => {
 
     const fetchVenues = async () => {
         setLoading(true);
-        const url = "http://localhost/coc/gsd/user.php";
-        const jsonData = { operation: "fetchVenue" };
-
         try {
-            const response = await axios.post(url, new URLSearchParams(jsonData));
+            const response = await axios.post(`${encryptedUrl}/user.php`, new URLSearchParams({ operation: "fetchVenue" }));
             if (response.data.status === 'success') {
                 setVenues(response.data.data);
             } else {
@@ -82,7 +84,7 @@ const VenueEntry = () => {
 
     const fetchStatusAvailability = async () => {
         try {
-            const response = await axios.post("http://localhost/coc/gsd/fetchMaster.php", 
+            const response = await axios.post(`${encryptedUrl}/fetchMaster.php`, 
                 new URLSearchParams({
                     operation: 'fetchStatusAvailability'
                 })
@@ -112,7 +114,7 @@ const VenueEntry = () => {
             formData.append('operation', 'fetchVenueById');
             formData.append('id', venueId);
     
-            const response = await axios.post("http://localhost/coc/gsd/fetchMaster.php", 
+            const response = await axios.post(`${encryptedUrl}/fetchMaster.php`, 
                 formData,
                 {
                     headers: {
@@ -140,7 +142,7 @@ const VenueEntry = () => {
                 }
                 
                 if (venue.ven_pic) {
-                    const imageUrl = `http://localhost/coc/gsd/${venue.ven_pic}`;
+                    const imageUrl = `${encryptedUrl}/${venue.ven_pic}`;
                     setPreviewUrl(imageUrl);
                 } else {
                     setPreviewUrl(null);
@@ -163,7 +165,7 @@ const VenueEntry = () => {
     };
 
     const checkVenueExists = async () => {
-        const response = await axios.post("http://localhost/coc/gsd/user.php", new URLSearchParams({
+        const response = await axios.post(`${encryptedUrl}/user.php`, new URLSearchParams({
             operation: "venueExists",
             json: JSON.stringify({ venue_name: venueName })
         }));
@@ -202,7 +204,7 @@ const VenueEntry = () => {
             }
 
             const response = await axios.post(
-                "http://localhost/coc/gsd/update_master1.php",
+                `${encryptedUrl}/update_master1.php`,
                 requestData,
                 {
                     headers: {
@@ -289,15 +291,16 @@ const VenueEntry = () => {
                         name: validatedData.name,
                         occupancy: validatedData.occupancy,
                         operating_hours: validatedData.hours,
-                        user_admin_id: user_level_id === '1' ? user_id : null,  // Set for user admin (level 1)
-                        super_admin_id: user_level_id === '4' ? user_id : null,
+                        user_admin_id: encryptedUserLevel === '1' ? user_id : null,  // Set for user admin (level 1)
                         status_availability_id: parseInt(selectedStatus),
                         ven_pic: imageBase64
                     }
                 };
 
+                console.log(requestData);
+
                 const response = await axios.post(
-                    "http://localhost/coc/gsd/insert_master.php",
+                    `${encryptedUrl}/insert_master.php`,
                     requestData,
                     {
                         headers: {
@@ -345,7 +348,7 @@ const VenueEntry = () => {
         setLoading(true);
         try {
             const response = await axios.post(
-                "http://localhost/coc/gsd/delete_master.php",
+                `${encryptedUrl}/delete_master.php`,
                 {
                     operation: "archiveResource",
                     resourceType: "venue",
@@ -405,16 +408,13 @@ const VenueEntry = () => {
         venue.ven_name && venue.ven_name.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const indexOfLastVenue = currentPage * entriesPerPage;
-    const indexOfFirstVenue = indexOfLastVenue - entriesPerPage;
-    const currentVenues = filteredVenues.slice(indexOfFirstVenue, indexOfLastVenue);
     const totalPages = Math.ceil(filteredVenues.length / entriesPerPage);
 
     const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
     const getImageUrl = (venuePic) => {
         if (!venuePic) return null;
-        return `http://localhost/coc/gsd/${venuePic}`;
+        return `${encryptedUrl}/${venuePic}`;
     };
 
     const itemTemplate = (venue) => {
@@ -653,7 +653,7 @@ const VenueEntry = () => {
                             onSelect={onFileUpload}
                             onClear={onFileRemove}
                             headerTemplate={options => {
-                                const { className, chooseButton, uploadButton, cancelButton } = options;
+                                const { className, chooseButton, } = options;
                                 return (
                                     <div className={className} style={{backgroundColor: 'transparent', display: 'flex', alignItems: 'center'}}>
                                         {chooseButton}

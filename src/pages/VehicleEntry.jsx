@@ -27,9 +27,10 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEdit, faTrashAlt, faSearch, faPlus } from '@fortawesome/free-solid-svg-icons';
 import { Modal, Form, Input, TimePicker } from 'antd'; // Add this import
 import { sanitizeInput, validateInput } from '../utils/sanitize';
+import {SecureStorage} from '../utils/encryption'; // Adjust the import path as necessary
 
 const VehicleEntry = () => {
-    const user_level_id = localStorage.getItem('user_level_id');
+    const user_level_id = SecureStorage.getSessionItem('user_level_id');
     // Add fileUploadRef before other state declarations
     const fileUploadRef = useRef(null);
     const [vehicles, setVehicles] = useState([]);

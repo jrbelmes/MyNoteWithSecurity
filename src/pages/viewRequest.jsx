@@ -7,7 +7,7 @@ import {FaCar, FaBuilding, FaTools} from 'react-icons/fa';
 import { motion } from 'framer-motion';
 import 'react-datepicker/dist/react-datepicker.css';
 import { useNavigate } from 'react-router-dom';
-import { Modal, Tabs,Tag,  Button, Alert, Table, Tooltip, Input } from 'antd';
+import { Modal, Tabs,Tag,  Button, Alert, Table, Tooltip, Input, Radio, Space } from 'antd';
 import { 
     CarOutlined, 
     BuildOutlined, 
@@ -720,6 +720,7 @@ const ReservationRequests = () => {
                         setReservationDetails(null);
                     }}
                     reservationDetails={reservationDetails}
+                    setReservationDetails={setReservationDetails}
                     onAccept={handleAccept}
                     onDecline={() => setIsDeclineModalOpen(true)}
                     isAccepting={isAccepting}
@@ -790,9 +791,102 @@ const formatDateRange = (startDate, endDate) => {
     }
 };
 
-const DetailModal = ({ visible, onClose, reservationDetails, onAccept, onDecline, isAccepting, isDeclining }) => {
-    if (!reservationDetails) return null;
+const DetailModal = ({ visible, onClose, reservationDetails, setReservationDetails, onAccept, onDecline, isAccepting, isDeclining }) => {
+    const [tripTicketApproved, setTripTicketApproved] = useState(false);
+    const encryptedUrl = SecureStorage.getLocalItem("url");
     
+    const fetchReservationDetails = async (reservationId) => {
+        try {
+            const response = await axios.post(`${encryptedUrl}/process_reservation.php`, 
+                {
+                    operation: 'fetchRequestById',  
+                    reservation_id: reservationId  
+                },
+                {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            if (response.data?.status === 'success' && response.data.data) {
+                return response.data.data;
+            }
+            return null;
+        } catch (error) {
+            console.error('Error fetching reservation details:', error);
+            toast.error('Error fetching reservation details');
+            return null;
+        }
+    };
+    
+    if (!reservationDetails) return null;
+
+    // Add trip ticket verification
+    const needsTripTicketApproval = () => {
+        if (!reservationDetails.drivers || reservationDetails.drivers.length === 0) return false;
+        const driver = reservationDetails.drivers[0];
+        
+        // Case 1: If driver and name have values but is_accepted_trip is null - No trip ticket required
+        if (driver && driver.driver_id && driver.name && driver.is_accepted_trip === null) {
+            return false;
+        }
+        
+        // Case 2: If driver and name are null but is_accepted_trip is 0 - Trip ticket required
+        if (driver && !driver.driver_id && !driver.name && driver.is_accepted_trip === "0") {
+            return true;
+        }
+        
+        // Case 3: If all values are null - No trip ticket required
+        if (driver && !driver.driver_id && !driver.name && driver.is_accepted_trip === null) {
+            return false;
+        }
+
+        // Default case
+        return false;
+    };
+
+    const hasPendingTripTicket = () => {
+        if (!reservationDetails.drivers || reservationDetails.drivers.length === 0) return false;
+        const driver = reservationDetails.drivers[0];
+        return driver.is_accepted_trip === "0";
+    };
+
+    const isTripApproved = () => {
+        if (!reservationDetails.drivers || reservationDetails.drivers.length === 0) return false;
+        const driver = reservationDetails.drivers[0];
+        return driver.is_accepted_trip === "1";
+    };
+
+    const handleTripTicketApproval = async () => {
+        try {
+            const driver = reservationDetails.drivers[0];
+            if (!driver || !driver.reservation_driver_id) {
+                throw new Error('No driver information found');
+            }
+
+            const response = await axios.post(`${encryptedUrl}/process_reservation.php`, {
+                operation: 'updateTripTicket',
+                reservation_driver_id: driver.reservation_driver_id
+            });
+
+            if (response.data?.status === 'success') {
+                toast.success('Trip ticket approved successfully');
+                setTripTicketApproved(true);
+                const updatedDetails = await fetchReservationDetails(reservationDetails.reservation_id);
+                if (updatedDetails) {
+                    setReservationDetails(updatedDetails);
+                }
+            } else {
+                throw new Error(response.data?.message || 'Failed to update trip ticket');
+            }
+        } catch (error) {
+            console.error('Trip ticket update error:', error);
+            toast.error(error.message || 'Failed to update trip ticket');
+            setTripTicketApproved(false);
+        }
+    };
+
     // Add priority checking logic
     const checkPriority = () => {
         const userPriorities = {
@@ -858,7 +952,6 @@ const DetailModal = ({ visible, onClose, reservationDetails, onAccept, onDecline
         };
     };
 
-    // Add function to check resource availability
     const checkResourceAvailability = (type, id, data) => {
         if (!data) return true;
         
@@ -879,6 +972,8 @@ const DetailModal = ({ visible, onClose, reservationDetails, onAccept, onDecline
     const getModalFooter = () => {
         if (reservationDetails.active === "0") {
             const priorityCheck = checkPriority();
+            const isDisabled = needsTripTicketApproval() ? !tripTicketApproved : hasPendingTripTicket();
+            
             return [
                 <Button key="decline" danger loading={isDeclining} onClick={(e) => {
                     e.stopPropagation();
@@ -893,7 +988,7 @@ const DetailModal = ({ visible, onClose, reservationDetails, onAccept, onDecline
                     onClick={onAccept} 
                     size="large" 
                     icon={<CheckCircleOutlined />}
-                    disabled={!priorityCheck.hasPriority}
+                    disabled={!priorityCheck.hasPriority || isDisabled}
                 >
                     Accept
                 </Button>,
@@ -1010,6 +1105,46 @@ const DetailModal = ({ visible, onClose, reservationDetails, onAccept, onDecline
 
                 {/* Main Content */}
                 <div className="p-6">
+                    {/* Trip Ticket Approval Section - Only show if there are drivers */}
+                    {reservationDetails.drivers && reservationDetails.drivers.length > 0 && (
+                        <>
+                            {needsTripTicketApproval() && (
+                                <div className="mb-6">
+                                    <Alert
+                                        message="Trip Ticket Approval Required"
+                                        description="This reservation requires trip ticket approval before it can be accepted."
+                                        type="info"
+                                        showIcon
+                                        className="mb-4"
+                                    />
+                                    <Radio.Group 
+                                        onChange={(e) => {
+                                            if (e.target.value) {
+                                                handleTripTicketApproval();
+                                            }
+                                        }} 
+                                        value={tripTicketApproved}
+                                    >
+                                        <Space direction="vertical">
+                                            <Radio value={true}>Approve Trip Ticket</Radio>
+                                        </Space>
+                                    </Radio.Group>
+                                </div>
+                            )}
+
+                            {isTripApproved() && (
+                                <div className="mb-6">
+                                    <Alert
+                                        message="Trip Ticket Status"
+                                        description="Trip ticket has been approved."
+                                        type="success"
+                                        showIcon
+                                    />
+                                </div>
+                            )}
+                        </>
+                    )}
+
                     {/* Priority and Existing Reservations Section - Moved to Top */}
                     {reservationDetails.active === "0" && (
                         <div className="mb-6 space-y-4">
@@ -1026,57 +1161,74 @@ const DetailModal = ({ visible, onClose, reservationDetails, onAccept, onDecline
                                 className="border border-gray-200 shadow-sm"
                             />
                             
-                            {/* Existing Reservations */}
-                            {reservationDetails.availabilityData?.reservation_users && 
-                             reservationDetails.availabilityData.reservation_users.length > 0 && (
-                                <div className="bg-white p-4 rounded-lg border border-red-200 shadow-sm">
-                                    <h2 className="text-xl font-semibold text-red-800 mb-4 flex items-center gap-2">
-                                        <InfoCircleOutlined className="text-red-600" />
-                                        Existing Reservations
-                                    </h2>
-                                    
-                                    <div className="space-y-4">
-                                        {reservationDetails.availabilityData.reservation_users.map((user, index) => (
-                                            <div key={index} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                                                <div className="flex justify-between items-start">
-                                                    <div>
-                                                        <p className="text-sm text-gray-500">Reserved by: {user.full_name}</p>
-                                                        <p className="text-sm text-gray-500">Department: {user.departments_name}</p>
-                                                        <p className="text-sm text-gray-500">Role: {user.user_level_name}</p>
-                                                    </div>
-                                                    <Tag color="blue">
-                                                        Priority: High
-                                                    </Tag>
-                                                </div>
-
-                                                <div className="mt-3">
-                                                        <h4 className="font-medium text-gray-800">
-                                                            Reservation Title: {user.reservation_title || 'Untitled Reservation'}
-                                                        </h4>
-                                                        <h4>Reservation Description: {user.reservation_description}</h4>
-                                                </div>
-
-                                                <div className="mt-3 pt-3 border-t border-gray-100">
-                                                    <div className="grid grid-cols-2 gap-4">
+                            {/* Existing Reservations - Only show if there are actual resource conflicts */}
+                            {(() => {
+                                const hasVenueConflict = reservationDetails.venues?.some(requestedVenue => 
+                                    reservationDetails.availabilityData?.unavailable_venues?.some(unavailableVenue => 
+                                        requestedVenue.venue_id === unavailableVenue.ven_id
+                                    )
+                                );
+                                const hasVehicleConflict = reservationDetails.vehicles?.some(requestedVehicle => 
+                                    reservationDetails.availabilityData?.unavailable_vehicles?.some(unavailableVehicle => 
+                                        requestedVehicle.vehicle_id === unavailableVehicle.vehicle_id
+                                    )
+                                );
+                                const hasEquipmentConflict = reservationDetails.equipment?.some(requestedEquipment => 
+                                    reservationDetails.availabilityData?.unavailable_equipment?.some(unavailableEquipment => 
+                                        requestedEquipment.equipment_id === unavailableEquipment.equip_id
+                                    )
+                                );
+                                const hasResourceConflicts = hasVenueConflict || hasVehicleConflict || hasEquipmentConflict;
+                                return hasResourceConflicts && reservationDetails.availabilityData?.reservation_users?.length > 0 && (
+                                    <div className="bg-white p-4 rounded-lg border border-red-200 shadow-sm">
+                                        <h2 className="text-xl font-semibold text-red-800 mb-4 flex items-center gap-2">
+                                            <InfoCircleOutlined className="text-red-600" />
+                                            Existing Reservations
+                                        </h2>
+                                        
+                                        <div className="space-y-4">
+                                            {reservationDetails.availabilityData.reservation_users.map((user, index) => (
+                                                <div key={index} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                                    <div className="flex justify-between items-start">
                                                         <div>
-                                                            <p className="text-xs text-gray-500">Start Time</p>
-                                                            <p className="font-medium">
-                                                                {new Date(user.reservation_start_date).toLocaleString()}
-                                                            </p>
+                                                            <p className="text-sm text-gray-500">Reserved by: {user.full_name}</p>
+                                                            <p className="text-sm text-gray-500">Department: {user.departments_name}</p>
+                                                            <p className="text-sm text-gray-500">Role: {user.user_level_name}</p>
                                                         </div>
-                                                        <div>
-                                                            <p className="text-xs text-gray-500">End Time</p>
-                                                            <p className="font-medium">
-                                                                {new Date(user.reservation_end_date).toLocaleString()}
-                                                            </p>
+                                                        <Tag color="blue">
+                                                            Priority: High
+                                                        </Tag>
+                                                    </div>
+
+                                                    <div className="mt-3">
+                                                            <h4 className="font-medium text-gray-800">
+                                                                Reservation Title: {user.reservation_title || 'Untitled Reservation'}
+                                                            </h4>
+                                                            <h4>Reservation Description: {user.reservation_description}</h4>
+                                                    </div>
+
+                                                    <div className="mt-3 pt-3 border-t border-gray-100">
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            <div>
+                                                                <p className="text-xs text-gray-500">Start Time</p>
+                                                                <p className="font-medium">
+                                                                    {new Date(user.reservation_start_date).toLocaleString()}
+                                                                </p>
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-xs text-gray-500">End Time</p>
+                                                                <p className="font-medium">
+                                                                    {new Date(user.reservation_end_date).toLocaleString()}
+                                                                </p>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            ))}
+                                        </div>
                                     </div>
-                                </div>
-                            )}
+                                );
+                            })()}
                         </div>
                     )}
 
@@ -1147,8 +1299,26 @@ const DetailModal = ({ visible, onClose, reservationDetails, onAccept, onDecline
                                     {reservationDetails.vehicles?.length > 0 && (
                                         <Table 
                                             title={() => "Vehicles"}
-                                            dataSource={reservationDetails.vehicles} 
-                                            columns={columns.vehicle}
+                                            dataSource={reservationDetails.vehicles.map(vehicle => ({
+                                                ...vehicle,
+                                                driver: reservationDetails.drivers?.[0]?.name || 'No driver assigned'
+                                            }))} 
+                                            columns={[
+                                                ...columns.vehicle,
+                                                {
+                                                    title: 'Driver',
+                                                    dataIndex: 'driver',
+                                                    key: 'driver',
+                                                    render: (text) => (
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center">
+                                                                <UserOutlined className="mr-2 text-blue-500" />
+                                                                <span className="font-medium">{text}</span>
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                }
+                                            ]}
                                             pagination={false}
                                             size="small"
                                         />

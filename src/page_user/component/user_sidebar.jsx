@@ -3,44 +3,42 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   FaSignOutAlt, FaTachometerAlt, FaCar, FaCog, FaFileAlt, FaHeadset,
   FaChevronDown, FaBars, FaHome, FaTools, FaUserCircle, FaFolder,
-  FaCalendarAlt, FaChartBar
+  FaCalendarAlt, FaChartBar, FaArchive, FaChevronRight, FaTimes,
+  FaComments, FaCogs, FaBell, FaSearch, FaEllipsisV, FaChevronUp,
+  FaAngleRight, FaAngleLeft
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Popover, Transition } from '@headlessui/react';
 import { format } from 'date-fns';
-import { Popover } from '@headlessui/react';
-import ProfileModal from './user_profile';  // Add this import
+import ProfileModal from './user_profile';
 import { clearAllExceptLoginAttempts } from '../../utils/loginAttempts';
+import { SecureStorage } from '../../utils/encryption';
 
 const SidebarContext = createContext();
-
-const sidebarVariants = {
-  open: { width: '16rem' },
-  closed: { width: '4rem' },
-};
 
 const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [activeItem, setActiveItem] = useState('');
-  const [isSidebarOpen, setSidebarOpen] = useState(true);
+  const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(true);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const savedMode = localStorage.getItem('darkMode');
     return savedMode ? JSON.parse(savedMode) : false;
   });
-  const [currentTime, setCurrentTime] = useState(new Date());
   const [searchQuery, setSearchQuery] = useState('');
-  const [notifications, setNotifications] = useState([]);
-  const [showUserMenu, setShowUserMenu] = useState(false);
-  const [systemStatus, setSystemStatus] = useState('online');
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [unreadMessages, setUnreadMessages] = useState(0);
 
-  const name = localStorage.getItem('name') || 'Admin User';
+  const name = SecureStorage.getSessionItem('name') || 'User';
   const user_level_id = localStorage.getItem('user_level_id');
 
   useEffect(() => {
     setActiveItem(location.pathname);
     const handleResize = () => {
-      setSidebarOpen(window.innerWidth >= 768);
+      if (window.innerWidth >= 1024) {
+        setIsMobileSidebarOpen(false);
+      }
     };
     window.addEventListener('resize', handleResize);
     handleResize();
@@ -52,14 +50,8 @@ const Sidebar = () => {
     localStorage.setItem('darkMode', JSON.stringify(isDarkMode));
   }, [isDarkMode]);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const toggleSidebar = () => setSidebarOpen(!isSidebarOpen);
+  const toggleDesktopSidebar = () => setIsDesktopSidebarOpen(!isDesktopSidebarOpen);
+  const toggleMobileSidebar = () => setIsMobileSidebarOpen(!isMobileSidebarOpen);
   const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
 
   const handleLogout = () => {
@@ -68,210 +60,386 @@ const Sidebar = () => {
     window.location.reload();
   };
 
-  const contextValue = useMemo(() => ({ isSidebarOpen }), [isSidebarOpen]);
+  const contextValue = useMemo(() => ({ isDesktopSidebarOpen }), [isDesktopSidebarOpen]);
 
-  const formattedTime = format(currentTime, 'h:mm:ss a');
-  const formattedDate = format(currentTime, 'EEEE, MMMM d, yyyy');
+  useEffect(() => {
+    const fetchUnreadMessages = async () => {
+      try {
+        const response = await fetch('http://localhost/coc/gsd/fetchMaster.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            operation: 'getUnreadMessages',
+            user_id: localStorage.getItem('user_id')
+          })
+        });
+        
+        const data = await response.json();
+        if (data.status === 'success') {
+          setUnreadMessages(data.count);
+        }
+      } catch (error) {
+        console.error('Error fetching unread messages:', error);
+      }
+    };
+
+    fetchUnreadMessages();
+    const interval = setInterval(fetchUnreadMessages, 30000); // Check every 30 seconds
+    
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <SidebarContext.Provider value={contextValue}>
-      <div className={`flex h-screen ${isDarkMode ? 'dark' : ''}`}>
-        <motion.aside
-          initial="open"
-          animate={isSidebarOpen ? "open" : "closed"}
-          variants={sidebarVariants}
-          transition={{ duration: 0.3, type: 'tween' }}
-          className={`fixed md:relative h-full bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 shadow-xl flex flex-col z-40 ${
-            isSidebarOpen ? 'w-64' : 'w-16'
-          } transition-all duration-300 ease-in-out`}
-        >
-          <div className="flex items-center justify-between p-4 border-b border-green-200">
-            <AnimatePresence>
-              {isSidebarOpen && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="flex items-center space-x-3"
-                >
-                  <img src="/images/assets/phinma.png" alt="GSD Logo" className="w-8 h-8" />
-                  <span className="font-semibold text-lg text-green-600">GSD Portal</span>
-                </motion.div>
-              )}
-            </AnimatePresence>
-            <button onClick={toggleSidebar} className="text-green-600 hover:text-green-700">
-              <FaBars />
+      <div className={`flex flex-col h-screen ${isDarkMode ? 'dark' : ''}`}>
+        {/* Mobile Header */}
+        <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-3 fixed top-0 left-0 right-0 z-30 lg:hidden flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <button onClick={toggleMobileSidebar} className="text-green-600 dark:text-green-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+              <FaBars size={20} />
             </button>
+            <div className="flex items-center">
+              <img src="/images/assets/phinma.png" alt="Logo" className="w-8 h-8" />
+              <span className="ml-2 font-bold text-green-600 dark:text-green-400">GSD Portal</span>
+            </div>
           </div>
 
-          {isSidebarOpen && (
-            <div className="px-4 py-3 border-b border-green-200 bg-green-50">
-              <div className="text-lg font-bold text-green-600">{formattedTime}</div>
-              <div className="text-sm text-green-500">{formattedDate}</div>
-            </div>
-          )}
+          <div className="flex items-center space-x-3">
+            <HeaderUserMenu name={name} handleLogout={handleLogout} />
+          </div>
+        </header>
 
-          <div className="flex-grow overflow-y-auto">
-            <nav className="mt-5 px-2">
-              <SidebarItem icon={FaTachometerAlt} text="Dashboard" link="/dashboard" active={activeItem === '/dashboard'} />
-              <SidebarItem icon={FaCar} text="Make Reservation" link="/addReservation" active={activeItem === '/addReservation'} />
-              <SidebarItem icon={FaFileAlt} text="View Reservations" link="/viewReserve" active={activeItem === '/viewReserve'} />
+        {/* Sidebar Overlay for Mobile */}
+        <AnimatePresence>
+          {isMobileSidebarOpen && (
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 0.5 }} 
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black z-30 lg:hidden"
+              onClick={toggleMobileSidebar}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Main Content Area */}
+        <div className="flex flex-1 pt-[60px] lg:pt-0">
+          {/* Desktop Sidebar */}
+          <div className={`hidden lg:flex lg:flex-col h-screen bg-white dark:bg-gray-900 shadow-lg z-40 transition-all duration-300 ${
+            isDesktopSidebarOpen ? 'w-64' : 'w-16'
+          }`}>
+            {/* Sidebar Header */}
+            <div className={`flex items-center justify-between p-4 border-b border-green-100 dark:border-green-800 ${
+              !isDesktopSidebarOpen && 'justify-center'
+            }`}>
+              {isDesktopSidebarOpen ? (
+                <>
+                  <div className="flex items-center space-x-2">
+                    <img src="/images/assets/phinma.png" alt="Logo" className="w-8 h-8" />
+                    <span className="font-bold text-green-600 dark:text-green-400">GSD Portal</span>
+                  </div>
+                  <button onClick={toggleDesktopSidebar} className="text-green-600 dark:text-green-400 p-1 rounded-full hover:bg-green-50 dark:hover:bg-green-900">
+                    <FaAngleLeft size={16} />
+                  </button>
+                </>
+              ) : (
+                <button onClick={toggleDesktopSidebar} className="text-green-600 dark:text-green-400 p-1 rounded-full hover:bg-green-50 dark:hover:bg-green-900">
+                  <FaAngleRight size={16} />
+                </button>
+              )}
+            </div>
+
+            {/* Search Input - Only show when expanded */}
+            {isDesktopSidebarOpen && (
+              <div className="px-4 my-3">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search..."
+                    className="w-full bg-gray-100 dark:bg-gray-800 rounded-lg py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                  <FaSearch className="absolute left-3 top-2.5 text-gray-400" size={14} />
+                </div>
+              </div>
+            )}
+
+            {/* Navigation */}
+            <nav className={`flex-grow overflow-y-auto ${isDesktopSidebarOpen ? 'px-3' : 'px-2'} py-1 space-y-1`}>
+              <MiniSidebarItem 
+                icon={FaTachometerAlt} 
+                text="Dashboard" 
+                link="/dashboard" 
+                active={activeItem === '/dashboard'}
+                isExpanded={isDesktopSidebarOpen}
+              />
+
+              <MiniSidebarItem 
+                icon={FaCar} 
+                text="Make Reservation" 
+                link="/addReservation" 
+                active={activeItem === '/addReservation'}
+                isExpanded={isDesktopSidebarOpen}
+              />
+
+              <MiniSidebarItem 
+                icon={FaFileAlt} 
+                text="My Reservations" 
+                link="/viewReserve" 
+                active={activeItem === '/viewReserve'}
+                isExpanded={isDesktopSidebarOpen}
+              />
+
+              <MiniSidebarItem 
+                icon={FaComments} 
+                text="Chat" 
+                link="/chat" 
+                active={activeItem === '/chat'}
+                badge={unreadMessages}
+                isExpanded={isDesktopSidebarOpen}
+              />
+
+              {isDesktopSidebarOpen && <SectionLabel text="Account" />}
+
+              <MiniSidebarItem 
+                icon={FaCogs} 
+                text="Account Settings" 
+                link="/settings" 
+                active={activeItem === '/settings'}
+                isExpanded={isDesktopSidebarOpen}
+              />
+            </nav>
+
+            {/* User Profile */}
+            <div className="mt-auto border-t border-gray-200 dark:border-gray-800">
+              <Popover className="relative w-full">
+                {({ open }) => (
+                  <>
+                    <Popover.Button className={`w-full p-3 flex items-center ${isDesktopSidebarOpen ? 'justify-between' : 'justify-center'} hover:bg-green-50 dark:hover:bg-green-900/20`}>
+                      {isDesktopSidebarOpen ? (
+                        <>
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-800 flex items-center justify-center">
+                              <FaUserCircle className="text-green-600 dark:text-green-300" />
+                            </div>
+                            <div className="text-left">
+                              <p className="font-medium text-sm">{name}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">User</p>
+                            </div>
+                          </div>
+                          <FaChevronDown className={`text-gray-400 transform ${open ? 'rotate-180' : ''}`} size={14} />
+                        </>
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-800 flex items-center justify-center">
+                          <FaUserCircle className="text-green-600 dark:text-green-300" />
+                        </div>
+                      )}
+                    </Popover.Button>
+                    <Transition
+                      show={open}
+                      as={React.Fragment}
+                      enter="transition ease-out duration-200"
+                      enterFrom="opacity-0 translate-y-1"
+                      enterTo="opacity-100 translate-y-0"
+                      leave="transition ease-in duration-150"
+                      leaveFrom="opacity-100 translate-y-0"
+                      leaveTo="opacity-0 translate-y-1"
+                    >
+                      <Popover.Panel className="absolute bottom-full left-0 w-full mb-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5">
+                        <div className="p-3 border-b border-gray-100 dark:border-gray-700">
+                          <p className="font-medium text-sm">{name}</p>
+                          <p className="text-xs text-gray-500">User</p>
+                        </div>
+                        <div className="p-2">
+                          <button
+                            onClick={() => setShowProfileModal(true)}
+                            className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+                          >
+                            Profile
+                          </button>
+                          <button
+                            onClick={handleLogout}
+                            className="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md"
+                          >
+                            Logout
+                          </button>
+                        </div>
+                      </Popover.Panel>
+                    </Transition>
+                  </>
+                )}
+              </Popover>
+            </div>
+          </div>
+
+          {/* Mobile Sidebar */}
+          {/* Mobile sidebar content - similar to desktop but optimized for mobile */}
+          <div className={`fixed lg:hidden h-[calc(100vh-60px)] bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 shadow-lg z-40 w-72 transition-transform duration-300 flex flex-col ${
+            isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}>
+            {/* Mobile navigation content here */}
+            <nav className="flex-grow overflow-y-auto px-3 py-1 space-y-1">
+              <SidebarItem 
+                icon={FaTachometerAlt} 
+                text="Dashboard" 
+                link="/dashboard" 
+                active={activeItem === '/dashboard'} 
+              />
+              
+              <SidebarItem 
+                icon={FaCar} 
+                text="Make Reservation" 
+                link="/addReservation" 
+                active={activeItem === '/addReservation'} 
+              />
+
+              <SidebarItem 
+                icon={FaFileAlt} 
+                text="View Reservations" 
+                link="/viewReserve" 
+                active={activeItem === '/viewReserve'} 
+              />
+
+              <SidebarItem 
+                icon={FaComments} 
+                text="Chat" 
+                link="/chat" 
+                active={activeItem === '/chat'} 
+                badge={unreadMessages}
+              />
+              
+              <SectionLabel text="Account" />
+              
+              <SidebarItem 
+                icon={FaCogs} 
+                text="Settings" 
+                link="/settings" 
+                active={activeItem === '/settings'} 
+              />
             </nav>
           </div>
 
-          <div className="border-t border-green-200 p-4">
-            <Popover className="relative">
-              <Popover.Button className="flex items-center space-x-3 w-full hover:bg-green-50 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
-                <FaUserCircle className="text-2xl text-green-600" />
-                {isSidebarOpen && (
-                  <div className="flex-1 text-left">
-                    <p className="font-medium text-gray-700">{name}</p>
-                    <p className="text-sm text-gray-500">Faculty</p>
-                  </div>
-                )}
-              </Popover.Button>
-
-              <Popover.Panel className="absolute bottom-full left-0 w-full mb-2">
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden"
-                >
-                  <div className="p-4 border-b border-gray-200 bg-green-50">
-                    <p className="font-semibold text-green-600">{name}</p>
-                    <p className="text-sm text-gray-500">Administrator</p>
-                  </div>
-                  
-                  <div className="p-2">
-                    <button 
-                      onClick={() => setShowProfileModal(true)}
-                      className="w-full text-left px-4 py-2 hover:bg-green-50 text-gray-700 rounded flex items-center space-x-2"
-                    >
-                      <FaUserCircle />
-                      <span>Profile</span>
-                    </button>
-                    
-                    <button
-                      onClick={handleLogout}
-                      className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 rounded flex items-center space-x-2"
-                    >
-                      <FaSignOutAlt />
-                      <span>Logout</span>
-                    </button>
-                  </div>
-                </motion.div>
-              </Popover.Panel>
-            </Popover>
-          </div>
-          <ProfileModal 
-            visible={showProfileModal} 
-            onClose={() => setShowProfileModal(false)}
-          />
-        </motion.aside>
+          {/* Content will be rendered here */}
+          <main className={`flex-1 bg-gray-50 dark:bg-gray-800 min-h-screen overflow-x-hidden transition-all duration-300 ${
+            !isDesktopSidebarOpen ? 'pl-0' : 'lg:pl-0'
+          }`}>
+            {/* Content will be rendered here */}
+          </main>
+        </div>
       </div>
+      {showProfileModal && (
+        <ProfileModal 
+          visible={showProfileModal} 
+          onClose={() => setShowProfileModal(false)}
+        />
+      )}
     </SidebarContext.Provider>
   );
 };
 
-// Memoize the SidebarItem component
-const SidebarItem = React.memo(({ icon: Icon, text, link, active }) => {
-  const { isSidebarOpen } = useContext(SidebarContext);
-  
+// Header User Menu Component
+const HeaderUserMenu = ({ name, handleLogout }) => {
+  return (
+    <Popover className="relative">
+      {({ open }) => (
+        <>
+          <Popover.Button className="flex items-center justify-center h-9 w-9 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-green-100 dark:hover:bg-green-800/50">
+            <FaUserCircle size={20} className="text-gray-600 dark:text-gray-300" />
+          </Popover.Button>
+
+          <Transition
+            show={open}
+            as={React.Fragment}
+            enter="transition ease-out duration-200"
+            enterFrom="opacity-0 translate-y-1"
+            enterTo="opacity-100 translate-y-0"
+            leave="transition ease-in duration-150"
+            leaveFrom="opacity-100 translate-y-0"
+            leaveTo="opacity-0 translate-y-1"
+          >
+            <Popover.Panel className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-lg bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black ring-opacity-5">
+              <div className="p-3 border-b border-gray-100 dark:border-gray-700">
+                <p className="font-medium text-sm">{name}</p>
+                <p className="text-xs text-gray-500">User</p>
+              </div>
+              <div className="p-2">
+                <button
+                  onClick={handleLogout}
+                  className="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md"
+                >
+                  Logout
+                </button>
+              </div>
+            </Popover.Panel>
+          </Transition>
+        </>
+      )}
+    </Popover>
+  );
+};
+
+// Section Label Component
+const SectionLabel = ({ text }) => (
+  <div className="pt-3 pb-1">
+    <p className="px-2 text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+      {text}
+    </p>
+  </div>
+);
+
+// Sidebar Item Components
+const SidebarItem = React.memo(({ icon: Icon, text, link, active, badge }) => {
   return (
     <Link 
       to={link} 
-      className={`flex items-center space-x-3 p-2 rounded-lg transition-colors ${
-        active ? 'bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-200' : 
-        'text-gray-600 dark:text-gray-300 hover:bg-green-50 dark:hover:bg-green-900 hover:text-green-600 dark:hover:text-green-300'
+      className={`flex items-center justify-between p-2.5 rounded-lg transition-all ${
+        active 
+          ? 'bg-green-100 dark:bg-green-800/50 text-green-700 dark:text-green-200 font-medium' 
+          : 'text-gray-600 dark:text-gray-300 hover:bg-green-50 dark:hover:bg-green-900/30 hover:text-green-600'
       }`}
-      aria-current={active ? 'page' : undefined}
     >
-      <Icon className={`text-xl ${active ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500'}`} />
-      <AnimatePresence>
-        {isSidebarOpen && (
-          <motion.span
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="font-medium"
-          >
-            {text}
-          </motion.span>
-        )}
-      </AnimatePresence>
+      <div className="flex items-center space-x-3">
+        <Icon size={16} className={active ? 'text-green-600 dark:text-green-400' : 'text-gray-400'} />
+        <span className="text-sm">{text}</span>
+      </div>
+      {badge && (
+        <span className="px-1.5 py-0.5 text-xs font-bold text-red-100 bg-red-500 rounded-full">
+          {badge}
+        </span>
+      )}
     </Link>
   );
 });
 
-// Memoize the SidebarDropdown component
-const SidebarDropdown = React.memo(({ icon: Icon, text, active, children }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const { isSidebarOpen } = useContext(SidebarContext);
-
-  return (
-    <div>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`w-full flex items-center justify-between p-2 rounded-lg transition-colors ${
-          active ? 'bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-200' : 
-          'text-gray-600 dark:text-gray-300 hover:bg-green-50 dark:hover:bg-green-900 hover:text-green-600 dark:hover:text-green-300'
-        }`}
-        aria-expanded={isOpen}
-      >
-        <div className="flex items-center space-x-3">
-          <Icon className={`text-xl ${active ? 'text-green-600' : 'text-gray-400'}`} />
-          <AnimatePresence>
-            {isSidebarOpen && (
-              <motion.span
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="font-medium"
-              >
-                {text}
-              </motion.span>
-            )}
-          </AnimatePresence>
-        </div>
-        <FaChevronDown className={`transition-transform ${isOpen ? 'rotate-180' : ''} text-gray-400`} />
-      </button>
-      {isOpen && (
-        <div className="ml-4 mt-2 space-y-2" role="menu">
-          {children}
-        </div>
-      )}
-    </div>
-  );
-});
-
-// Memoize the SidebarSubItem component
-const SidebarSubItem = React.memo(({ icon: Icon, text, link, active }) => {
-  const { isSidebarOpen } = useContext(SidebarContext);
-  
+// Mini Sidebar Item
+const MiniSidebarItem = React.memo(({ icon: Icon, text, link, active, isExpanded, badge }) => {
   return (
     <Link 
       to={link} 
-      className={`flex items-center space-x-3 p-2 rounded-lg transition-colors ${
-        active ? 'bg-green-50 dark:bg-green-900 text-green-600 dark:text-green-300' : 
-        'text-gray-500 dark:text-gray-400 hover:bg-green-50 dark:hover:bg-green-900 hover:text-green-600 dark:hover:text-green-300'
+      className={`flex items-center ${isExpanded ? 'justify-between p-2.5' : 'justify-center p-2'} rounded-lg transition-all ${
+        active 
+          ? 'bg-green-100 dark:bg-green-800/50 text-green-700 dark:text-green-200 font-medium' 
+          : 'text-gray-600 dark:text-gray-300 hover:bg-green-50 dark:hover:bg-green-900/30 hover:text-green-600'
       }`}
-      role="menuitem"
-      aria-current={active ? 'page' : undefined}
+      title={!isExpanded ? text : undefined}
     >
-      <Icon className={`text-sm ${active ? 'text-green-500' : 'text-gray-400'}`} />
-      <AnimatePresence>
-        {isSidebarOpen && (
-          <motion.span
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="text-sm"
-          >
-            {text}
-          </motion.span>
-        )}
-      </AnimatePresence>
+      <div className={`flex items-center ${isExpanded ? 'space-x-3' : ''}`}>
+        <Icon size={16} className={active ? 'text-green-600 dark:text-green-400' : 'text-gray-400'} />
+        {isExpanded && <span className="text-sm">{text}</span>}
+      </div>
+      
+      {badge && isExpanded && (
+        <span className="px-1.5 py-0.5 text-xs font-bold text-red-100 bg-red-500 rounded-full">
+          {badge}
+        </span>
+      )}
+      
+      {badge && !isExpanded && (
+        <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
+      )}
     </Link>
   );
 });

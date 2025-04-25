@@ -41,4 +41,19 @@ const secureSessionStorage = {
   },
 };
 
+export const getSecureUserData = () => {
+    try {
+        const userId = secureSessionStorage.getItem('user_id');
+        if (!userId) {
+            throw new Error('User ID not found in session');
+        }
+        return userId;
+    } catch (error) {
+        console.error('Failed to retrieve user ID:', error);
+        // Clear any potentially corrupted data
+        secureSessionStorage.removeItem('user_id');
+        throw error;
+    }
+};
+
 export default secureSessionStorage;

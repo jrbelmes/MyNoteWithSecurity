@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Sidebar from './Sidebar';  // Add this import
+import { SecureStorage } from '../utils/encryption'; // Adjust the import path as necessary
 
 const AssignPersonnel = () => {
   const [activeTab, setActiveTab] = useState('Not Assigned');
@@ -18,9 +20,94 @@ const AssignPersonnel = () => {
 
   const [isChecklistModalOpen, setIsChecklistModalOpen] = useState(false);
   const [selectedChecklists, setSelectedChecklists] = useState([]);
+  const navigate = useNavigate();
+  const encryptedUrl = SecureStorage.getLocalItem("url");
 
-  const handleOpenModal = (reservation) => {
-    setSelectedReservation(reservation);
+  useEffect(() => {
+    const encryptedUserLevel = SecureStorage.getSessionItem("user_level_id"); 
+    console.log("this is encryptedUserLevel", encryptedUserLevel);
+    if (encryptedUserLevel !== '1' && encryptedUserLevel !== '2' && encryptedUserLevel !== '4') {
+      localStorage.clear();
+      navigate('/gsd');
+    }
+  }, [navigate]);
+
+  const handleOpenModal = async (reservation) => {
+    try {
+      const response = await axios.post(`${encryptedUrl}fetch2.php`, {
+        operation: 'getReservedById',
+        reservation_id: reservation.id
+      });
+
+      if (response.data.status === 'success') {
+        const { data } = response.data;
+        let checklists = [];
+        
+        // Process venues
+        if (data.venues && data.venues.length > 0) {
+          data.venues.forEach(venue => {
+            if (venue.checklists && venue.checklists.length > 0) {
+              const venueItems = venue.checklists.map(item => ({
+                id: item.checklist_venue_id,
+                name: item.checklist_name,
+                type: 'venue',
+                reservation_venue_id: venue.reservation_venue_id
+              }));
+              checklists.push({
+                category: `Venue: ${venue.name}`,
+                items: venueItems
+              });
+            }
+          });
+        }
+
+        // Process equipment
+        if (data.equipments && data.equipments.length > 0) {
+          data.equipments.forEach(equipment => {
+            if (equipment.checklists && equipment.checklists.length > 0) {
+              const equipmentItems = equipment.checklists.map(item => ({
+                id: item.checklist_equipment_id,
+                name: item.checklist_name,
+                type: 'equipment',
+                reservation_equipment_id: equipment.reservation_equipment_id
+              }));
+              checklists.push({
+                category: `Equipment: ${equipment.name} (Qty: ${equipment.quantity})`,
+                items: equipmentItems
+              });
+            }
+          });
+        }
+
+        // Process vehicles
+        if (data.vehicles && data.vehicles.length > 0) {
+          data.vehicles.forEach(vehicle => {
+            if (vehicle.checklists && vehicle.checklists.length > 0) {
+              const vehicleItems = vehicle.checklists.map(item => ({
+                id: item.checklist_vehicle_id,
+                name: item.checklist_name,
+                type: 'vehicle',
+                reservation_vehicle_id: vehicle.reservation_vehicle_id
+              }));
+              checklists.push({
+                category: `Vehicle: ${vehicle.name}`,
+                items: vehicleItems
+              });
+            }
+          });
+        }
+
+        setSelectedReservation(reservation);
+        setFormData({
+          personnel: '',
+          checklists: checklists
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching reservation details:', error);
+      setFormData({ personnel: '', checklists: [] });
+    }
+
     setIsModalOpen(true);
   };
 
@@ -144,6 +231,7 @@ const AssignPersonnel = () => {
       return;
     }
 
+
     // Submit the release based on the reservation type
     await handleSubmitRelease(
       selectedReservation.id,
@@ -151,11 +239,79 @@ const AssignPersonnel = () => {
       formData.checklists,
       selectedReservation.type
     );
+
+    try {
+      const checklistIds = [];
+
+      formData.checklists.forEach(category => {
+        category.items.forEach(item => {
+          const entry = {
+            type: item.type,
+            checklist_id: item.id
+          };
+
+          switch (item.type) {
+            case 'venue':
+              entry.reservation_venue_id = item.reservation_venue_id;
+              break;
+            case 'equipment':
+              entry.reservation_equipment_id = item.reservation_equipment_id;
+              break;
+            case 'vehicle':
+              entry.reservation_vehicle_id = item.reservation_vehicle_id;
+              break;
+            default:
+              console.warn(`Unexpected checklist type: ${item.type}`);
+              break;
+          }
+
+          checklistIds.push(entry);
+        });
+      });
+
+      const payload = {
+        operation: 'saveChecklist',
+        data: {
+          admin_id: localStorage.getItem("user_id"),
+          personnel_id: selectedPersonnelObj.users_id,
+          checklist_ids: checklistIds
+        }
+      };
+
+      const response = await axios.post(`${encryptedUrl}fetch2.php`, payload);
+
+      if (response.data.status === 'success') {
+        setReservations(prev => 
+          prev.map(res => 
+            res.id === selectedReservation.id ? {
+              ...res,
+              personnel: formData.personnel,
+              status: 'Assigned'
+            } : res
+          )
+        );
+        
+        setIsModalOpen(false);
+        setFormData({ personnel: '', checklists: [] });
+        setSelectedReservation(null);
+        setErrorMessage('');
+
+        if (activeTab === 'Not Assigned') {
+          fetchNotAssignedReservations();
+        }
+      } else {
+        setErrorMessage('Failed to assign personnel. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error assigning personnel:', error);
+      setErrorMessage(error.message || 'An error occurred while assigning personnel.');
+    }
+
   };
 
   const handleComplete = async (reservationId, personnelId) => {
     try {
-      const response = await axios.post('http://localhost/coc/gsd/records&reports.php', {
+      const response = await axios.post(`${encryptedUrl}records&reports.php`, {
         operation: 'updateReleaseStatus',
         json: {
           reservation_id: reservationId,
@@ -174,23 +330,11 @@ const AssignPersonnel = () => {
     }
   };
 
-  const toggleChecklistStatus = (reservationId, checklistIndex) => {
-    setReservations(reservations.map(res => {
-      if (res.id === reservationId) {
-        const updatedChecklists = res.checklists.map((checklist, idx) => 
-          idx === checklistIndex 
-            ? { ...checklist, status: checklist.status === 'pending' ? 'completed' : 'pending' }
-            : checklist
-        );
-        return { ...res, checklists: updatedChecklists };
-      }
-      return res;
-    }));
-  };
 
-  const fetchPersonnel = async () => {
+
+  const fetchPersonnel = useCallback(async () => {
     try {
-      const response = await axios.post('http://localhost/coc/gsd/fetch2.php', {
+      const response = await axios.post(`${encryptedUrl}fetch2.php`, {
         operation: 'fetchPersonnel'
       });
 
@@ -202,11 +346,11 @@ const AssignPersonnel = () => {
     } catch (error) {
       console.error('Error fetching personnel:', error);
     }
-  };
+  }, []);
 
   const fetchNotAssignedReservations = async () => {
     try {
-      const response = await axios.post('http://localhost/coc/gsd/records&reports.php', {
+      const response = await axios.post(`${encryptedUrl}records&reports.php`, {
         operation: 'fetchNoAssignedReservation'
       }, {
         headers: {
@@ -232,9 +376,9 @@ const AssignPersonnel = () => {
     }
   };
 
-  const fetchAssignedReservations = async () => {
+  const fetchAssignedReservations = useCallback(async () => {
     try {
-      const response = await axios.post('http://localhost/coc/gsd/records&reports.php', {
+      const response = await axios.post(`${encryptedUrl}records&reports.php`, {
         operation: 'fetchAssignedRelease'
       }, {
         headers: {
@@ -269,11 +413,11 @@ const AssignPersonnel = () => {
     } catch (error) {
       console.error('Error fetching assigned reservations:', error);
     }
-  };
+  }, [personnel]);
 
-  const fetchCompletedReservations = async () => {
+  const fetchCompletedReservations = useCallback(async () => {
     try {
-      const response = await axios.post('http://localhost/coc/gsd/records&reports.php', {
+      const response = await axios.post(`${encryptedUrl}records&reports.php`, {
         operation: 'fetchCompletedRelease'
       }, {
         headers: {
@@ -308,11 +452,11 @@ const AssignPersonnel = () => {
     } catch (error) {
       console.error('Error fetching completed reservations:', error);
     }
-  };
+  }, [personnel]);
 
   useEffect(() => {
     fetchPersonnel();
-  }, []);
+  }, [fetchPersonnel]);
 
   useEffect(() => {
     if (activeTab === 'Not Assigned') {
@@ -322,33 +466,11 @@ const AssignPersonnel = () => {
     } else if (activeTab === 'Completed') {
       fetchCompletedReservations();
     }
-  }, [activeTab]);
+  }, [activeTab, fetchPersonnel, fetchAssignedReservations, fetchCompletedReservations]);
 
   const filteredReservations = reservations.filter(res => res.status === activeTab);
 
-  const renderStatusCell = (reservation) => {
-    if (activeTab === 'Assigned') {
-      const allCompleted = reservation.checklists.every(item => item.status === 'completed');
-      return (
-        <td className="px-6 py-4">
-          {allCompleted ? (
-            <button
-              onClick={() => handleComplete(reservation.id, reservation.personnel_id)}
-              className="px-3 py-1 bg-green-500 text-white rounded-full hover:bg-green-600 transition-colors"
-            >
-              Mark as Complete
-            </button>
-          ) : (
-            <span className="px-3 py-1 inline-flex text-sm leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-              Pending
-            </span>
-          )}
-        </td>
-      );
-    }
-    return null;
-  };
-
+  
   return (
     <div className="flex h-screen bg-gray-50">
       <Sidebar />

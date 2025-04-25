@@ -2,4 +2,55 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Custom styles for modern modal */
+.modern-modal .ant-modal-content {
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.1);
+}
+
+.modern-modal .ant-modal-body {
+  padding: 0;
+}
+
+.modern-modal .ant-modal-close {
+  color: #047857;
+}
+
+.modern-modal .ant-modal-close:hover {
+  color: #059669;
+  background-color: rgba(16, 185, 129, 0.1);
+}
+
+/* Custom animations for the login page */
+@keyframes gradient-animation {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.bg-gradient-animate {
+  background-size: 200% 200%;
+  animation: gradient-animation 5s ease infinite;
+}
+
+/* Add your custom styles below */
+@layer utilities {
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .hide-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+}
+
 

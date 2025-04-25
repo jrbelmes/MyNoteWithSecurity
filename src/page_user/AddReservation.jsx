@@ -1,69 +1,170 @@
-import React, { useState, useEffect, Fragment, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../pages/Sidebar';
 import axios from 'axios';
 import { Toaster, toast } from 'react-hot-toast';
-import { FaCalendarAlt, FaMapMarkerAlt, FaUser, FaCar, FaTools, FaTimes, FaSearch, FaCheck, FaCheckCircle } from 'react-icons/fa';
+import { FaCalendarAlt, FaMapMarkerAlt, FaUser, FaCar, FaTools, FaTimes, FaSearch, FaCheck, FaCheckCircle, FaInfoCircle, FaQuestion } from 'react-icons/fa';
 import 'react-datepicker/dist/react-datepicker.css';
-import { motion } from 'framer-motion';
-import { BsCalendarCheck, BsClock, BsPeople, BsFillGridFill, BsList } from 'react-icons/bs';
+import { motion, AnimatePresence } from 'framer-motion';
+import { BsCalendarCheck, BsClock, BsPeople, BsFillGridFill, BsList, BsExclamationCircle } from 'react-icons/bs';
 import { InputText } from 'primereact/inputtext';
 import { InputTextarea } from 'primereact/inputtextarea';
 import { Button } from 'primereact/button';
 import 'primereact/resources/themes/lara-light-indigo/theme.css';
 import 'primereact/resources/primereact.min.css';
 import 'primeicons/primeicons.css';
-import { Calendar } from 'primereact/calendar'; // Add this import
+import { Calendar } from 'primereact/calendar';
 import { Dropdown } from 'primereact/dropdown';
 import { Checkbox } from 'primereact/checkbox';
 import { Tag } from 'primereact/tag';
-import { UserOutlined, InfoCircleOutlined, TeamOutlined, FileTextOutlined, PrinterOutlined, DashboardOutlined, PlusOutlined, TagOutlined, BankOutlined, CarOutlined, FormOutlined, FileSearchOutlined, CheckCircleOutlined, CheckCircleFilled } from '@ant-design/icons';
-import { DatePicker, TimePicker, Form, Input, InputNumber, Select, Card, Typography, Row, Col, Divider, Radio, Result, Alert, Modal, Empty, Steps, Spin } from 'antd';
+import { UserOutlined, InfoCircleOutlined, TeamOutlined, FileTextOutlined, PrinterOutlined, DashboardOutlined, PlusOutlined, TagOutlined, BankOutlined, CarOutlined, FormOutlined, FileSearchOutlined, CheckCircleOutlined, CheckCircleFilled, QuestionCircleOutlined } from '@ant-design/icons';
+import { DatePicker, TimePicker, Form, Input, InputNumber, Select, Card, Typography, Row, Col, Divider, Radio, Result, Alert, Modal, Empty, Steps, Spin, Tooltip, Badge, Skeleton, Image } from 'antd';
 import moment from 'moment';
 import { CalendarOutlined } from '@ant-design/icons';
 import { format } from 'date-fns';
 import { Dialog } from 'primereact/dialog';
 import { InputNumber as PrimeInputNumber } from 'primereact/inputnumber';
 import ReservationCalendar from './component/reservation_calendar';
-import { Button as AntButton } from 'antd';  // Add this import
+import { Button as AntButton } from 'antd';
+import { SecureStorage } from '../utils/encryption';
+
+import './StepIndicator.css';
 
 const { RangePicker } = DatePicker;
+const { Title } = Typography;
 
 const fadeInAnimation = {
-  initial: { opacity: 0, y: 0 },
+  initial: { opacity: 0, y: 10 },
   animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -20 },
-  transition: { duration: 0.3 }
+  exit: { opacity: 0, y: -10 },
+  transition: { duration: 0.4, ease: "easeInOut" }
 };
 
-// Add these new style constants
-const mobileBreakpoint = '375px';
+const slideInAnimation = {
+  initial: { opacity: 0, x: -20 },
+  animate: { opacity: 1, x: 0 },
+  exit: { opacity: 0, x: 20 },
+  transition: { duration: 0.3, ease: "easeOut" }
+};
 
+// Improved responsive design breakpoints
+const mobileBreakpoint = '576px';
+const tabletBreakpoint = '768px';
+
+// Enhanced container styles with better spacing
 const containerStyles = {
   mobile: {
-    padding: '12px',
+    padding: '16px',
     margin: '0',
     width: '100%'
   },
+  tablet: {
+    padding: '20px',
+    margin: '0 auto',
+    maxWidth: '100%'
+  },
   desktop: {
-    padding: '24px',
-    maxWidth: '1200px',
+    padding: '32px',
+    maxWidth: '1280px',
     margin: '0 auto'
   }
 };
 
+// Improved card styles with subtle shadows and rounded corners
 const cardStyles = {
   mobile: {
-    padding: '12px',
-    margin: '8px 0'
+    padding: '16px',
+    margin: '12px 0',
+    borderRadius: '12px',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)'
+  },
+  tablet: {
+    padding: '20px',
+    margin: '16px 0',
+    borderRadius: '12px',
+    boxShadow: '0 2px 10px rgba(0, 0, 0, 0.05)'
   },
   desktop: {
     padding: '24px',
-    margin: '16px 0'
+    margin: '20px 0',
+    borderRadius: '16px',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)'
   }
 };
 
+// New color scheme for a more professional look
+const colors = {
+  primary: '#1890ff',
+  secondary: '#722ed1',
+  success: '#52c41a',
+  warning: '#faad14',
+  error: '#f5222d',
+  background: {
+    light: '#f5f8fa',
+    card: '#ffffff'
+  },
+  text: {
+    primary: '#262626',
+    secondary: '#595959',
+    muted: '#8c8c8c'
+  }
+};
+
+// Add common image handling function to be used across the component
+const ImageWithFallback = ({ src, alt, className }) => {
+  const [hasError, setHasError] = useState(false);
+  const fallbackSrc = "/no-image-placeholder.png";
+  
+  return (
+    <div className={`relative overflow-hidden ${className}`}>
+      {hasError ? (
+        <div className="flex flex-col items-center justify-center w-full h-full bg-gray-100 rounded-lg">
+          <FaQuestion className="text-gray-400 text-2xl mb-2" />
+          <span className="text-xs text-gray-500">Image not available</span>
+        </div>
+      ) : (
+        <Image
+          src={src}
+          alt={alt}
+          className="w-full h-full object-cover rounded-lg"
+          onError={() => setHasError(true)}
+          preview={!hasError}
+          fallback={fallbackSrc}
+        />
+      )}
+    </div>
+  );
+};
+
 const AddReservation = () => {
+  const [deptId] = useState(localStorage.getItem('dept_id') || '');
+  const [storedName] = useState(localStorage.getItem('name') || '');
+  const [driverType, setDriverType] = useState('default'); // Add state for driver type
+
+  // Helper function for formatting date ranges
+  const formatDateRange = (startDate, endDate) => {
+    if (!startDate || !endDate) return 'Not specified';
+    
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    const formatDate = (date) => {
+      return format(date, 'MMM dd, yyyy');
+    };
+    
+    const formatTime = (date) => {
+      return format(date, 'h:mm a');
+    };
+    
+    if (formatDate(start) === formatDate(end)) {
+      // Same day
+      return `${formatDate(start)} ${formatTime(start)} - ${formatTime(end)}`;
+    } else {
+      // Different days
+      return `${formatDate(start)} ${formatTime(start)} - ${formatDate(end)} ${formatTime(end)}`;
+    }
+  };
+
   const timeSlots = [
     { id: '08:00-10:00', label: 'Early Morning', time: '8:00 AM - 10:00 AM', start: 8, end: 10 },
     { id: '10:00-12:00', label: 'Mid Morning', time: '10:00 AM - 12:00 PM', start: 10, end: 12 },
@@ -133,11 +234,14 @@ const AddReservation = () => {
     // Vehicle specific fields
     purpose: '',
     destination: '',
-    passengers: [], // Make sure this is initialized as an empty array
+    passengers: [], 
+    driverType: 'default', // Add driver type to form data
     driverName: '',
+    tripTicketDriver: null, // Add trip ticket driver field
   });
 
-  // Add this with other state declarations at the top
+
+
   const [viewMode, setViewMode] = useState('grid');
 
   // Add these two new state declarations
@@ -178,73 +282,123 @@ const handleRemovePassenger = (passengerId) => {
   }));
 };
 
-const handlePassengerChange = (passengerId, value) => {
-  setFormData(prev => ({
-    ...prev,
-    passengers: prev.passengers.map(p =>
-      p.id === passengerId ? { ...p, name: value } : p
-    )
-  }));
-};
 
 const handleEquipmentQuantityChange = (equipId, value) => {
-  // Don't allow undefined, null, or negative values
-  if (value === undefined || value === null || value < 0) return;
+  const numericValue = parseInt(value) || 0;
   
-  const equip = equipment.find(e => e.equipment_id === equipId);
-  if (!equip) return;
-
-  // Check if quantity exceeds available amount
-  if (value > equip.equipment_quantity) {
-    toast.error(`Maximum available quantity is ${equip.equipment_quantity}`);
+  const equip = equipment.find(e => e.equipment_id.toString() === equipId.toString());
+  if (!equip) {
+    toast.error('Equipment not found');
     return;
   }
 
+  const availableQuantity = parseInt(equip.available_quantity) || 0;
+
+
+
+  if (numericValue > availableQuantity) {
+    toast.error(`Only ${availableQuantity} units available for this equipment`);
+    return;
+  }
+
+  // Update equipment quantities
   setEquipmentQuantities(prev => ({
     ...prev,
-    [equipId]: value // Store the actual number value
+    [equipId]: numericValue
   }));
-};
 
-const handleAddEquipment = () => {
-  const newEquipment = {};
-  Object.entries(equipmentQuantities).forEach(([equipId, quantity]) => {
-    if (quantity > 0) {
-      // Make sure to store as string consistently
-      newEquipment[equipId.toString()] = quantity;
+  // Automatically update selected equipment
+  // If quantity is 0 or empty, remove from selection
+  // If quantity is > 0, add/update selection
+  setSelectedVenueEquipment(prev => {
+    const newSelection = { ...prev };
+    if (numericValue <= 0) {
+      delete newSelection[equipId];
+    } else {
+      newSelection[equipId] = numericValue;
     }
+    return newSelection;
   });
-  
-  setSelectedVenueEquipment(newEquipment);
-  setShowEquipmentModal(false);
-
-  // Add debug log
-  console.log('Added Equipment:', newEquipment);
 };
+
+// No need for separate handleAddEquipment since selection is handled in handleEquipmentQuantityChange
+const handleAddEquipment = () => {
+  setShowEquipmentModal(false);
+};
+
+const fetchAllEquipments = async () => {
+  try {
+    const response = await axios.post(
+      'http://localhost/coc/gsd/fetch2.php',
+      {
+        operation: 'fetchEquipments'
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (response.data.status === 'success') {
+      const formattedEquipment = response.data.data.map(item => {
+        // Parse quantities properly
+        const totalQuantity = parseInt(item.equip_quantity) || 0;
+        const reservedQuantity = parseInt(item.reserved_quantity) || 0;
+        // Calculate available quantity properly
+        const availableQuantity = Math.max(0, totalQuantity - reservedQuantity);
+        
+        return {
+          equipment_id: item.equip_id,
+          equipment_name: item.equip_name,
+          equipment_quantity: totalQuantity,
+          equipment_category: item.equipments_category_name || 'Uncategorized',
+          equipment_category_id: item.equipments_category_id,
+          equipment_pic: item.equip_pic,
+          status_availability_name: availableQuantity > 0 ? 'available' : 'unavailable',
+          reserved_quantity: reservedQuantity,
+          equip_quantity: totalQuantity,
+          available_quantity: availableQuantity
+        };
+      });
+
+      setEquipment(formattedEquipment);
+    } else {
+      toast.error("Error fetching all equipment: " + response.data.message);
+    }
+  } catch (error) {
+    console.error("Error fetching all equipment:", error);
+    toast.error("An error occurred while fetching all equipment.");
+  }
+};
+useEffect(() => {
+  if (resourceType === 'equipment') {
+    fetchAllEquipments();
+  }
+}, [resourceType]);
 
   useEffect(() => {
-    const user_level_id = localStorage.getItem('user_level_id');
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        if (user_level_id !== '3' && user_level_id !== '3') {
-          localStorage.clear();
-          navigate('/gsd');
-          return;
+      const fetchData = async () => {
+        setLoading(true);
+        try {
+          const encryptedUserLevel = SecureStorage.getSessionItem("user_level_id"); 
+          console.log("this is encryptedUserLevel", encryptedUserLevel);
+          if (encryptedUserLevel !== '3' && encryptedUserLevel !== '15') {
+              localStorage.clear();
+              navigate('/gsd');
+          }
+          await Promise.all([fetchVenues(), fetchVehicles(), fetchEquipment()]);
+        } catch (error) {
+          toast.error("An error occurred while fetching data.");
+        } finally {
+          setLoading(false);
         }
-        await Promise.all([fetchVenues(), fetchVehicles(), fetchEquipment()]);
-      } catch (error) {
-        toast.error("An error occurred while fetching data.");
-      } finally {
-        setLoading(false);
-      }
-    };
+      };
+  
+      fetchData();
+    }, [navigate]);
 
-    fetchData();
-  }, [navigate]);
-
-
-
+  
   const fetchVenues = async () => {
     try {
       const response = await axios({
@@ -300,33 +454,49 @@ const fetchEquipment = async () => {
   if (!formData.startDate || !formData.endDate) return;
 
   try {
-    const response = await axios({
+    // Convert dates to required format
+    const startDateTime = format(new Date(formData.startDate), 'yyyy-MM-dd HH:mm:ss');
+    const endDateTime = format(new Date(formData.endDate), 'yyyy-MM-dd HH:mm:ss');
+
+    // Log the request payload for debugging
+    console.log('Equipment fetch payload:', {
+      operation: 'fetchEquipments',
+      startDateTime,
+      endDateTime
+    });
+
+   const response = await axios({
       method: 'post',
       url: 'http://localhost/coc/gsd/fetch2.php',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
       data: {
         operation: 'fetchEquipments',
-        startDateTime: format(new Date(formData.startDate), 'yyyy-MM-dd HH:mm:ss'),
-        endDateTime: format(new Date(formData.endDate), 'yyyy-MM-dd HH:mm:ss')
+        startDateTime: startDateTime,
+        endDateTime: endDateTime
       }
     });
 
-    if (response.data.status === 'success') {
+    // Log the response for debugging
+    console.log('Equipment fetch response:', response.data);
+
+    if (response.data && response.data.status === 'success' && Array.isArray(response.data.data)) {
       const formattedEquipment = response.data.data.map(item => ({
         equipment_id: item.equip_id,
         equipment_name: item.equip_name,
-        equipment_quantity: parseInt(item.equip_quantity),
-        equipment_category: item.equipments_category_name,
+        equipment_quantity: parseInt(item.equip_quantity) || 0,
+        equipment_category: item.equipments_category_name || 'Uncategorized',
         equipment_pic: item.equip_pic,
-        status_availability_name: item.status_availability_name,
+        status_availability_name: item.status_availability_name || 'unavailable',
         reserved_quantity: parseInt(item.reserved_quantity || 0),
-        available_quantity: parseInt(item.equip_quantity) - parseInt(item.reserved_quantity || 0)
+        available_quantity: parseInt(item.equip_quantity || 0) - parseInt(item.reserved_quantity || 0)
       }));
+      
       setEquipment(formattedEquipment);
     } else {
-      toast.error("Error fetching equipment: " + response.data.message);
+      throw new Error('Invalid response format from server');
     }
   } catch (error) {
     console.error("Error fetching equipment:", error);
@@ -412,7 +582,7 @@ const validateCurrentStep = () => {
   switch (currentStep) {
     case 0:
       if (!formData.resourceType) {
-        toast.error('Please select a resource type (Venue or Vehicle)');
+        toast.error('Please select a resource type (Venue, Vehicle, or Equipment)');
         return false;
       }
       return true;
@@ -422,8 +592,12 @@ const validateCurrentStep = () => {
         toast.error('Please select a venue');
         return false;
       }
-      if (formData.resourceType === 'vehicle' && (!selectedModels || selectedModels.length === 0)) {
+      if (formData.resourceType === 'vehicle' && selectedModels.length === 0) {
         toast.error('Please select at least one vehicle');
+        return false;
+      }
+      if (formData.resourceType === 'equipment' && Object.keys(equipmentQuantities).length === 0) {
+        toast.error('Please select at least one equipment item');
         return false;
       }
       return true;
@@ -460,7 +634,16 @@ const validateCurrentStep = () => {
           toast.error('Please enter a description');
           return false;
         }
-        // Note: participants is not required
+        return true;
+      } else if (formData.resourceType === 'equipment') {
+        if (!formData.eventTitle || !formData.eventTitle.trim()) {
+          toast.error('Please enter a title for your equipment request');
+          return false;
+        }
+        if (!formData.description || !formData.description.trim()) {
+          toast.error('Please enter a description for your equipment request');
+          return false;
+        }
         return true;
       } else { // Vehicle validation
         if (!formData.purpose || !formData.purpose.trim()) {
@@ -471,10 +654,7 @@ const validateCurrentStep = () => {
           toast.error('Please enter a destination');
           return false;
         }
-        if (!formData.driverName || !formData.driverName.trim()) {
-          toast.error('Please enter a driver name');
-          return false;
-        }
+        
         if (!formData.passengers || formData.passengers.length === 0) {
           toast.error('Please add at least one passenger');
           return false;
@@ -758,8 +938,7 @@ const renderResources = () => (
               cursor-pointer
               ${selectedModels.includes(vehicle.vehicle_id) 
                 ? 'ring-1 ring-blue-500 bg-blue-50' 
-                : 'hover:shadow-md hover:border-blue-200'
-              }
+                : 'hover:shadow-md hover:border-blue-200'}
               p-2
             `}
             onClick={() => handleVehicleSelect(vehicle.vehicle_id)}
@@ -864,7 +1043,6 @@ const renderResources = () => (
 
 // Modify renderBasicInformation to include date selection button and modal
 const renderBasicInformation = () => {
-  const { Title } = Typography;
   const { TextArea } = Input;
 
   return (
@@ -879,13 +1057,15 @@ const renderBasicInformation = () => {
           <Title level={isMobile ? 5 : 4} className="mb-4 flex items-center gap-2">
             <InfoCircleOutlined />
             <span className="truncate">
-              {formData.resourceType === 'venue' ? 'Venue Details' : 'Vehicle Details'}
+              {formData.resourceType === 'venue' ? 'Venue Details' : 
+               formData.resourceType === 'vehicle' ? 'Vehicle Details' : 
+               'Equipment Details'}
             </span>
           </Title>
 
           <Form layout="vertical" className="space-y-3">
             {formData.resourceType === 'venue' ? (
-              // Venue Fields - Minimized for Mobile
+              // Venue Fields
               <>
                 <Form.Item
                   label={<span className="text-sm">Event Title <span className="text-red-500">*</span></span>}
@@ -916,89 +1096,66 @@ const renderBasicInformation = () => {
                 </Form.Item>
 
                 <Form.Item
-                  label={<span className="text-sm">Participants</span>}
+                  label={<span className="text-sm">Number of Participants</span>}
                 >
-                  <InputNumber
-                    min={1}
+                  <Input
                     name="participants"
                     value={formData.participants}
-                    onChange={(value) => handleInputChange({
-                      target: { name: 'participants', value }
-                    })}
-                    className="w-full"
+                    onChange={handleInputChange}
+                    type="number"
+                    min="0"
+                    className="rounded"
                     size={isMobile ? 'middle' : 'large'}
+                    placeholder="Enter number of participants (optional)"
                   />
                 </Form.Item>
 
-                {/* Equipment Section - Collapsed on Mobile */}
-                <div className={`${isMobile ? 'mt-3 pt-3' : 'mt-6 pt-6'} border-t`}>
-                  <div className="flex justify-between items-center mb-3">
-                    <span className={`font-medium ${isMobile ? 'text-sm' : 'text-base'}`}>
-                      Equipment
-                    </span>
-                    <Button
-                      type="dashed"
-                      icon={<FaTools className="text-xs" />}
-                      onClick={() => setShowEquipmentModal(true)}
-                      size={isMobile ? 'small' : 'middle'}
-                    >
-                      Add
-                    </Button>
-                  </div>
-
-                  {/* Equipment List - Grid for Desktop, List for Mobile */}
-                  {Object.keys(selectedVenueEquipment).length > 0 && (
-                    <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
+                <Form.Item
+                  label={
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm">Equipment</span>
+                      <Button
+                        type="text"
+                        onClick={() => setShowEquipmentModal(true)}
+                        icon={<FaTools />}
+                        className="text-blue-500 hover:text-blue-600"
+                      >
+                        Add Equipment
+                      </Button>
+                    </div>
+                  }
+                >
+                  {Object.keys(selectedVenueEquipment).length > 0 ? (
+                    <div className="border rounded-lg divide-y">
                       {Object.entries(selectedVenueEquipment).map(([equipId, quantity]) => {
-                        const equip = equipment.find(e => e.equipment_id.toString() === equipId);
+                        const equip = equipment.find(e => e.equipment_id.toString() === equipId.toString());
                         if (!equip) return null;
-                        
                         return (
-                          <Card 
-                            key={equipId} 
-                            size="small"
-                            className="bg-gray-50"
-                          >
-                            <div className="flex items-center gap-2">
-                              <img
-                                src={`http://localhost/coc/gsd/${equip.equipment_pic}`}
-                                alt={equip.equipment_name}
-                                className={`${isMobile ? 'w-8 h-8' : 'w-10 h-10'} object-cover rounded`}
-                                onError={(e) => {
-                                  e.target.src = '/default-equipment.jpg';
-                                  e.target.onerror = null;
-                                }}
-                              />
-                              <div className="flex-1 min-w-0">
-                                <div className="text-xs font-medium truncate">
-                                  {equip.equipment_name}
-                                </div>
-                                <div className="text-xs text-gray-500">
-                                  Qty: {quantity}
-                                </div>
-                              </div>
-                              <Button
-                                danger
-                                type="text"
-                                size="small"
-                                icon={<FaTimes className="text-xs" />}
-                                onClick={() => {
-                                  const newSelected = { ...selectedVenueEquipment };
-                                  delete newSelected[equipId];
-                                  setSelectedVenueEquipment(newSelected);
-                                }}
-                              />
+                          <div key={equipId} className="flex items-center justify-between p-3 hover:bg-gray-50">
+                            <div className="flex items-center gap-3">
+                              <FaTools className="text-gray-400" />
+                              <span>{equip.equipment_name}</span>
+                              <span className="text-gray-500">x{quantity}</span>
                             </div>
-                          </Card>
+                          </div>
                         );
                       })}
                     </div>
+                  ) : (
+                    <Empty
+                      image={Empty.PRESENTED_IMAGE_SIMPLE}
+                      description={
+                        <span className="text-gray-500">
+                          No equipment added yet. Click "Add Equipment" to begin.
+                        </span>
+                      }
+                    />
                   )}
-                </div>
+                </Form.Item>
               </>
-            ) : (
-              // Vehicle Fields - Minimized for Mobile
-              <>
+            ) : formData.resourceType === 'vehicle' ? (
+                // Vehicle Fields
+                <>
                 <Form.Item
                   label={<span className="text-sm">Purpose <span className="text-red-500">*</span></span>}
                   required
@@ -1023,163 +1180,262 @@ const renderBasicInformation = () => {
                     onChange={handleInputChange}
                     className="rounded"
                     size={isMobile ? 'middle' : 'large'}
-                    placeholder="Enter destination"
+                    placeholder="Trip destination"
                   />
                 </Form.Item>
 
                 {renderDriverDropdown()}
 
-                {/* Passengers Section */}
                 <Form.Item
-                  label={<span className="text-sm">Passengers <span className="text-red-500">*</span></span>}
+                  label={
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm">Passengers <span className="text-red-500">*</span></span>
+                      <Button
+                        type="text"
+                        onClick={() => setShowPassengerModal(true)}
+                        icon={<PlusOutlined />}
+                        className="text-blue-500 hover:text-blue-600"
+                      >
+                        Add Passenger
+                      </Button>
+                    </div>
+                  }
                   required
                 >
-                  <Button
-                    icon={<UserOutlined className="text-xs" />}
-                    onClick={() => setShowPassengerModal(true)}
-                    size={isMobile ? 'middle' : 'large'}
-                    className="w-full bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200"
-                  >
-                    Add Passengers
-                  </Button>
-
-                  {/* Passenger List - Compact on Mobile */}
-                  {formData.passengers.length > 0 && (
-                    <div className={`mt-2 border rounded divide-y ${isMobile ? 'text-xs' : 'text-sm'}`}>
+                  {formData.passengers.length > 0 ? (
+                    <div className="border rounded-lg divide-y">
                       {formData.passengers.map((passenger, index) => (
-                        <div 
-                          key={passenger.id}
-                          className="flex items-center justify-between p-2"
-                        >
-                          <div className="flex items-center gap-2">
+                        <div key={passenger.id} className="flex items-center justify-between p-3 hover:bg-gray-50">
+                          <div className="flex items-center gap-3">
                             <span className="text-gray-500">{index + 1}.</span>
-                            <span className="truncate">{passenger.name}</span>
+                            <UserOutlined className="text-gray-400" />
+                            <span>{passenger.name}</span>
                           </div>
                           <Button
                             type="text"
                             danger
-                            size="small"
-                            icon={<FaTimes className="text-xs" />}
+                            icon={<FaTimes />}
                             onClick={() => handleRemovePassenger(passenger.id)}
                           />
                         </div>
                       ))}
                     </div>
+                  ) : (
+                    <Empty
+                      image={Empty.PRESENTED_IMAGE_SIMPLE}
+                      description={
+                        <span className="text-gray-500">
+                          No passengers added yet. Click "Add Passenger" to begin.
+                        </span>
+                      }
+                    />
                   )}
+                </Form.Item>
+
+                {/* Add Equipment Button for Vehicle */}
+                <Form.Item
+                  label={
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm">Equipment</span>
+                      <Button
+                        type="text"
+                        onClick={() => setShowEquipmentModal(true)}
+                        icon={<FaTools />}
+                        className="text-blue-500 hover:text-blue-600"
+                      >
+                        Add Equipment
+                      </Button>
+                    </div>
+                  }
+                >
+                  {Object.keys(selectedVenueEquipment).length > 0 ? (
+                    <div className="border rounded-lg divide-y">
+                      {Object.entries(selectedVenueEquipment).map(([equipId, quantity]) => {
+                        const equip = equipment.find(e => e.equipment_id.toString() === equipId);
+                        if (!equip) return null;
+                        return (
+                          <div key={equipId} className="flex items-center justify-between p-3 hover:bg-gray-50">
+                            <div className="flex items-center gap-3">
+                              <FaTools className="text-gray-400" />
+                              <span>{equip.equipment_name}</span>
+                              <span className="text-gray-500">x{quantity}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <Empty
+                      image={Empty.PRESENTED_IMAGE_SIMPLE}
+                      description={
+                        <span className="text-gray-500">
+                          No equipment added yet. Click "Add Equipment" to begin.
+                        </span>
+                      }
+                    />
+                  )}
+                </Form.Item>
+                </>
+              ) : (
+              // Equipment Fields - Only title and description
+              <>
+                <Form.Item
+                  label={<span className="text-sm">Title <span className="text-red-500">*</span></span>}
+                  required
+                >
+                  <Input
+                    name="eventTitle"
+                    value={formData.eventTitle}
+                    onChange={handleInputChange}
+                    className="rounded"
+                    size={isMobile ? 'middle' : 'large'}
+                    placeholder="Purpose of equipment request"
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  label={<span className="text-sm">Description <span className="text-red-500">*</span></span>}
+                  required
+                >
+                  <TextArea
+                    name="description"
+                    value={formData.description}
+                    onChange={handleInputChange}
+                    rows={isMobile ? 3 : 4}
+                    className="rounded"
+                    placeholder="Describe how you will use the equipment"
+                  />
                 </Form.Item>
               </>
             )}
           </Form>
         </div>
       </Card>
-      {formData.resourceType === 'venue' && <EquipmentSelectionModal />}
+      {(formData.resourceType === 'venue' || formData.resourceType === 'vehicle') && <EquipmentSelectionModal />}
     </motion.div>
   );
 };
 
+// Enhanced resource type selection with better visuals
 const renderResourceTypeSelection = () => (
   <motion.div
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    className="max-w-4xl mx-auto"
+    {...fadeInAnimation}
+    className="py-4"
   >
-    <div className={`grid ${isMobile ? 'grid-cols-1 gap-3' : 'grid-cols-2 gap-6'}`}>
-      <Card 
-        className={`
-          cursor-pointer transform transition-all duration-300
-          ${isMobile ? 'p-3' : 'p-6'}
-          ${resourceType === 'venue' ? 'ring-2 ring-blue-500 shadow-lg' : 'hover:shadow-lg'}`}
-        onClick={() => {
-          setResourceType('venue');
-          setFormData(prev => ({ ...prev, resourceType: 'venue' }));
-        }}
-      >
-        <div className={`text-center ${isMobile ? 'space-y-2' : 'space-y-4'}`}>
-          <div className={`
-            mx-auto rounded-full flex items-center justify-center
-            ${isMobile ? 'w-12 h-12' : 'w-16 h-16'}
-            bg-blue-100
-          `}>
-            <FaMapMarkerAlt className={`${isMobile ? 'text-xl' : 'text-2xl'} text-blue-600`} />
-          </div>
-          <h4 className={`font-semibold ${isMobile ? 'text-lg' : 'text-xl'}`}>
-            Venue Reservation
-          </h4>
-          {!isMobile && <p className="text-gray-600">Book a venue for your upcoming event</p>}
-        </div>
-      </Card>
-
-      <Card 
-        className={`cursor-pointer transform transition-all duration-300 hover:scale-105
-          ${resourceType === 'vehicle' ? 'ring-2 ring-blue-500 shadow-lg' : 'hover:shadow-lg'}`}
-        onClick={() => {
-          setResourceType('vehicle');
-          setFormData(prev => ({ ...prev, resourceType: 'vehicle', venue: '' }));
-        }}
-      >
-        <div className={`text-center ${isMobile ? 'space-y-2' : 'space-y-4'}`}>
-          <div className={`
-            mx-auto rounded-full flex items-center justify-center
-            ${isMobile ? 'w-12 h-12' : 'w-16 h-16'}
-            bg-green-100
-          `}>
-            <FaCar className={`${isMobile ? 'text-xl' : 'text-2xl'} text-green-600`} />
-          </div>
-          <h4 className={`font-semibold ${isMobile ? 'text-lg' : 'text-xl'}`}>
-            Vehicle Reservation
-          </h4>
-          {!isMobile && <p className="text-gray-600">Reserve a vehicle for transportation</p>}
-        </div>
-      </Card>
-    </div>
+    <Card className="shadow-sm rounded-xl border-0">
+      <div className="text-center mb-6">
+        <h2 className="text-xl font-semibold mb-2">What would you like to reserve?</h2>
+        <p className="text-gray-500">Select the type of resource you need for your reservation</p>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
+        {[
+          { 
+            value: 'venue', 
+            title: 'Venue', 
+            icon: <BankOutlined className="text-4xl mb-3" />,
+            description: 'Conference rooms, halls, or other spaces for events and meetings',
+            color: '#1890ff'
+          },
+          { 
+            value: 'vehicle', 
+            title: 'Vehicle', 
+            icon: <CarOutlined className="text-4xl mb-3" />,
+            description: 'Cars, vans, or other transportation for official travel',
+            color: '#722ed1'
+          },
+          { 
+            value: 'equipment', 
+            title: 'Equipment', 
+            icon: <FaTools className="text-4xl mb-3" />,
+            description: 'Projectors, laptops, audio systems, and other equipment',
+            color: '#13c2c2'
+          }
+        ].map(option => (
+          <Card
+            key={option.value}
+            className={`
+              hover:shadow-md transition-all duration-200 text-center cursor-pointer
+              ${resourceType === option.value ? 'border-2 border-blue-500 shadow-sm' : 'border border-gray-100'}
+            `}
+            onClick={() => {
+              setResourceType(option.value);
+              setFormData(prev => ({ ...prev, resourceType: option.value }));
+            }}
+            style={{ borderRadius: '12px' }}
+          >
+            <div 
+              className="flex flex-col items-center justify-center h-full p-6"
+              style={{ 
+                color: resourceType === option.value ? option.color : 'inherit',
+              }}
+            >
+              {option.icon}
+              <h3 className="text-lg font-medium mb-2">{option.title}</h3>
+              <p className="text-gray-500 text-sm">{option.description}</p>
+              
+              {resourceType === option.value && (
+                <Tag color="blue" className="mt-3">
+                  <div className="flex items-center gap-1">
+                    <FaCheckCircle />
+                    <span>Selected</span>
+                  </div>
+                </Tag>
+              )}
+            </div>
+          </Card>
+        ))}
+      </div>
+      
+      <div className="mt-8 text-center text-gray-500 text-sm">
+        <BsExclamationCircle className="inline mr-2" />
+        Your selection will determine the next steps in the reservation process
+      </div>
+    </Card>
   </motion.div>
 );
 
+const validateEquipmentQuantities = (equipment) => {
+  if (!equipment || equipment.length === 0) return false;
+  return equipment.every(item => item.quantity > 0);
+};
+
 const handleAddReservation = async () => {
   try {
-    setLoading(true); // Start loading
+    setLoading(true);
+    const userId = SecureStorage.getSessionItem('user_id');
 
-    const userId = localStorage.getItem('user_id');
-    const deptId = localStorage.getItem('department_id');
-    const storedName = localStorage.getItem('name');
-    
-    if (!userId || !deptId || !storedName) {
-      toast.error('User session invalid. Please log in again.');
+    // Common validation for dates
+    if (!formData.startDate || !formData.endDate) {
+      toast.error('Please select start and end dates');
       return false;
     }
 
-    // Simulate a 5-second delay
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-
-    // Validate required fields based on resource type
+    // Resource type specific validation and submission
     if (formData.resourceType === 'venue') {
-      if (!formData.venue || !formData.eventTitle || !formData.description || 
-          !formData.startDate || !formData.endDate) {
+      if (!formData.eventTitle || !formData.description || !formData.venue) {
         toast.error('Please fill in all required venue reservation fields');
         return false;
       }
 
-      // Create the venue reservation payload
       const venuePayload = {
         operation: 'venuereservation',
-        user_id: parseInt(userId),
-        user_type: 'user',
-        dept_id: parseInt(deptId),
-        venue_id: parseInt(formData.venue),
         form_data: {
-          name: storedName,
-          event_title: formData.eventTitle.trim(),
+          title: formData.eventTitle.trim(),
           description: formData.description.trim(),
-          participants: formData.participants ? formData.participants.toString() : "0",
           start_date: format(new Date(formData.startDate), 'yyyy-MM-dd HH:mm:ss'),
           end_date: format(new Date(formData.endDate), 'yyyy-MM-dd HH:mm:ss'),
+          participants: formData.participants ? formData.participants.toString() : "0",
+          user_id: userId,
+          venues: [formData.venue],
           equipment: Object.entries(selectedVenueEquipment).map(([equipId, quantity]) => ({
-            equipment_id: parseInt(equipId),
+            equipment_id: equipId,
             quantity: parseInt(quantity)
           })).filter(item => item.quantity > 0)
         }
       };
 
+      // Proceed with venue reservation
       const response = await axios.post(
         'http://localhost/coc/gsd/insert_reservation.php',
         venuePayload,
@@ -1192,64 +1448,108 @@ const handleAddReservation = async () => {
 
       if (response.data.status === 'success') {
         toast.success('Venue reservation submitted successfully!');
-        setCurrentStep(5); // Move to success state
+        setCurrentStep(5);
         return true;
       } else {
         throw new Error(response.data.message || 'Failed to submit venue reservation');
       }
-    } else {
-      // Vehicle reservation validation
+
+    } else if (formData.resourceType === 'vehicle') {
       if (!selectedModels || selectedModels.length === 0) {
         toast.error('Please select at least one vehicle');
         return false;
       }
-      if (!formData.purpose || !formData.destination || 
-          !formData.startDate || !formData.endDate || 
-          !formData.passengers || formData.passengers.length === 0) {
-        toast.error('Please fill in all required vehicle reservation fields');
+      if (!formData.purpose || !formData.destination) {
+        toast.error('Please fill in both purpose and destination');
+        return false;
+      }
+      if (!formData.passengers || formData.passengers.length === 0) {
+        toast.error('Please add at least one passenger');
         return false;
       }
 
       const vehiclePayload = {
         operation: 'vehiclereservation',
-        user_id: parseInt(userId),
-        user_type: 'user',
-        dept_id: parseInt(deptId),
-        vehicles: selectedModels.map(id => parseInt(id)),  // Convert to integers
         form_data: {
-          name: storedName,
-          purpose: formData.purpose.trim(), 
           destination: formData.destination.trim(),
+          purpose: formData.purpose.trim(),
           start_date: format(new Date(formData.startDate), 'yyyy-MM-dd HH:mm:ss'),
           end_date: format(new Date(formData.endDate), 'yyyy-MM-dd HH:mm:ss'),
-          driver_id: parseInt(formData.driverName),  // Convert to integer
-          passengers: formData.passengers.map(p => p.name.trim())
+          user_id: userId,
+          vehicles: selectedModels,
+          passengers: formData.passengers.map(p => p.name.trim()),
+          driver_id: formData.driverName || null,
+          equipment: Object.entries(selectedVenueEquipment).map(([equipId, quantity]) => ({
+            equipment_id: equipId,
+            quantity: parseInt(quantity)
+          })).filter(item => item.quantity > 0)
         }
       };
 
-      try {
-        const response = await axios.post(
-          'http://localhost/coc/gsd/insert_reservation.php',
-          vehiclePayload,
-          {
-            headers: {
-              'Content-Type': 'application/json'
-            }
+      // Proceed with vehicle reservation
+      const response = await axios.post(
+        'http://localhost/coc/gsd/insert_reservation.php',
+        vehiclePayload,
+        {
+          headers: {
+            'Content-Type': 'application/json'
           }
-        );
-
-        console.log('Vehicle reservation response:', response.data); // Debug log
-
-        if (response.data.status === 'success') {
-          toast.success('Vehicle reservation submitted successfully!');
-          setCurrentStep(5);
-          return true;
-        } else {
-          throw new Error(response.data.message || 'Failed to submit vehicle reservation');
         }
-      } catch (error) {
-        console.error('Vehicle reservation error:', error);
-        throw error;
+      );
+
+      if (response.data.status === 'success') {
+        toast.success('Vehicle reservation submitted successfully!');
+        setCurrentStep(5);
+        return true;
+      } else {
+        throw new Error(response.data.message || 'Failed to submit vehicle reservation');
+      }
+
+    } else if (formData.resourceType === 'equipment') {
+      // Equipment specific validation
+      if (!formData.eventTitle || !formData.description) {
+        toast.error('Please fill in all required equipment reservation fields');
+        return false;
+      }
+
+      // Check if any equipment is selected for equipment reservation
+      if (Object.keys(selectedVenueEquipment).length === 0) {
+        toast.error('Please select at least one equipment item');
+        return false;
+      }
+
+      const equipmentPayload = {
+        operation: 'equipmentreservation',
+        form_data: {
+          title: formData.eventTitle.trim(),
+          description: formData.description.trim(),
+          start_date: format(new Date(formData.startDate), 'yyyy-MM-dd HH:mm:ss'),
+          end_date: format(new Date(formData.endDate), 'yyyy-MM-dd HH:mm:ss'),
+          user_id: userId,
+          equipment: Object.entries(selectedVenueEquipment).map(([equipId, quantity]) => ({
+            equipment_id: equipId,
+            quantity: parseInt(quantity)
+          })).filter(item => item.quantity > 0)
+        }
+      };
+
+      // Proceed with equipment reservation
+      const response = await axios.post(
+        'http://localhost/coc/gsd/insert_reservation.php',
+        equipmentPayload,
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (response.data.status === 'success') {
+        toast.success('Equipment reservation submitted successfully!');
+        setCurrentStep(5);
+        return true;
+      } else {
+        throw new Error(response.data.message || 'Failed to submit equipment reservation');
       }
     }
   } catch (error) {
@@ -1257,7 +1557,7 @@ const handleAddReservation = async () => {
     toast.error(error.message || 'An error occurred while submitting the reservation');
     return false;
   } finally {
-    setLoading(false); // Stop loading
+    setLoading(false);
   }
 };
 
@@ -1314,6 +1614,8 @@ const resetForm = () => {
     destination: '',
     passengers: [], // Reset passengers to empty array
     driverName: '',
+    driverType: 'default', // Reset driver type to default
+    tripTicketDriver: null, // Reset trip ticket driver
   });
   setSelectedModels([]);
   setSelectedEquipment({});
@@ -1332,57 +1634,87 @@ const resetForm = () => {
 
 
 const renderReviewSection = () => {
-  const selectedVenue = venues.find(v => v.ven_id.toString() === formData.venue.toString());
+  const selectedVenues = venues.filter(v => formData.venue.includes(v.ven_id));
   const selectedVehicleDetails = vehicles.filter(v => selectedModels.includes(v.vehicle_id));
   const storedName = localStorage.getItem('name');
   const selectedDriver = drivers.find(d => d.driver_id.toString() === formData.driverName?.toString());
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-        <div className={`${isMobile ? 'p-3 space-y-3' : 'p-6 space-y-6'}`}>
-          {/* Basic Details - Minimized for mobile */}
-          <div className="space-y-3">
-            <h4 className={`${isMobile ? 'text-sm' : 'text-lg'} font-medium text-gray-700 flex items-center gap-2`}>
-              <FaCalendarAlt className="text-green-600" />
-              Basic Details
-            </h4>
-            <div className={`grid ${isMobile ? 'grid-cols-2 gap-2' : 'grid-cols-2 gap-6'} pl-4`}>
-              <div>
-                <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-500`}>Name</p>
-                <p className={`${isMobile ? 'text-sm' : 'text-base'} font-medium text-gray-900 truncate`}>
-                  {storedName || '-'}
-                </p>
-              </div>
-              <div>
-                <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-500`}>Type</p>
-                <p className={`${isMobile ? 'text-sm' : 'text-base'} font-medium text-gray-900 capitalize`}>
-                  {formData.resourceType}
-                </p>
-              </div>
+    <motion.div
+      {...fadeInAnimation}
+      className="space-y-6"
+    >
+      <Alert
+        message="Review Your Reservation"
+        description="Please review all details carefully before submitting. You won't be able to modify them after submission."
+        type="info"
+        showIcon
+        className="mb-6"
+      />
+      
+      <Card className="rounded-xl shadow-sm">
+        <div className="flex justify-between items-center mb-6">
+          <Title level={4} className="m-0">Reservation Summary</Title>
+          <AntButton 
+            type="primary" 
+            icon={<PrinterOutlined />}
+            onClick={handlePrintRequest}
+            className="bg-blue-500"
+          >
+            Print Preview
+          </AntButton>
+        </div>
+        
+        <Divider className="my-4" />
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+          {/* Resource Type */}
+          <div>
+            <div className="text-gray-500 text-sm mb-1">Resource Type</div>
+            <div className="font-medium flex items-center">
+              {formData.resourceType === 'venue' ? (
+                <><BankOutlined className="mr-2" /> Venue</>
+              ) : formData.resourceType === 'vehicle' ? (
+                <><CarOutlined className="mr-2" /> Vehicle</>
+              ) : (
+                <><FaTools className="mr-2" /> Equipment</>
+              )}
             </div>
           </div>
-
+          
+          {/* Date/Time */}
+          <div>
+            <div className="text-gray-500 text-sm mb-1">Date & Time</div>
+            <div className="font-medium">
+              {formatDateRange(formData.startDate, formData.endDate)}
+            </div>
+          </div>
+          
+          {/* Resource specific details */}
           {formData.resourceType === 'venue' ? (
             // Venue Details - Minimized for mobile
             <div className="space-y-4">
               <h4 className={`${isMobile ? 'text-sm' : 'text-lg'} font-medium text-gray-700`}>
-                Venue Details
+                Selected Venues ({selectedVenues.length})
               </h4>
               <div className="bg-gray-50 rounded-lg p-3">
-                {selectedVenue && (
-                  <div className="space-y-3">
-                    <img
-                      src={selectedVenue.image_url || '/default-venue.jpg'}
-                      alt={selectedVenue.ven_name}
-                      className={`w-full ${isMobile ? 'h-32' : 'h-48'} object-cover rounded-lg`}
-                    />
-                    <div className={isMobile ? 'text-sm' : ''}>
-                      <h5 className="font-medium">{selectedVenue.ven_name}</h5>
-                      <p className="text-xs text-gray-600">Capacity: {selectedVenue.ven_occupancy}</p>
+                <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-4`}>
+                  {selectedVenues.map(venue => (
+                    <div key={venue.ven_id} className="bg-white rounded-lg p-3">
+                      <div className="space-y-3">
+                        <img
+                          src={venue.image_url || '/default-venue.jpg'}
+                          alt={venue.ven_name}
+                          className={`w-full ${isMobile ? 'h-32' : 'h-48'} object-cover rounded-lg`}
+                        />
+                        <div className={isMobile ? 'text-sm' : ''}>
+                          <h5 className="font-medium">{venue.ven_name}</h5>
+                          <p className="text-xs text-gray-600">Capacity: {venue.ven_occupancy}</p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  ))}
+                </div>
 
                 <div className={`grid ${isMobile ? 'grid-cols-1 gap-2' : 'grid-cols-2 gap-4'} mt-3`}>
                   <div>
@@ -1427,7 +1759,7 @@ const renderReviewSection = () => {
                 )}
               </div>
             </div>
-          ) : (
+          ) : formData.resourceType === 'vehicle' ? (
             // Vehicle Details - Minimized for mobile
             <div className="space-y-4">
               <h4 className={`${isMobile ? 'text-sm' : 'text-lg'} font-medium text-gray-700`}>
@@ -1443,9 +1775,9 @@ const renderReviewSection = () => {
                     </p>
                   </div>
                   <div>
-                    <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-500`}>Driver</p>
+                    <p className="text-sm text-gray-500">Driver</p>
                     <p className={`${isMobile ? 'text-sm' : 'text-base'} font-medium truncate`}>
-                      {selectedDriver?.driver_full_name || '-'}
+                      {availableDrivers.find(d => d.driver_id === formData.driverName)?.driver_full_name || '-'}
                     </p>
                   </div>
                 </div>
@@ -1492,32 +1824,86 @@ const renderReviewSection = () => {
                 </div>
               </div>
             </div>
-          )}
+          ) : (
+            // Equipment Details
+            <div className="space-y-4">
+              <h4 className={`${isMobile ? 'text-sm' : 'text-lg'} font-medium text-gray-700`}>
+                Selected Equipment Details
+              </h4>
+              <div className="bg-gray-50 rounded-lg p-3">
+                {/* Equipment Info */}
+                <div className={`grid ${isMobile ? 'grid-cols-1 gap-2' : 'grid-cols-2 gap-4'}`}>
+                  <div>
+                    <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-500`}>Purpose</p>
+                    <p className={`${isMobile ? 'text-sm' : 'text-base'} font-medium truncate`}>
+                      {formData.eventTitle}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Description</p>
+                    <p className={`${isMobile ? 'text-sm' : 'text-base'} font-medium truncate`}>
+                      {formData.description}
+                    </p>
+                  </div>
+                </div>
 
-          {/* Schedule - Minimized for mobile */}
-          <div className="space-y-2">
-            <h4 className={`${isMobile ? 'text-sm' : 'text-lg'} font-medium text-gray-700 flex items-center gap-2`}>
-              <BsClock className="text-green-600" />
-              Schedule
-            </h4>
-            <div className={`grid ${isMobile ? 'grid-cols-1 gap-2' : 'grid-cols-2 gap-4'} pl-4`}>
-              <div>
-                <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-500`}>Start</p>
-                <p className={`${isMobile ? 'text-sm' : 'text-base'} font-medium`}>
-                  {formData.startDate ? format(new Date(formData.startDate), isMobile ? 'PP p' : 'PPpp') : '-'}
-                </p>
-              </div>
-              <div>
-                <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-500`}>End</p>
-                <p className={`${isMobile ? 'text-sm' : 'text-base'} font-medium`}>
-                  {formData.endDate ? format(new Date(formData.endDate), isMobile ? 'PP p' : 'PPpp') : '-'}
-                </p>
+                {/* Selected Equipment List */}
+                <div className="mt-4">
+                  <p className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium mb-2`}>Equipment List</p>
+                  {Object.keys(selectedVenueEquipment).length > 0 ? (
+                    <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
+                      {Object.entries(selectedVenueEquipment).map(([equipId, quantity]) => {
+                        const equip = equipment.find(e => e.equipment_id.toString() === equipId);
+                        if (!equip) return null;
+                        return (
+                          <div key={equipId} className="bg-white rounded p-2 flex gap-2">
+                            <img
+                              src={equip.equipment_pic ? `http://localhost/coc/gsd/${equip.equipment_pic}` : '/default-equipment.jpg'}
+                              alt={equip.equipment_name}
+                              className={`${isMobile ? 'w-16 h-16' : 'w-20 h-20'} object-cover rounded`}
+                              onError={(e) => { e.target.src = '/default-equipment.jpg'; }}
+                            />
+                            <div className={isMobile ? 'text-xs' : 'text-sm'}>
+                              <p className="font-medium">{equip.equipment_name}</p>
+                              <p className="text-gray-500">Quantity: {quantity}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 bg-white rounded-lg">
+                      <FaTools className="mx-auto text-gray-400 text-2xl mb-2" />
+                      <p className="text-gray-500">No equipment has been selected</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
-      </div>
-    </div>
+        
+        <Divider className="my-4" />
+        
+        <div className="flex justify-between mt-4">
+          <AntButton 
+            onClick={handleBack}
+            icon={<FaTimes className="mr-1" />}
+          >
+            Back
+          </AntButton>
+          <AntButton 
+            type="primary" 
+            onClick={handleAddReservation}
+            loading={loading}
+            icon={<FaCheckCircle className="mr-1" />}
+            className="bg-blue-500"
+          >
+            Confirm Reservation
+          </AntButton>
+        </div>
+      </Card>
+    </motion.div>
   );
 };
 
@@ -1597,118 +1983,39 @@ const formatTime = (time) => {
   return `${hour > 12 ? hour - 12 : hour}:${minutes} ${hour >= 12 ? 'PM' : 'AM'}`;
 };
 
+// Enhanced success state with better visuals
 const renderSuccessState = () => (
   <motion.div
-    initial={{ opacity: 0, scale: 0.95 }}
-    animate={{ opacity: 1, scale: 1 }}
-    transition={{ duration: 0.5 }}
+    {...fadeInAnimation}
+    className="min-h-[400px] flex items-center justify-center"
   >
     <Result
       status="success"
-      title={
-        <span className="text-2xl font-semibold text-green-600">
-          Reservation Request Submitted Successfully!
-        </span>
-      }
-      subTitle={
-        <div className="text-gray-600 mt-2">
-          <p>Your reservation request has been submitted and is pending approval.</p>
-          <p>You will receive a notification once the status has been updated.</p>
-        </div>
-      }
+      title="Reservation Successfully Created!"
+      subTitle="Your reservation has been submitted and is pending approval. You'll receive a notification once it's approved."
       extra={[
-        <Button
-          key="print"
-          type="default"
-          icon={<PrinterOutlined />}
-          onClick={handlePrintRequest}
-          size="large"
-          className="mr-4"
-        >
-          Print Request
-        </Button>,
-        <Button
+        <AntButton 
+          type="primary" 
           key="dashboard"
-          type="primary"
+          onClick={() => navigate('/dean/reservation')}
           icon={<DashboardOutlined />}
-          onClick={() => navigate('/dashboard')}
-          size="large"
-          className="mr-4 bg-blue-500 hover:bg-blue-600"
+          className="bg-blue-500"
         >
-          Go to Dashboard
-        </Button>,
-        <Button
-          key="newRequest"
-          type="default"
+          View All Reservations
+        </AntButton>,
+        <AntButton 
+          key="new" 
+          onClick={resetForm}
           icon={<PlusOutlined />}
-          onClick={() => {
-            resetForm();
-            setCurrentStep(0);
-          }}
-          size="large"
-          className="border-green-500 text-green-500 hover:text-green-600 hover:border-green-600"
         >
-          New Request
-        </Button>,
+          Create Another Reservation
+        </AntButton>,
       ]}
     />
   </motion.div>
 );
 
-const TimeSlotVisualizer = ({ selectedTime, unavailableSlots, isChecking, conflicts }) => {
-  return (
-    <div className="mt-4 md:mt-6 p-3 md:p-4 bg-white rounded-lg shadow-sm">
-      <h5 className="font-medium mb-3 text-sm md:text-base">Select Time Slot</h5>
-      {isChecking ? (
-        <div className="text-center py-4">
-          <i className="pi pi-spin pi-spinner mr-2" />
-          <span className="text-gray-600 text-sm">Checking availability...</span>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-          {timeSlots.map(slot => {
-            const isConflicting = conflicts.some(conflict => {
-              const conflictStart = new Date(conflict.reservation_start_date);
-              const conflictEnd = new Date(conflict.reservation_end_date);
-              const conflictStartHour = conflictStart.getHours();
-              const conflictEndHour = conflictEnd.getHours();
-              
-              const [slotStart, slotEnd] = slot.id.split('-').map(time => parseInt(time));
-              
-              return (conflictStartHour < slotEnd && conflictEndHour > slotStart);
-            });
-            const isSelected = selectedTime === slot.id;
 
-            return (
-              <button
-                key={slot.id}
-                onClick={() => !isConflicting && handleTimeSlotSelect(slot.id)}
-                disabled={isConflicting}
-                className={`
-                  p-4 rounded-lg border transition-all duration-200 relative
-                  ${isSelected ? 'border-green-500 bg-green-50 text-green-700' : ''}
-                  ${isConflicting 
-                    ? 'border-red-300 bg-red-50 text-red-700 cursor-not-allowed' 
-                    : 'border-gray-200 hover:border-green-300 hover:bg-green-50'}
-                `}
-              >
-                <div className="text-center">
-                  <div className="font-medium">{slot.label}</div>
-                  <div className="text-sm">{slot.time}</div>
-                  {isConflicting && (
-                    <div className="text-xs text-red-500 mt-1">
-                      Unavailable
-                    </div>
-                  )}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-};
 
 const RecurringOptions = ({ onRecurringChange }) => (
   <div className="mt-6 p-4 bg-white rounded-lg shadow-sm">
@@ -1746,60 +2053,280 @@ const RecurringOptions = ({ onRecurringChange }) => (
   </div>
 );
 
-// Fix the renderCalendarSection
+// Enhanced calendar section with improved date handling
 const renderCalendarSection = () => (
-  <motion.div
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    className="space-y-6"
+  <Card 
+    className="rounded-xl shadow-sm"
+    title={
+      <div className="flex items-center gap-2">
+        <CalendarOutlined className="text-blue-500" />
+        <span className="font-medium">Select Date & Time</span>
+      </div>
+    }
   >
-    <Card className="shadow-lg border-0">
-      <div className="p-6 space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="space-y-4">
-            <label className="block text-sm font-semibold text-gray-700">
-              Start Date
-            </label>
-            <Calendar
-              value={formData.startDate ? new Date(formData.startDate) : null}
-              onChange={(e) => handleDateChange('start', e.value)}
-              showTime={false}
-              dateFormat="dd/mm/yy"
-              minDate={new Date()}
-              className="w-full"
-              panelClassName="date-panel"
-              inline
-            />
+    <Alert
+      message="Scheduling Guidelines"
+      description="Select the exact date and time for your reservation. The system will check availability in real-time."
+      type="info"
+      showIcon
+      className="mb-4"
+    />
+    
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="space-y-4">
+        <Form.Item 
+          label={
+            <div className="flex items-center">
+              <span className="text-sm">Date Range <span className="text-red-500">*</span></span>
+              <GuidelineTooltip 
+                title="Date Selection"
+                content="Choose the start and end dates for your reservation. For single-day reservations, select the same date for both."
+              />
+            </div>
+          }
+          required
+        >
+          <RangePicker
+            className="w-full rounded-md"
+            value={[
+              formData.startDate ? moment(formData.startDate) : null,
+              formData.endDate ? moment(formData.endDate) : null
+            ]}
+            onChange={(dates) => {
+              if (dates && dates[0] && dates[1]) {
+                handleDateChange('start', dates[0].toDate());
+                handleDateChange('end', dates[1].toDate());
+              } else {
+                setFormData(prev => ({
+                  ...prev,
+                  startDate: null,
+                  endDate: null
+                }));
+              }
+            }}
+            disabledDate={(current) => {
+              // Can't select days before today
+              return current && current < moment().startOf('day');
+            }}
+            format="MMMM D, YYYY"
+            placeholder={['Start Date', 'End Date']}
+            size={isMobile ? 'middle' : 'large'}
+          />
+        </Form.Item>
+        
+        <Form.Item
+          label={
+            <div className="flex items-center">
+              <span className="text-sm">Time Selection</span>
+              <GuidelineTooltip 
+                title="Time Selection"
+                content="Choose from preset time slots or specify custom times for your reservation."
+              />
+            </div>
+          }
+        >
+          <Radio.Group 
+            value={timeSlotMode} 
+            onChange={(e) => setTimeSlotMode(e.target.value)}
+            buttonStyle="solid"
+            className="mb-4"
+          >
+            <Radio.Button value="preset">Preset Times</Radio.Button>
+            <Radio.Button value="custom">Custom Time</Radio.Button>
+          </Radio.Group>
+          
+          {timeSlotMode === 'preset' ? (
+            <div className="space-y-2">
+              {timeSlots.map(slot => (
+                <div 
+                  key={slot.id}
+                  className={`
+                    border p-3 rounded-md cursor-pointer transition-all duration-200
+                    ${selectedTime === slot.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}
+                  `}
+                  onClick={() => handleTimeSlotSelect(slot.id)}
+                >
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <div className="font-medium text-sm">{slot.label}</div>
+                      <div className="text-xs text-gray-500">{slot.time}</div>
+                    </div>
+                    {selectedTime === slot.id && <FaCheckCircle className="text-blue-500" />}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Form.Item 
+                label="Start Time" 
+                className="mb-0"
+              >
+                <TimePicker
+                  use12Hours
+                  format="h:mm A"
+                  className="w-full"
+                  placeholder="Select start time"
+                  value={formData.startDate ? moment(formData.startDate) : null}
+                  onChange={(time) => handleCustomTimeChange('start', time)}
+                />
+              </Form.Item>
+              <Form.Item 
+                label="End Time"
+                className="mb-0"
+              >
+                <TimePicker
+                  use12Hours
+                  format="h:mm A"
+                  className="w-full"
+                  placeholder="Select end time"
+                  value={formData.endDate ? moment(formData.endDate) : null}
+                  onChange={(time) => handleCustomTimeChange('end', time)}
+                />
+              </Form.Item>
+            </div>
+          )}
+        </Form.Item>
+      </div>
+      
+      <div>
+        <div className="mb-3 flex items-center justify-between">
+          <h4 className="text-sm font-medium">Availability Preview</h4>
+          <Tag color={timeSlotAvailability.isAvailable ? 'success' : 'warning'}>
+            {timeSlotAvailability.isChecking ? 'Checking...' : 
+             timeSlotAvailability.isAvailable ? 'Available' : 'Checking Availability'}
+          </Tag>
+        </div>
+        
+        {formData.startDate && formData.endDate ? (
+          <TimeSlotVisualizer
+            selectedTime={selectedTime}
+            unavailableSlots={unavailableSlots}
+            isChecking={timeSlotAvailability.isChecking}
+            conflicts={timeSlotAvailability.conflicts}
+          />
+        ) : (
+          <div className="border border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center text-center">
+            <CalendarOutlined className="text-gray-400 text-3xl mb-2" />
+            <p className="text-gray-500">Select dates to view availability</p>
           </div>
+        )}
+      </div>
+    </div>
+  </Card>
+);
 
-          <div className="space-y-4">
-            <label className="block text-sm font-semibold text-gray-700">
-              End Date
-            </label>
-            <Calendar
-              value={formData.endDate ? new Date(formData.endDate) : null}
-              onChange={(e) => handleDateChange('end', e.value)}
-              showTime={false}
-              dateFormat="dd/mm/yy"
-              minDate={formData.startDate ? new Date(formData.startDate) : new Date()}
-              className="w-full"
-              panelClassName="date-panel"
-              disabled={!formData.startDate}
-              inline
-            />
+// Enhanced TimeSlotVisualizer component
+const TimeSlotVisualizer = ({ selectedTime, unavailableSlots, isChecking, conflicts }) => {
+  // Hours displayed in the timeline (8 AM to 5 PM)
+  const hours = Array.from({ length: 10 }, (_, i) => i + 8);
+  
+  const getSelectedTimeRange = () => {
+    if (!selectedTime) return null;
+    
+    const slot = timeSlots.find(s => s.id === selectedTime);
+    if (!slot) return null;
+    
+    return {
+      start: slot.start,
+      end: slot.end
+    };
+  };
+  
+  const selectedRange = getSelectedTimeRange();
+  
+  return (
+    <div className="border rounded-lg p-4 bg-white">
+      {isChecking ? (
+        <div className="flex justify-center py-6">
+          <Spin tip="Checking availability..." />
+        </div>
+      ) : conflicts && conflicts.length > 0 ? (
+        <div className="space-y-4">
+          <Alert
+            message="Scheduling Conflicts Detected"
+            description="The selected time overlaps with existing reservations."
+            type="warning"
+            showIcon
+          />
+          <div className="max-h-40 overflow-y-auto">
+            {conflicts.map((conflict, index) => (
+              <div key={index} className="border-b border-gray-100 py-2">
+                <p className="text-xs text-gray-600">
+                  <span className="font-medium">{conflict.resource_name}</span> is already reserved from{' '}
+                  <span className="font-medium">{format(new Date(conflict.start_time), 'h:mm a')}</span> to{' '}
+                  <span className="font-medium">{format(new Date(conflict.end_time), 'h:mm a')}</span>
+                </p>
+              </div>
+            ))}
           </div>
         </div>
-
-        <TimeSlotVisualizer
-          selectedTime={selectedTime}
-          unavailableSlots={unavailableSlots}
-          isChecking={timeSlotAvailability.isChecking}
-          conflicts={timeSlotAvailability.conflicts}
-        />
-      </div>
-    </Card>
-  </motion.div>
-);
+      ) : (
+        <div className="space-y-4">
+          <div className="flex items-center text-xs text-gray-500 mb-2">
+            <div className="w-16">Hour</div>
+            <div className="flex-1 grid grid-cols-4">
+              {['Morning', 'Noon', 'Afternoon', 'Evening'].map((label, i) => (
+                <div key={i} className="text-center">{label}</div>
+              ))}
+            </div>
+          </div>
+          
+          <div className="space-y-2">
+            {hours.map(hour => (
+              <div key={hour} className="flex items-center">
+                <div className="w-16 text-xs">{hour > 12 ? `${hour-12} PM` : `${hour} AM`}</div>
+                <div className="flex-1 h-6 bg-gray-100 rounded relative">
+                  {/* Render selected time range */}
+                  {selectedRange && hour >= selectedRange.start && hour < selectedRange.end && (
+                    <div
+                      className="absolute h-full bg-blue-500 opacity-70"
+                      style={{
+                        left: `${(hour - selectedRange.start) / (selectedRange.end - selectedRange.start) * 100}%`,
+                        width: `${1 / (selectedRange.end - selectedRange.start) * 100}%`
+                      }}
+                    />
+                  )}
+                  
+                  {/* Render unavailable time blocks */}
+                  {unavailableSlots.map((slot, index) => {
+                    const slotStart = new Date(slot.start_time).getHours();
+                    const slotEnd = new Date(slot.end_time).getHours();
+                    
+                    if (hour >= slotStart && hour < slotEnd) {
+                      return (
+                        <div
+                          key={index}
+                          className="absolute h-full bg-red-500 opacity-50"
+                          style={{
+                            left: `${(hour - slotStart) / (slotEnd - slotStart) * 100}%`,
+                            width: `${1 / (slotEnd - slotStart) * 100}%`
+                          }}
+                        />
+                      );
+                    }
+                    return null;
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          <div className="flex items-center text-xs space-x-4 mt-2">
+            <div className="flex items-center">
+              <div className="w-4 h-4 bg-blue-500 opacity-70 rounded mr-1"></div>
+              <span>Your Selection</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-4 h-4 bg-red-500 opacity-50 rounded mr-1"></div>
+              <span>Unavailable</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // Update your useEffect to fetch initial availability
 useEffect(() => {
@@ -1967,23 +2494,42 @@ const checkTimeSlotAvailability = async (startDate, endDate) => {
 const renderStepContent = () => {
   const steps = {
     0: renderResourceTypeSelection,
-    1: () => resourceType === 'venue' ? renderVenues() : renderResources(),
-    2: () => <ReservationCalendar 
-                onDateSelect={(startDate, endDate) => {
-                  setFormData(prev => ({
-                    ...prev,
-                    startDate: startDate,
-                    endDate: endDate
-                  }));
-                }}
-                selectedResource={{
-                  type: formData.resourceType,
-                  id: formData.resourceType === 'venue' ? formData.venue : selectedModels
-                }}
-              />,
+    1: () => {
+      if (resourceType === 'venue') {
+        return renderVenues();
+      } else if (resourceType === 'vehicle') {
+        return renderResources();
+      } else if (resourceType === 'equipment') {
+        return renderEquipmentSelection();
+      }
+    },
+    2: () => (
+      <ReservationCalendar
+        onDateSelect={(startDate, endDate) => {
+          setFormData((prev) => ({
+            ...prev,
+            startDate: startDate,
+            endDate: endDate,
+          }));
+        }}
+        selectedResource={{
+          type: formData.resourceType,
+          id: formData.resourceType === 'equipment' 
+            ? Object.entries(equipmentQuantities)
+                .filter(([_, qty]) => qty > 0)
+                .map(([id, qty]) => ({
+                  id: parseInt(id),
+                  quantity: qty // Add the quantity here
+                }))
+            : formData.resourceType === 'venue' 
+              ? formData.venue 
+              : selectedModels,
+        }}
+      />
+    ),
     3: renderBasicInformation,
     4: renderReviewSection,
-    5: renderSuccessState
+    5: renderSuccessState,
   };
 
   return (
@@ -1993,7 +2539,95 @@ const renderStepContent = () => {
   );
 };
 
-// Separate date selection into its own component
+const renderEquipmentSelection = () => (
+  <motion.div 
+    {...fadeInAnimation}
+    className="space-y-4"
+  >
+    <div className="flex justify-between items-center mb-6">
+      <h3 className="text-lg font-semibold text-gray-800">Select Equipment</h3>
+      <Tooltip title="Select the equipment you need for your reservation">
+        <InfoCircleOutlined className="text-gray-400 text-lg cursor-pointer" />
+      </Tooltip>
+    </div>
+    
+    <Alert
+      message="Equipment Availability"
+      description="Equipment availability is calculated based on existing reservations. The available quantity shown is what you can reserve for your selected time period."
+      type="info"
+      showIcon
+      className="mb-4"
+    />
+    
+    {equipment.length === 0 ? (
+      <Skeleton active paragraph={{ rows: 6 }} />
+    ) : (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        {equipment.map(item => (
+          <Card
+            key={item.equipment_id}
+            className="rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-200"
+            hoverable
+          >
+            <ImageWithFallback
+              src={`http://localhost/coc/gsd/${item.equipment_pic}`}
+              alt={item.equipment_name}
+              className="w-full h-40 mb-4"
+            />
+            <h4 className="text-base font-medium text-gray-800">{item.equipment_name}</h4>
+            <div className="flex items-center my-2">
+              <Tag className="mr-2 bg-blue-50 text-blue-600 border-blue-100">{item.equipment_category}</Tag>
+              <Badge 
+                count={item.available_quantity} 
+                showZero 
+                color={item.available_quantity > 0 ? 'green' : 'red'} 
+                overflowCount={99} 
+              />
+            </div>
+            
+            <Divider className="my-2" />
+            
+            <div className="flex justify-between text-xs text-gray-500 mb-2">
+              <span>Total Quantity:</span>
+              <span>{item.equipment_quantity}</span>
+            </div>
+            <div className="flex justify-between text-xs mb-3">
+              <span className="text-gray-500">Available:</span>
+              <span className={item.available_quantity > 0 ? 'text-green-500 font-medium' : 'text-red-500 font-medium'}>
+                {item.available_quantity}
+              </span>
+            </div>
+            
+            <div className="mt-3">
+              <Form.Item label="Quantity" className="mb-0">
+                <InputNumber
+                  min={0}
+                  max={item.available_quantity}
+                  value={equipmentQuantities[item.equipment_id] || 0}
+                  onChange={(value) => handleEquipmentQuantityChange(item.equipment_id, value)}
+                  placeholder="Qty"
+                  className="w-full"
+                  disabled={item.available_quantity === 0}
+                />
+              </Form.Item>
+              {item.available_quantity === 0 && (
+                <Alert 
+                  message="Not available" 
+                  type="warning" 
+                  showIcon 
+                  className="mt-2" 
+                  style={{ padding: '2px 8px' }}
+                />
+              )}
+            </div>
+          </Card>
+        ))}
+      </div>
+    )}
+  </motion.div>
+);
+
+
 const renderDateSelection = () => (
   <motion.div
     initial={{ opacity: 0, y: 20 }}
@@ -2042,48 +2676,112 @@ const handleDateChange = (type, newDate) => {
 
 
 
-const StepIndicator = ({ currentStep }) => {
+const StepIndicator = ({ currentStep, resourceType, isMobile }) => {
   const steps = [
-    { title: 'Select Type', icon: <TagOutlined /> },
-    { title: 'Select Resource', icon: resourceType === 'venue' ? <BankOutlined /> : <CarOutlined /> },
-    { title: 'Choose Date', icon: <CalendarOutlined /> },
-    { title: 'Fill Details', icon: <FormOutlined /> },
-    { title: 'Review', icon: <FileSearchOutlined /> },
-    { title: 'Complete', icon: <CheckCircleOutlined /> }
+    { 
+      title: 'Select Type',
+      icon: <TagOutlined />,
+      description: 'Choose resource type'
+    },
+    { 
+      title: 'Select Resource',
+      icon: resourceType === 'venue' ? 
+        <BankOutlined /> : 
+        resourceType === 'vehicle' ? 
+          <CarOutlined /> : 
+          <FaTools className="text-sm" />,
+      description: `Choose ${resourceType || 'resource'}`
+    },
+    { 
+      title: 'Schedule',
+      icon: <CalendarOutlined />,
+      description: 'Pick dates & times' 
+    },
+    { 
+      title: 'Details',
+      icon: <FormOutlined />,
+      description: 'Fill required info'
+    },
+    { 
+      title: 'Review',
+      icon: <FileSearchOutlined />,
+      description: 'Check details'
+    },
+    { 
+      title: 'Complete',
+      icon: <CheckCircleOutlined />,
+      description: 'Confirmation'
+    }
   ];
 
   return (
-    <Steps
-      current={currentStep}
-      className="custom-steps"
-      responsive={false}
-      size="small"
-    >
-      {steps.map((step, index) => (
-        <Steps.Step
-          key={index}
-          title={<span className="hidden sm:inline">{step.title}</span>}
-          icon={
-            index < currentStep ? (
-              <CheckCircleFilled className="text-green-500" />
-            ) : (
-              <div className={`
-                ${currentStep === index ? 'text-blue-500' : 'text-gray-400'}
-              `}>
-                {step.icon}
+    <div className="step-indicator-container">
+      <Steps
+        current={currentStep}
+        className={`custom-steps ${isMobile ? 'mobile-steps' : ''}`}
+        size={isMobile ? "small" : "default"}
+        responsive={!isMobile}
+        progressDot={(dot, { status, index }) => (
+          <Tooltip
+            title={steps[index].description}
+            placement="top"
+            overlayClassName="step-tooltip"
+          >
+            {status === 'finish' ? (
+              <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white shadow-md">
+                <CheckCircleFilled className="text-white text-lg" />
               </div>
-            )
-          }
-          status={
-            index === currentStep 
-              ? 'process'
-              : index < currentStep 
-                ? 'finish' 
-                : 'wait'
-          }
-        />
-      ))}
-    </Steps>
+            ) : status === 'process' ? (
+              <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white shadow-md border-2 border-white transition-all duration-300 pulse-animation">
+                {steps[index].icon}
+              </div>
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-300 transition-colors duration-200">
+                {steps[index].icon}
+              </div>
+            )}
+          </Tooltip>
+        )}
+      >
+        {steps.map((step, index) => (
+          <Steps.Step
+            key={index}
+            title={
+              <span className={`
+                font-medium transition-colors duration-200
+                ${currentStep === index ? 'text-blue-600' : ''}
+                ${currentStep > index ? 'text-green-600' : ''}
+                ${isMobile ? 'text-xs' : 'text-sm'}
+                ${isMobile ? 'hidden sm:block' : ''}
+              `}>
+                {step.title}
+              </span>
+            }
+            description={
+              <span className={`
+                text-xs transition-colors duration-200
+                ${currentStep === index ? 'text-blue-500' : 'text-gray-500'}
+                ${isMobile ? 'hidden sm:block' : ''}
+              `}>
+                {step.description}
+              </span>
+            }
+            style={{ 
+              textAlign: 'center',
+              margin: '0 auto'
+            }}
+          />
+        ))}
+      </Steps>
+      
+      {/* Mobile step labels (only shown on mobile) */}
+      {isMobile && (
+        <div className="mt-2 text-center">
+          <h4 className="font-medium text-blue-600">{steps[currentStep].title}</h4>
+          <p className="text-xs text-gray-500">{steps[currentStep].description}</p>
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -2140,6 +2838,8 @@ const fetchDrivers = async (startDate, endDate) => {
       endDateTime: format(endDate, 'yyyy-MM-dd HH:mm:ss')
     });
 
+    console.log('Driver response:', response.data); // Debugging line
+
     if (response.data.status === 'success') {
       const driversData = response.data.data.map(driver => ({
         ...driver,
@@ -2168,349 +2868,346 @@ useEffect(() => {
 
 // Add PassengerModal component
 const PassengerModal = ({ visible, onHide }) => {
-  const [localPassengerName, setLocalPassengerName] = useState('');
-  const inputRef = useRef(null);
+  const [newPassengerName, setNewPassengerName] = useState('');
+  const [passengerError, setPassengerError] = useState('');
 
-  useEffect(() => {
-    if (visible) {
-      // Focus input when modal opens
-      setTimeout(() => inputRef.current?.focus(), 100);
-    }
-  }, [visible]);
+  const resetModal = () => {
+    setNewPassengerName('');
+    setPassengerError('');
+  };
 
   const handleSubmit = () => {
-    if (localPassengerName.trim()) {
-      handleAddPassenger(localPassengerName.trim());
-      setLocalPassengerName(''); // Clear input
-      inputRef.current?.focus(); // Refocus input for next passenger
-      // Removed onHide() to keep modal open
-    }
-  };
-
-  return (
-    <Dialog
-      visible={visible}
-      onHide={onHide}
-      header={
-        <div className="flex items-center gap-3 px-4 py-2">
-          <UserOutlined className="text-blue-500 text-xl" />
-          <div>
-            <h3 className="text-lg font-semibold text-gray-800">Add Passengers</h3>
-            <p className="text-sm text-gray-500">Enter passenger details below</p>
-          </div>
-        </div>
-      }
-      modal
-      className="w-[90vw] md:w-[500px]"
-      closeOnEscape
-      dismissableMask
-      footer={
-        <div className="flex justify-end gap-2">
-          <Button
-            label="Done"
-            icon="pi pi-check"
-            onClick={onHide}
-            className="p-button-text"
-          />
-          <Button
-            label="Add Passenger"
-            icon="pi pi-plus"
-            onClick={handleSubmit}
-            className="p-button-primary"
-            disabled={!localPassengerName.trim()}
-          />
-        </div>
-      }
-    >
-      <div className="p-4 space-y-4">
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700">
-            Passenger Name <span className="text-red-500">*</span>
-          </label>
-          <div className="relative"></div>
-            <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <UserOutlined className="text-gray-400" />
-            </span>
-            <InputText
-              ref={inputRef}
-              value={localPassengerName}
-              onChange={(e) => setLocalPassengerName(e.target.value)}
-              placeholder="Enter passenger name"
-              className="w-full pl-10"
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  handleSubmit();
-                }
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Show current passengers list if any */}
-        {formData.passengers.length > 0 && (
-          <div className="mt-4">
-            <div className="text-sm font-medium text-gray-700 mb-2">
-              Current Passengers ({formData.passengers.length})
-            </div>
-            <div className="max-h-48 overflow-y-auto">
-              <div className="bg-gray-50 rounded-lg divide-y divide-gray-200">
-                {formData.passengers.map((passenger, index) => (
-                  <div 
-                    key={passenger.id}
-                    className="flex items-center justify-between p-3 hover:bg-gray-100 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm text-gray-500">{index + 1}.</span>
-                      <UserOutlined className="text-gray-400" />
-                      <span className="font-medium text-gray-700">{passenger.name}</span>
-                    </div>
-                    <Button
-                      icon="pi pi-trash"
-                      onClick={() => handleRemovePassenger(passenger.id)}
-                      className="p-button-text p-button-danger p-button-sm"
-                      tooltip="Remove passenger"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Quick tips */}
-        <div className="mt-4 bg-blue-50 text-blue-700 p-3 rounded-lg text-sm">
-          <div className="flex items-center gap-2">
-            <InfoCircleOutlined />
-            <span className="font-medium">Quick Tips:</span>
-          </div>
-          <ul className="list-disc ml-5 mt-1 text-blue-600">
-            <li>Press Enter to quickly add multiple passengers</li>
-            <li>Click the trash icon to remove a passenger</li>
-            <li>Click Done when finished adding all passengers</li>
-          </ul>
-        </div>
-
-    </Dialog>
-  );
-};
-
-const EquipmentSelectionModal = () => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  const [viewMode, setViewMode] = useState('grid');
-  const [localEquipmentQuantities, setLocalEquipmentQuantities] = useState({});
-
-  // Track viewport size
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 375);
-
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth <= 375);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  useEffect(() => {
-    if (showEquipmentModal) {
-      setLocalEquipmentQuantities({ ...equipmentQuantities });
-    }
-  }, [showEquipmentModal]);
-
-  const categories = ['all', ...new Set(equipment.map(item => item.equipment_category))];
-
-  const filteredEquipment = equipment.filter(item => {
-    const matchesSearch = item.equipment_name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = categoryFilter === 'all' || item.equipment_category === categoryFilter;
-    return matchesSearch && matchesCategory;
-  });
-
-  const handleLocalQuantityChange = (equipId, value) => {
-    if (value === undefined || value === null || value < 0) return;
-    
-    const equip = equipment.find(e => e.equipment_id === equipId);
-    if (!equip) return;
-
-    const availableQty = getAvailableQuantity(equip);
-    if (value > availableQty) {
-      toast.error(`Maximum available quantity is ${availableQty}`);
+    if (!newPassengerName.trim()) {
+      setPassengerError('Passenger name cannot be empty');
       return;
     }
-
-    setLocalEquipmentQuantities(prev => ({
-      ...prev,
-      [equipId]: value
-    }));
+    
+    // Check if passenger name already exists
+    if (formData.passengers.some(p => p.name.toLowerCase() === newPassengerName.trim().toLowerCase())) {
+      setPassengerError('This passenger is already in the list');
+      return;
+    }
+    
+    handleAddPassenger(newPassengerName.trim());
+    resetModal();
+    onHide();
   };
-
-  const handleConfirm = () => {
-    setEquipmentQuantities(localEquipmentQuantities);
-    const newEquipment = {};
-    Object.entries(localEquipmentQuantities).forEach(([equipId, quantity]) => {
-      if (quantity > 0) {
-        newEquipment[equipId.toString()] = quantity;
-      }
-    });
-    setSelectedVenueEquipment(newEquipment);
-    setShowEquipmentModal(false);
-  };
-
-  const getAvailableQuantity = (item) => item.available_quantity || 0;
-
-  // Responsive card rendering
-  const renderEquipmentCard = (item) => (
-    <Card
-      key={item.equipment_id}
-      className={`
-        transition-all duration-300 hover:shadow-md
-        ${viewMode === 'list' ? 'flex items-center' : ''}
-        ${equipmentQuantities[item.equipment_id] > 0 ? 'ring-2 ring-blue-500' : ''}
-        ${isMobile ? 'p-2' : 'p-4'}
-      `}
-      bodyStyle={viewMode === 'list' ? { padding: isMobile ? '8px' : '16px', width: '100%' } : {}}
-    >
-      <div className={viewMode === 'list' ? 'flex gap-2 w-full' : ''}>
-        {/* Image */}
-        <div className={viewMode === 'list' ? (isMobile ? 'w-20' : 'w-32') : ''}>
-          <img
-            src={`http://localhost/coc/gsd/${item.equipment_pic}`}
-            alt={item.equipment_name}
-            className={`
-              object-cover rounded-lg
-              ${viewMode === 'grid' 
-                ? isMobile ? 'h-24 w-full' : 'h-32 w-full'
-                : isMobile ? 'h-20 w-20' : 'h-32 w-32'}
-            `}
-            onError={(e) => {
-              e.target.src = '/default-equipment.jpg';
-              e.target.onerror = null;
-            }}
-          />
-        </div>
-
-        {/* Content */}
-        <div className={`
-          ${viewMode === 'list' ? 'flex-grow flex justify-between items-center' : 'mt-2'}
-          ${isMobile ? 'space-y-1' : 'space-y-2'}
-        `}>
-          <div>
-            <h4 className={`font-medium ${isMobile ? 'text-sm' : 'text-base'} text-gray-900 truncate`}>
-              {item.equipment_name}
-            </h4>
-            {!isMobile && (
-              <p className="text-xs text-gray-500">{item.equipment_category}</p>
-            )}
-            <Tag 
-              color={item.status_availability_name === 'available' ? 'green' : 'red'}
-              className={`${isMobile ? 'text-xs' : 'text-sm'}`}
-            >
-              {item.status_availability_name}
-            </Tag>
-            <div className={isMobile ? 'text-xs' : 'text-sm'}>
-              Available: {getAvailableQuantity(item)}
-            </div>
-          </div>
-
-          {/* Quantity Input */}
-          <div className={viewMode === 'list' ? 'ml-2' : 'mt-2'}>
-            <InputNumber
-              min={0}
-              max={getAvailableQuantity(item)}
-              value={localEquipmentQuantities[item.equipment_id] || 0}
-              onChange={(value) => handleLocalQuantityChange(item.equipment_id, value)}
-              disabled={getAvailableQuantity(item) === 0}
-              className={`w-full ${isMobile ? 'mini-input' : ''}`}
-              size={isMobile ? 'small' : 'middle'}
-              controls={!isMobile}
-            />
-          </div>
-        </div>
-      </div>
-    </Card>
-  );
 
   return (
     <Modal
-      open={showEquipmentModal}
-      onCancel={() => setShowEquipmentModal(false)}
       title={
         <div className="flex items-center gap-2">
-          <FaTools className={isMobile ? 'text-sm' : 'text-base'} />
-          <span className={`font-semibold ${isMobile ? 'text-sm' : 'text-base'}`}>
-            Equipment Selection
-          </span>
+          <TeamOutlined />
+          <span>Add Passenger</span>
         </div>
       }
-      width={isMobile ? '100%' : 1000}
+      open={visible}
+      onCancel={() => {
+        resetModal();
+        onHide();
+      }}
       footer={[
-        <Button 
-          key="cancel" 
-          onClick={() => setShowEquipmentModal(false)}
-          size={isMobile ? 'small' : 'middle'}
-        >
+        <Button key="cancel" onClick={onHide}>
           Cancel
         </Button>,
         <Button
           key="submit"
           type="primary"
-          onClick={handleConfirm}
-          icon={<FaCheck />}
-          size={isMobile ? 'small' : 'middle'}
+          onClick={handleSubmit}
         >
-          Confirm
+          Add Passenger
         </Button>
       ]}
-      className="equipment-modal"
     >
-      {/* Search and Filter Controls */}
-      <div className={`${isMobile ? 'space-y-2' : 'space-y-4'} mb-4`}>
-        <Input.Search
-          placeholder="Search equipment..."
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full"
-          size={isMobile ? 'small' : 'middle'}
-          allowClear
+      <div className="mb-4">
+        <Alert
+          message="Passenger Guidelines"
+          description="Add each passenger who will be traveling in the vehicle. Make sure to include all passengers for accurate capacity planning."
+          type="info"
+          showIcon
+          className="mb-4"
         />
-        <div className="flex items-center gap-2 justify-between">
-          <Select
-            value={categoryFilter}
-            onChange={setCategoryFilter}
-            className={isMobile ? 'w-32' : 'w-48'}
-            size={isMobile ? 'small' : 'middle'}
-            placeholder="Category"
+        
+        <Form layout="vertical">
+          <Form.Item 
+            label="Passenger Name" 
+            required
+            validateStatus={passengerError ? "error" : ""}
+            help={passengerError}
           >
-            {categories.map(category => (
-              <Select.Option key={category} value={category}>
-                {category === 'all' ? 'All' : category}
-              </Select.Option>
-            ))}
-          </Select>
-          <Radio.Group
-            value={viewMode}
-            onChange={(e) => setViewMode(e.target.value)}
-            size={isMobile ? 'small' : 'middle'}
-          >
-            <Radio.Button value="grid"><BsFillGridFill /></Radio.Button>
-            <Radio.Button value="list"><BsList /></Radio.Button>
-          </Radio.Group>
+            <Input
+              placeholder="Enter passenger's full name"
+              value={newPassengerName}
+              onChange={e => {
+                setNewPassengerName(e.target.value);
+                if (passengerError) setPassengerError('');
+              }}
+              onPressEnter={handleSubmit}
+              suffix={
+                <GuidelineTooltip 
+                  title="Passenger Name"
+                  content="Enter the full name of the passenger. This information will be used for the travel manifest."
+                />
+              }
+            />
+          </Form.Item>
+        </Form>
+      </div>
+    </Modal>
+  );
+};
+
+// Enhanced Equipment Selection Modal with search, filtering and better UI
+const EquipmentSelectionModal = () => {
+  const [localEquipmentQuantities, setLocalEquipmentQuantities] = useState({...equipmentQuantities});
+  const [equipmentSearch, setEquipmentSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 375);
+  
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 375);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
+  // Reset local state when modal opens
+  useEffect(() => {
+    setLocalEquipmentQuantities({...equipmentQuantities});
+  }, [showEquipmentModal, equipmentQuantities]);
+  
+  const handleLocalQuantityChange = (equipId, value) => {
+    const equip = equipment.find(e => e.equipment_id.toString() === equipId.toString());
+    if (!equip) return;
+    
+    const numericValue = Number(value) || 0;
+    const maxAvailable = parseInt(equip.available_quantity);
+    
+    // Ensure quantity doesn't exceed available amount
+    const constrainedValue = Math.min(numericValue, maxAvailable);
+    
+    setLocalEquipmentQuantities(prev => ({
+      ...prev,
+      [equipId]: constrainedValue
+    }));
+  };
+  
+  const handleConfirm = () => {
+    setEquipmentQuantities(localEquipmentQuantities);
+    
+    if (formData.resourceType === 'venue') {
+      setSelectedVenueEquipment(localEquipmentQuantities);
+    }
+    
+    setShowEquipmentModal(false);
+  };
+  
+  const getAvailableQuantity = (item) => {
+    return parseInt(item.available_quantity);
+  };
+  
+  // Filter equipment by search term and category
+  const filteredEquipment = equipment.filter(item => {
+    const matchesSearch = item.equipment_name.toLowerCase().includes(equipmentSearch.toLowerCase());
+    const matchesCategory = selectedCategory === 'all' || item.equipment_category_id.toString() === selectedCategory.toString();
+    return matchesSearch && matchesCategory;
+  });
+  
+  // Group equipment by category for better organization
+  const groupedEquipment = filteredEquipment.reduce((acc, item) => {
+    const category = item.equipment_category;
+    if (!acc[category]) {
+      acc[category] = [];
+    }
+    acc[category].push(item);
+    return acc;
+  }, {});
+  
+  const renderEquipmentCard = (item) => (
+    <Card 
+      key={item.equipment_id}
+      className={`
+        overflow-hidden rounded-lg shadow-sm transition-all duration-200
+        ${localEquipmentQuantities[item.equipment_id] > 0 ? 'border-blue-200 shadow-blue-50' : 'border-gray-100'}
+      `}
+      hoverable
+    >
+      <div className="flex flex-col h-full">
+        <div className="relative">
+          <ImageWithFallback
+            src={`http://localhost/coc/gsd/${item.equipment_pic}`}
+            alt={item.equipment_name}
+            className="w-full h-32"
+          />
+          
+          {localEquipmentQuantities[item.equipment_id] > 0 && (
+            <div className="absolute top-2 right-2">
+              <Badge count={localEquipmentQuantities[item.equipment_id]} color="blue" />
+            </div>
+          )}
+          
+          {getAvailableQuantity(item) === 0 && (
+            <div className="absolute inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center">
+              <Tag color="red" className="text-sm">Not Available</Tag>
+            </div>
+          )}
+        </div>
+        
+        <div className="p-3 flex-1 flex flex-col">
+          <div className="mb-1 text-base font-medium text-gray-800">{item.equipment_name}</div>
+          <div className="flex flex-col text-xs text-gray-500 mb-3">
+            <div className="flex justify-between">
+              <span>Total Quantity:</span>
+              <span className="font-medium">{item.equipment_quantity}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Available:</span>
+              <span className={`font-medium ${getAvailableQuantity(item) === 0 ? 'text-red-500' : 'text-green-500'}`}>
+                {getAvailableQuantity(item)}
+              </span>
+            </div>
+          </div>
+          
+          <div className="mt-auto">
+            <div className="flex items-center justify-between">
+              <InputNumber
+                min={0}
+                max={getAvailableQuantity(item)}
+                value={localEquipmentQuantities[item.equipment_id] || 0}
+                onChange={(value) => handleLocalQuantityChange(item.equipment_id, value)}
+                disabled={getAvailableQuantity(item) === 0}
+                className="w-20"
+                size="small"
+              />
+              
+              {localEquipmentQuantities[item.equipment_id] > 0 ? (
+                <Button
+                  type="text"
+                  danger
+                  icon={<FaTimes />}
+                  onClick={() => handleLocalQuantityChange(item.equipment_id, 0)}
+                  size="small"
+                />
+              ) : (
+                <Button
+                  type="text"
+                  icon={<PlusOutlined />}
+                  onClick={() => handleLocalQuantityChange(item.equipment_id, 1)}
+                  disabled={getAvailableQuantity(item) === 0}
+                  size="small"
+                  className="text-blue-500"
+                />
+              )}
+            </div>
+          </div>
         </div>
       </div>
-
-      {/* Equipment List */}
-      <div className={`
-        ${viewMode === 'grid' 
-          ? 'grid grid-cols-2 gap-2'
-          : 'space-y-2'}
-      `}>
-        {filteredEquipment.map(renderEquipmentCard)}
-      </div>
-
-      {filteredEquipment.length === 0 && (
-        <Empty
-          description={<span className={isMobile ? 'text-xs' : 'text-sm'}>No equipment found</span>}
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          className="my-4"
-          imageStyle={{ width: isMobile ? 40 : 60 }}
+    </Card>
+  );
+  
+  return (
+    <Modal
+      title={
+        <div className="flex items-center gap-2">
+          <FaTools />
+          <span>Select Equipment</span>
+        </div>
+      }
+      open={showEquipmentModal}
+      onCancel={() => setShowEquipmentModal(false)}
+      width={900}
+      footer={[
+        <AntButton key="cancel" onClick={() => setShowEquipmentModal(false)}>
+          Cancel
+        </AntButton>,
+        <AntButton
+          key="confirm"
+          type="primary"
+          onClick={handleConfirm}
+          className="bg-blue-500"
+        >
+          Confirm Selection
+        </AntButton>
+      ]}
+    >
+      <div className="space-y-4">
+        <Alert
+          message="Equipment Selection Guidelines"
+          description="Select the equipment you need for your event. Only available items can be reserved, and quantities are limited."
+          type="info"
+          showIcon
+          className="mb-4"
         />
-      )}
+        
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+          <Input.Search
+            placeholder="Search equipment..."
+            value={equipmentSearch}
+            onChange={e => setEquipmentSearch(e.target.value)}
+            className="sm:w-60"
+            allowClear
+          />
+          
+          <Select
+            placeholder="Filter by category"
+            value={selectedCategory}
+            onChange={setSelectedCategory}
+            className="w-full sm:w-60"
+            options={[
+              { value: 'all', label: 'All Categories' },
+              ...equipmentCategories.map(cat => ({
+                value: cat.equipment_category_id.toString(),
+                label: cat.equipment_category_name
+              }))
+            ]}
+          />
+        </div>
+        
+        <div className="mt-4 max-h-[400px] overflow-y-auto p-1">
+          {filteredEquipment.length === 0 ? (
+            <Empty
+              description={
+                <span className="text-gray-500">
+                  {equipmentSearch
+                    ? `No equipment matching "${equipmentSearch}"`
+                    : "No equipment available"}
+                </span>
+              }
+            />
+          ) : (
+            <div>
+              {selectedCategory === 'all' ? (
+                // Group by category when showing all
+                Object.entries(groupedEquipment).map(([category, items]) => (
+                  <div key={category} className="mb-6">
+                    <h3 className="text-sm font-medium mb-3 text-gray-700">{category}</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {items.map(renderEquipmentCard)}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                // Simple grid when filtered by category
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredEquipment.map(renderEquipmentCard)}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        
+        <div className="mt-4 flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+          <div className="text-sm font-medium">
+            Selected Items: <span className="text-blue-500">
+              {Object.values(localEquipmentQuantities).filter(qty => qty > 0).length}
+            </span>
+          </div>
+          <div className="text-sm font-medium">
+            Total Quantity: <span className="text-blue-500">
+              {Object.values(localEquipmentQuantities).reduce((sum, qty) => sum + qty, 0)}
+            </span>
+          </div>
+        </div>
+      </div>
     </Modal>
   );
 };
@@ -2519,88 +3216,121 @@ const EquipmentSelectionModal = () => {
 const renderDriverDropdown = () => {
   return (
     <Form.Item
-      label={<span className="text-sm">Select Driver <span className="text-red-500">*</span></span>}
+      label={<span className="text-sm">Driver Information <span className="text-red-500">*</span></span>}
       required
     >
       <div className="space-y-3">
-        {isLoadingDrivers ? (
-          <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-            <Spin size="small" />
-            <span className="text-gray-500">Loading available drivers...</span>
-          </div>
-        ) : (
-          <>
-            <Select
-              value={formData.driverName}
-              onChange={(value) => handleInputChange({
-                target: { name: 'driverName', value }
-              })}
-              placeholder="Select a driver"
-              className="w-full"
-              disabled={availableDrivers.length === 0}
-              showSearch
-              filterOption={(input, option) =>
-                option.children?.toString().toLowerCase().indexOf(input.toLowerCase()) >= 0
-              }
-              notFoundContent={
-                <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description="No drivers available for the selected time slot."
-                />
-              }
-            >
-              {availableDrivers.map(driver => (
-                <Select.Option 
-                  key={driver.driver_id} 
-                  value={driver.driver_id}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <UserOutlined className="text-gray-400" />
-                      <span>{driver.driver_full_name}</span>
-                    </div>
-                    
-                  </div>
-                </Select.Option>
-              ))}
-            </Select>
+        <Radio.Group
+          value={formData.driverType}
+          onChange={(e) => {
+            setFormData(prev => ({
+              ...prev,
+              driverType: e.target.value,
+              driverName: e.target.value === 'trip_ticket' ? null : '', // Set null for trip ticket
+              tripTicketDriver: null
+            }));
+          }}
+          className="mb-4"
+        >
+          <Radio value="default">Default Driver</Radio>
+          <Radio value="trip_ticket">Trip Ticket Driver</Radio>
+        </Radio.Group>
 
-            {formData.driverName && (
-              <Card className="bg-blue-50 border-blue-200">
-                <div className="flex items-center gap-4">
-                  <div className="p-2 bg-blue-100 rounded-full">
-                    <UserOutlined className="text-xl text-blue-500" />
-                  </div>
-                  <div>
-                    <div className="font-medium text-blue-700">
-                      {availableDrivers.find(d => d.driver_id === formData.driverName)?.driver_full_name}
+        {formData.driverType === 'default' ? (
+          isLoadingDrivers ? (
+            <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+              <Spin size="small" />
+              <span className="text-gray-500">Loading available drivers...</span>
+            </div>
+          ) : (
+            <>
+              <Select
+                value={formData.driverName}
+                onChange={(value) => {
+                  setFormData(prevState => ({
+                    ...prevState,
+                    driverName: value,
+                    tripTicketDriver: null
+                  }));
+                }}
+                placeholder="Select a default driver"
+                className="w-full"
+                disabled={availableDrivers.length === 0}
+                showSearch
+                filterOption={(input, option) =>
+                  option?.children?.toString().toLowerCase().includes(input.toLowerCase())
+                }
+              >
+                {availableDrivers.map(driver => (
+                  <Select.Option 
+                    key={driver.users_id} 
+                    value={driver.driver_id}
+                  >
+                    {driver.driver_full_name}
+                  </Select.Option>
+                ))}
+              </Select>
+
+              {formData.driverName && (
+                <Card className="bg-blue-50 border-blue-200">
+                  <div className="flex items-center gap-4">
+                    <div className="p-2 bg-blue-100 rounded-full">
+                      <UserOutlined className="text-xl text-blue-500" />
                     </div>
-                    <div className="text-sm text-blue-600">
-                      {availableDrivers.find(d => d.driver_id === formData.driverName)?.departments_name || 'Driver'}
+                    <div>
+                      <div className="font-medium text-blue-700">
+                        {availableDrivers.find(d => d.driver_id === formData.driverName)?.driver_full_name}
+                      </div>
+                      <div className="text-sm text-blue-600">
+                        {availableDrivers.find(d => d.driver_id === formData.driverName)?.departments_name || 'Driver'}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Card>
-            )}
-          </>
+                </Card>
+              )}
+            </>
+          )
+        ) : (
+          <div className="p-3 bg-gray-50 rounded-lg">
+            <div className="text-sm text-gray-600">
+              Trip ticket driver will be assigned later
+            </div>
+          </div>
         )}
       </div>
     </Form.Item>
   );
 };
 
+// Add a new guidelines component that can be reused across the form
+const GuidelineTooltip = ({ title, content }) => (
+  <Tooltip
+    title={
+      <div className="p-1">
+        <h4 className="font-medium mb-1">{title}</h4>
+        <p className="text-xs">{content}</p>
+      </div>
+    }
+    color="#fff"
+    overlayInnerStyle={{ 
+      color: '#555', 
+      boxShadow: '0 3px 6px rgba(0,0,0,0.1)',
+      border: '1px solid #eee'
+    }}
+  >
+    <QuestionCircleOutlined className="ml-1 text-gray-400 cursor-help" />
+  </Tooltip>
+);
+
+
 
 return (
   <div className="min-h-screen bg-gradient-to-br">
-    {/* Sidebar handling */}
     <div className="hidden md:block">
       {userLevel === '100' && <Sidebar />}
     </div>
-
-    {/* Enhanced main content area */}
     <div className={`w-full p-6 transition-all duration-300 ${isMobile ? 'px-3 py-4' : 'p-6'}`}>
       <div className={`mx-auto ${isMobile ? 'max-w-full' : 'max-w-6xl'}`}>
-        {/* Enhanced header section with back button */}
         <div className={`bg-white rounded-2xl shadow-sm p-6 border border-gray-100 ${isMobile ? 'mb-3' : 'mb-6'}`}>
           <div className={`flex ${isMobile ? 'flex-col gap-2' : 'justify-between items-center'}`}>
             <Button
@@ -2627,10 +3357,7 @@ return (
             isMobile={isMobile}
           />
         </div>
-
-        {/* Main content card with enhanced styling */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          {/* Content header */}
           <div className={`px-6 py-4 bg-gray-50 border-b border-gray-100 ${isMobile ? 'p-3' : 'px-6 py-4'}`}>
             <h2 className={`text-xl font-semibold text-gray-800 ${isMobile ? 'text-lg' : 'text-xl'}`}>
               {currentStep === 0 && "Select Resource Type"}
@@ -2641,15 +3368,11 @@ return (
               {currentStep === 5 && "Reservation Complete"}
             </h2>
           </div>
-
-          {/* Main content area with enhanced padding */}
           <div className={isMobile ? 'p-3' : 'p-6'}>
             <div className={`mx-auto ${isMobile ? 'max-w-full' : 'max-w-4xl'}`}>
               {renderStepContent()}
             </div>
           </div>
-
-          {/* Enhanced footer with better positioned buttons */}
           {currentStep !== 5 && (
             <div className={`px-6 py-4 bg-gray-50 border-t border-gray-100 ${isMobile ? 'p-3' : 'px-6 py-4'}`}>
               <div className={`flex ${isMobile ? 'flex-col gap-2' : 'justify-between items-center'}`}>
@@ -2721,60 +3444,6 @@ return (
     <EquipmentSelectionModal />
   </div>
 );
-};
-
-// Update the StepIndicator component with enhanced styling
-const StepIndicator = ({ currentStep, resourceType, isMobile }) => {
-  const steps = [
-    { title: 'Select Type', icon: <TagOutlined className="text-lg" /> },
-    { 
-      title: 'Select Resource', 
-      icon: resourceType === 'venue' 
-        ? <BankOutlined className="text-lg" /> 
-        : <CarOutlined className="text-lg" /> 
-    },
-    { title: 'Schedule', icon: <CalendarOutlined className="text-lg" /> },
-    { title: 'Details', icon: <FormOutlined className="text-lg" /> },
-    { title: 'Review', icon: <FileSearchOutlined className="text-lg" /> },
-    { title: 'Complete', icon: <CheckCircleOutlined className="text-lg" /> }
-  ];
-
-  return (
-    <Steps
-      current={currentStep}
-      className={`custom-steps site-navigation-steps ${isMobile ? 'mobile-steps' : ''}`}
-      responsive={false}
-      size={isMobile ? 'small' : 'default'}
-      // Only show current and adjacent steps on mobile
-      progressDot={isMobile}
-    >
-      {steps.map((step, index) => (
-        <Steps.Step
-          key={index}
-          title={!isMobile && <span>{step.title}</span>}
-          icon={
-            index < currentStep ? (
-              <CheckCircleFilled className="text-green-500 text-lg" />
-            ) : (
-              <div className={`
-                transition-colors duration-200
-                ${currentStep === index ? 'text-blue-500' : 'text-gray-400'}
-              `}>
-                {step.icon}
-              </div>
-            )
-          }
-          status={
-            index === currentStep 
-              ? 'process'
-              : index < currentStep 
-                ? 'finish' 
-                : 'wait'
-          }
-        />
-      ))}
-    </Steps>
-  );
 };
 
 

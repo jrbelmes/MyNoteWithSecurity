@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FiCalendar, FiList, FiHelpCircle, FiLogOut, FiBell, FiUser, FiSettings, FiClock, FiCheckCircle, FiAlertCircle, FiBarChart2, FiUsers, FiBookmark, FiX, FiCheck, FiTrash2, FiInfo, FiMessageSquare } from 'react-icons/fi';
 import ReservationCalendar from '../components/ReservationCalendar';
 import Sidebar from './component/user_sidebar';
+import { SecureStorage } from '../utils/encryption';
+
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -13,6 +15,15 @@ const Dashboard = () => {
   const [notificationsLoading, setNotificationsLoading] = useState(true);
   const [userName, setUserName] = useState('');
   const [showSupportTicket, setShowSupportTicket] = useState(false);
+
+  useEffect(() => {
+          const encryptedUserLevel = SecureStorage.getSessionItem("user_level_id"); 
+          console.log("this is encryptedUserLevel", encryptedUserLevel);
+          if (encryptedUserLevel !== '3' && encryptedUserLevel !== '15') {
+              localStorage.clear();
+              navigate('/gsd');
+          }
+      }, [navigate]);
 
   const navButtonVariants = {
     hover: { 

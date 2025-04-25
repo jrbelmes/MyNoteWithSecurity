@@ -15,6 +15,7 @@ import { Divider } from 'primereact/divider';
 import { Modal, Form, Input, Upload } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { sanitizeInput, validateInput } from '../utils/sanitize';
+import {SecureStorage} from '../utils/encryption';
 
 const EquipmentEntry = () => {
     const adminId = localStorage.getItem('adminId') || '';
@@ -39,7 +40,7 @@ const EquipmentEntry = () => {
     const [statusAvailability, setStatusAvailability] = useState([]);
     const [selectedStatus, setSelectedStatus] = useState('');
 
-    const user_level_id = localStorage.getItem('user_level_id');
+    const user_level_id = SecureStorage.getSessionItem('user_level_id');
 
     useEffect(() => {
         if (user_level_id !== '1' && user_level_id !== '2' && user_level_id !== '4') {

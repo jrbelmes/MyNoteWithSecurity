@@ -183,19 +183,40 @@ function Logins() {
         if (sessionNotification && document.body.contains(sessionNotification)) {
             document.body.removeChild(sessionNotification);
         }
-        if (localStorage.getItem('loggedIn') === 'true') {
-            const savedApiUrl = SecureStorage.getLocalItem("url");
-            localStorage.clear();
-            sessionStorage.clear();
-            removeSessionCookie('userSession');
+        if (SecureStorage.getLocalItem('loggedIn') === 'true' || SecureStorage.getSessionItem('loggedIn') === 'true') {
+            // Get user level from secure storage
+            const userLevel = SecureStorage.getLocalItem('user_level') || SecureStorage.getSessionItem('user_level');
             
-            // Preserve API URL
-            if (savedApiUrl) {
-                SecureStorage.setLocalItem("url", savedApiUrl);
+            // Navigate based on user level
+            switch(userLevel) {
+                case 'Super Admin':
+                case 'Admin':
+                    navigateTo('/adminDashboard');
+                    break;
+                case 'Personnel':
+                    navigateTo('/personnelDashboard');
+                    break;
+                case 'Dean':
+                case 'Secretary':
+                    navigateTo('/deanDashboard');
+                    break;
+                case 'Faculty/Staff':
+                    navigateTo('/dashboard');
+                    break;
+                default:
+                    // If no valid user level, clear everything except API URL
+                    const savedApiUrl = SecureStorage.getLocalItem("url");
+                    localStorage.clear();
+                    sessionStorage.clear();
+                    removeSessionCookie('userSession');
+                    if (savedApiUrl) {
+                        SecureStorage.setLocalItem("url", savedApiUrl);
+                    }
             }
-            
-            console.log("Cleared stale session data on login page load");
+            return; // Exit early after navigation
         }
+
+        // Continue with normal login page initialization
         const timer = setTimeout(() => {
             if (captchaCanvasRef.current) {
                 generateCaptcha();
@@ -291,7 +312,7 @@ function Logins() {
         
         // Check for existing session on load
         const checkExistingSession = () => {
-            const isLoggedIn = localStorage.getItem('loggedIn') === 'true';
+            const isLoggedIn = SecureStorage.getLocalItem('loggedIn') === 'true' || SecureStorage.getSessionItem('loggedIn');
             const userSession = document.cookie.includes('userSession=');
             
             // If we have localStorage but no valid session cookie, log out

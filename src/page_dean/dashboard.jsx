@@ -21,6 +21,7 @@ import {
 import ReservationCalendar from '../components/ReservationCalendar';
 import DeanSidebar from './component/dean_sidebar';
 import ViewApproval from './component/viewApproval';
+import { SecureStorage } from '../utils/encryption';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -39,6 +40,15 @@ const Dashboard = () => {
     },
     tap: { scale: 0.95 }
   };
+
+  useEffect(() => {
+            const encryptedUserLevel = SecureStorage.getSessionItem("user_level_id"); 
+            console.log("this is encryptedUserLevel", encryptedUserLevel);
+            if (encryptedUserLevel !== '5' && encryptedUserLevel !== '6') {
+                localStorage.clear();
+                navigate('/gsd');
+            }
+      }, [navigate]);
 
 
 

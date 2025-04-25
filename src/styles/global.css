@@ -1,3 +1,20 @@
+/* Color Palette */
+:root {
+  --primary-green: #548e54;
+  --light-cream: #d4f4dc;
+  --accent-green: #83b383;
+  
+  /* Additional complementary shades */
+  --primary-green-dark: #145414;
+  --primary-green-light: #83b383;
+  --accent-green-dark: #538c4c;
+  --accent-green-light: #d4f4dc;
+  
+  /* Modern theme colors */
+  --modern-green: #d4f4dc;
+  --modern-teal: #83b383;
+  --modern-sage: #538c4c;
+}
 
 /* Enhanced Steps styling */
 .site-navigation-steps .ant-steps-item-icon {

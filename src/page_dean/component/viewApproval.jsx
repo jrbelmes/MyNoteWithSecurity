@@ -48,11 +48,6 @@ const ViewApproval = () => {
 
   // Approve or Disapprove a request
   const handleApproval = async (approvalId, status) => {
-    if (status === 'approved' && isAnyResourceUnavailable(availabilityData, selectedRequest)) {
-      alert('Cannot approve: One or more resources are unavailable');
-      return;
-    }
-
     try {
       const response = await axios.post('http://localhost/coc/gsd/process_reservation.php', {
         operation: 'approveRequest',
@@ -83,7 +78,6 @@ const ViewApproval = () => {
   // View details of the selected request
   const handleViewDetails = async (request) => {
     setSelectedRequest(request);
-    await checkAvailability(request);
   };
 
   // Close the details view
@@ -142,32 +136,6 @@ const ViewApproval = () => {
     }
     return new Date(a.approval_created_at) - new Date(b.approval_created_at);
   });
-
-  const checkAvailability = async (details) => {
-    try {
-      const startDate = details.venue ? details.venue.venue_form_start_date : details.vehicle.vehicle_form_start_date;
-      const endDate = details.venue ? details.venue.venue_form_end_date : details.vehicle.vehicle_form_end_date;
-
-      const response = await axios.post('http://localhost/coc/gsd/process_reservation.php', {
-        operation: 'doubleCheckAvailability',
-        start_datetime: startDate,
-        end_datetime: endDate,
-        venue_id: details.venue?.ven_id,
-        vehicle_id: details.vehicle?.vehicle_id,
-        equipment_id: details.equipment?.equip_id,
-        driver_id: details.vehicle?.driver_id // Add driver_id for checking
-      });
-
-      if (response.data?.status === 'success') {
-        setAvailabilityData(response.data.data);
-        return !isAnyResourceUnavailable(response.data.data, details);
-      }
-      return false;
-    } catch (error) {
-      console.error('Error checking availability:', error);
-      return false;
-    }
-  };
 
   const isAnyResourceUnavailable = (availabilityData, details) => {
     if (!availabilityData) return false;

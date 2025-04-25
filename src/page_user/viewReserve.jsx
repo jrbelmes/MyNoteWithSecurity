@@ -1,13 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { 
-    FaTrash, 
-    FaPlus, 
     FaClock, 
     FaCalendar, 
     FaUser, 
     FaEye, 
-    FaEdit,
     FaUsers,
     FaBuilding,
     FaTools,
@@ -21,34 +18,28 @@ import {
 } from 'react-icons/fa';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
-import { toast, ToastContainer } from 'react-toastify';
+import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import ReservationCalendar from '../components/ReservationCalendar';
 import Sidebar from './component/user_sidebar';
+import { Modal, Tabs, Table } from 'antd';
+import { SecureStorage } from '../utils/encryption';
+import { InfoCircleOutlined, BuildOutlined, ToolOutlined, UserOutlined, TeamOutlined, CalendarOutlined, AppstoreOutlined } from '@ant-design/icons';
+
+const { TabPane } = Tabs;
 
 const ViewReserve = () => {
-    
     const navigate = useNavigate();
-    const [editModalOpen, setEditModalOpen] = useState(false);
     const [activeFilter, setActiveFilter] = useState('all');
     const [reservations, setReservations] = useState([]);
-    const [currentReservation, setCurrentReservation] = useState({
-        name: '',
-        date: '',
-        time: '',
-        guests: 1,
-        notes: '',
-        type: 'dinner',
-        status: 'pending'
-    });
     const [showCancelModal, setShowCancelModal] = useState(false);
     const [reservationToCancel, setReservationToCancel] = useState(null);
     const [showViewModal, setShowViewModal] = useState(false);
-    const [selectedReservation, setSelectedReservation] = useState(null);
-    // Add these new state variables with the other useState declarations
-    const [notifications, setNotifications] = useState(0);
-    const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-    const [detailedReservation, setDetailedReservation] = useState(null);
+    const [selectedReservation] = useState(null);
+
+    const [detailedReservation] = useState(null);
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+    const [currentRequest, setCurrentRequest] = useState(null);
+    const [reservationDetails, setReservationDetails] = useState(null);
 
     const statusColors = {
         confirmed: 'bg-green-100 text-green-800',
@@ -56,23 +47,35 @@ const ViewReserve = () => {
         cancelled: 'bg-red-100 text-red-800'
     };
 
-    const handleCancelReservation = (reservation) => {
-        setReservationToCancel(reservation);
-        setShowCancelModal(true);
-    };
+    useEffect(() => {
+              const encryptedUserLevel = SecureStorage.getSessionItem("user_level_id"); 
+              console.log("this is encryptedUserLevel", encryptedUserLevel);
+              if (encryptedUserLevel !== '3' && encryptedUserLevel !== '15') {
+                  localStorage.clear();
+                  navigate('/gsd');
+              }
+        }, [navigate]);
+
 
     const confirmCancelReservation = async () => {
         try {
-            const formData = new URLSearchParams();
-            formData.append('reservation_id', reservationToCancel.id);
-            formData.append('operation', 'cancelReservation');
+            const userId = SecureStorage.getSessionItem('user_id');
+            if (!userId) {
+                toast.error('User session expired');
+                navigate('/gsd');
+                return;
+            }
 
-            const response = await fetch('http://localhost/coc/gsd/fetch_reserve.php', {
+            const response = await fetch('http://localhost/coc/gsd/process_reservation.php', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Content-Type': 'application/json',
                 },
-                body: formData.toString()
+                body: JSON.stringify({
+                    operation: 'handleCancelReservation',
+                    reservation_id: reservationToCancel.id,
+                    user_id: userId
+                })
             });
 
             const result = await response.json();
@@ -86,125 +89,23 @@ const ViewReserve = () => {
                             : res
                     )
                 );
-                toast.success('Reservation cancelled successfully!');
+                toast.success(result.message || 'Reservation cancelled successfully!');
+                setShowCancelModal(false);
+                setReservationToCancel(null);
             } else {
                 toast.error(result.message || 'Failed to cancel reservation');
             }
         } catch (error) {
             console.error('Error cancelling reservation:', error);
             toast.error('Failed to cancel reservation');
-        } finally {
-            setShowCancelModal(false);
-            setReservationToCancel(null);
         }
     };
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setCurrentReservation({ ...currentReservation, [name]: value });
-    };
+ 
 
-    const handleEdit = async (reservation) => {
+    const fetchReservations = useCallback(async () => {
         try {
-            const formData = new URLSearchParams();
-            formData.append('reservation_id', reservation.id);
-            formData.append('operation', 'getReservationDetailsById'); // Add operation parameter
-            
-            const response = await fetch(`http://localhost/coc/gsd/fetch_reserve.php`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: formData.toString()
-            });
-
-            // Check if response is valid JSON
-            const textResponse = await response.text();
-            let result;
-            try {
-                result = JSON.parse(textResponse);
-            } catch (error) {
-                console.error('Invalid JSON response:', textResponse);
-                throw new Error('Invalid server response');
-            }
-            
-            if (result.status === 'success') {
-                const { reservation: details, equipment, vehicles, venues } = result.data;
-                setCurrentReservation({
-                    id: details.reservation_id,
-                    name: details.reservation_name,
-                    eventTitle: details.reservation_event_title,
-                    description: details.reservation_description,
-                    startDate: details.reservation_start_date.split(' ')[0],
-                    startTime: details.reservation_start_date.split(' ')[1],
-                    endDate: details.reservation_end_date.split(' ')[0],
-                    endTime: details.reservation_end_date.split(' ')[1],
-                    status: details.status_master_name,
-                    userName: details.users_name,
-                    userContact: details.users_contact_number,
-                    equipment: equipment,
-                    vehicles: vehicles,
-                    venues: venues
-                });
-                setEditModalOpen(true);
-            } else {
-                throw new Error(result.message || 'Failed to fetch reservation details');
-            }
-        } catch (error) {
-            console.error('Error fetching reservation details:', error);
-            // Optionally add user notification here
-        }
-    };
-
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        if (currentReservation.id) {
-            // Update existing reservation
-            const updatedReservations = reservations.map(r => 
-                r.id === currentReservation.id ? { ...r, ...currentReservation } : r
-            );
-            setReservations(updatedReservations);
-        } else {
-            // Create new reservation
-            const newReservation = {
-                ...currentReservation,
-                id: Date.now(), // Temporary ID, should be replaced with server-generated ID
-                status: 'pending'
-            };
-            setReservations([...reservations, newReservation]);
-        }
-        setEditModalOpen(false);
-    };
-
-    const formatTimeRange = (dateTimeString) => {
-        if (!dateTimeString) return '';
-        
-        const [info, timeRange] = dateTimeString.split(' - ');
-        const [startDateTime, endDateTime] = timeRange.split(' to ');
-        
-        const startDate = new Date(startDateTime);
-        const endDate = new Date(endDateTime);
-        
-        // Format the date
-        const dateStr = startDate.getDate() === endDate.getDate() && 
-                       startDate.getMonth() === endDate.getMonth() &&
-                       startDate.getFullYear() === endDate.getFullYear()
-            ? format(startDate, 'MMM d')
-            : `${format(startDate, 'MMM d')} to ${format(endDate, 'MMM d')}`;
-
-        // Format the time
-        const startTimeStr = format(startDate, 'ha').toLowerCase();
-        const endTimeStr = format(endDate, 'ha').toLowerCase();
-        
-        return {
-            date: dateStr,
-            time: `${startTimeStr} to ${endTimeStr}`
-        };
-    };
-
-    const fetchReservations = async () => {
-        try {
-            const userId = localStorage.getItem('user_id');
+            const userId = SecureStorage.getSessionItem('user_id');
             console.log('Fetching reservations for user:', userId);
             
             if (!userId) {
@@ -213,13 +114,13 @@ const ViewReserve = () => {
                 return;
             }
 
-            const response = await fetch('http://localhost/coc/gsd/user1.php', {
+            const response = await fetch('http://localhost/coc/gsd/faculty&staff.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    operation: 'getUserReservations',
+                    operation: 'fetchMyReservation',
                     userId: userId
                 })
             });
@@ -229,20 +130,19 @@ const ViewReserve = () => {
             
             if (result.status === 'success' && result.data) {
                 const transformedReservations = result.data.map(reservation => {
-                    const details = reservation.venue_details || reservation.vehicle_details || '';
-                    const formattedTime = formatTimeRange(details);
-                    
-                    // Use approval_status if reservation_status is null
-                    const status = reservation.reservation_status || reservation.approval_status || 'pending';
+                    // Format creation date and time
+                    const createdAt = new Date(reservation.reservation_created_at);
+                    const formattedCreatedAt = format(createdAt, 'MMM dd, yyyy h:mm a');
                     
                     return {
-                        id: reservation.approval_id,
-                        name: reservation.venue_form_name || reservation.vehicle_form_name,
-                        date: formattedTime.date,
-                        time: formattedTime.time,
-                        status: status.toLowerCase(),
-                        createdAt: reservation.approval_created_at,
-                        type: reservation.approval_form_venue_id ? 'venue' : 'vehicle'
+                        id: reservation.reservation_id,
+                        title: reservation.reservation_title,
+                        description: reservation.reservation_description,
+                        startDate: new Date(reservation.reservation_start_date),
+                        endDate: new Date(reservation.reservation_end_date),
+                        participants: reservation.reservation_participants,
+                        createdAt: formattedCreatedAt,
+                        status: reservation.reservation_status || 'pending' // Use the status from API
                     };
                 });
                 setReservations(transformedReservations);
@@ -253,7 +153,7 @@ const ViewReserve = () => {
             console.error('Error fetching reservations:', error);
             toast.error('Failed to fetch reservations');
         }
-    };
+    }, [navigate]);
 
     useEffect(() => {
         const userId = localStorage.getItem('user_id');
@@ -267,7 +167,7 @@ const ViewReserve = () => {
         
         console.log('User ID:', userId); // Debug log
         fetchReservations();
-    }, [navigate]);
+    }, [navigate, fetchReservations]);
 
     const filteredReservations = reservations.filter(reservation => 
         activeFilter === 'all' ? true : reservation.status === activeFilter
@@ -275,25 +175,41 @@ const ViewReserve = () => {
 
     const handleViewReservation = async (reservation) => {
         try {
-            const response = await fetch('http://localhost/coc/gsd/user1.php', {
+            // Fetch reservation details
+            const response = await fetch(`http://localhost/coc/gsd/faculty&staff.php`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    operation: 'getUserReservationDetailsById',
-                    approvalId: reservation.id
+                    operation: 'fetchMyReservationbyId',
+                    reservationId: reservation.id
                 })
             });
 
-            const result = await response.json();
+            // Fetch status history
+            const statusResponse = await fetch(`http://localhost/coc/gsd/faculty&staff.php`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    operation: 'fetchStatusById',
+                    reservationId: reservation.id
+                })
+            });
+
+            const [result, statusResult] = await Promise.all([response.json(), statusResponse.json()]);
             
-            if (result.status === 'success' && result.data) {
-                setDetailedReservation(result.data[0]);
-                setSelectedReservation(reservation);
-                setShowViewModal(true);
+            if (result.status === 'success') {
+                const details = result.data;
+                setReservationDetails({
+                    ...details,
+                    statusHistory: statusResult.status === 'success' ? statusResult.data : []
+                });
+                setIsDetailModalOpen(true);
             } else {
-                toast.error('Failed to fetch reservation details');
+                throw new Error(result.message || 'Failed to fetch reservation details');
             }
         } catch (error) {
             console.error('Error fetching reservation details:', error);
@@ -301,9 +217,315 @@ const ViewReserve = () => {
         }
     };
 
-    const handleNavigation = () => {
-        navigate('/dashboard'); // Navigate to /dashboard on click
-      };
+   
+
+    const DetailModal = ({ visible, onClose, reservationDetails }) => {
+        if (!reservationDetails) return null;
+
+        const getStatusColor = () => {
+            if (reservationDetails.active === "0") return "gold";
+            switch (reservationDetails.reservation_status?.toLowerCase()) {
+                case 'approved': return "green";
+                case 'declined': return "red";
+                case 'pending': return "blue";
+                default: return "blue";
+            }
+        };
+
+        // Check if reservation is cancelled
+        const isCancelled = reservationDetails.statusHistory?.some(
+            status => status.status_name === "Cancelled"
+        );
+
+        const handleShowCancelModal = () => {
+            setReservationToCancel({
+                id: reservationDetails.reservation_id,
+                name: reservationDetails.reservation_event_title || reservationDetails.reservation_destination
+            });
+            setShowCancelModal(true);
+            onClose(); // Close the detail modal
+        };
+
+        // Function to format status timestamp
+        const formatStatusDate = (dateString) => {
+            return format(new Date(dateString), 'MMM dd, yyyy h:mm a');
+        };
+
+        // Function to handle reservation cancellation
+        const handleCancelReservation = async () => {
+            try {
+                const userId = localStorage.getItem('user_id');
+                const response = await fetch('http://localhost/coc/gsd/process_reservation.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        operation: 'handleCancelReservation',
+                        reservation_id: reservationDetails.reservation_id,
+                        user_id: userId
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    toast.success(result.message);
+                    onClose();
+                    fetchReservations(); // Refresh the list
+                } else {
+                    toast.error(result.message || 'Failed to cancel reservation');
+                }
+            } catch (error) {
+                console.error('Error cancelling reservation:', error);
+                toast.error('Failed to cancel reservation');
+            }
+        };
+
+        // Table columns definition for resources
+        const venueColumns = [
+            {
+                title: 'Venue Name',
+                dataIndex: 'venue_name',
+                key: 'venue_name',
+                render: (text) => (
+                    <div className="flex items-center">
+                        <BuildOutlined className="mr-2 text-purple-500" />
+                        <span className="font-medium">{text}</span>
+                    </div>
+                )
+            },
+            {
+                title: 'Capacity',
+                dataIndex: 'occupancy',
+                key: 'occupancy',
+            }
+        ];
+
+        const equipmentColumns = [
+            {
+                title: 'Equipment',
+                dataIndex: 'name',
+                key: 'name',
+                render: (text) => (
+                    <div className="flex items-center">
+                        <ToolOutlined className="mr-2 text-orange-500" />
+                        <span className="font-medium">{text}</span>
+                    </div>
+                )
+            },
+            {
+                title: 'Quantity',
+                dataIndex: 'quantity',
+                key: 'quantity'
+            }
+        ];
+
+        return (
+            <Modal
+                title={null}
+                visible={visible}
+                onCancel={onClose}
+                width={900}
+                footer={[
+                    <button
+                        key="close"
+                        onClick={onClose}
+                        className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                    >
+                        Close
+                    </button>,
+                    !isCancelled && (
+                        <button
+                            key="cancel"
+                            onClick={handleShowCancelModal}
+                            disabled={reservationDetails.active === "0"}
+                            className={`px-4 py-2 text-white rounded-lg ml-2 ${
+                                reservationDetails.active === "0"
+                                    ? 'bg-red-300 cursor-not-allowed'
+                                    : 'bg-red-600 hover:bg-red-700'
+                            }`}
+                        >
+                            Cancel Reservation
+                        </button>
+                    )
+                ]}
+                className="reservation-detail-modal"
+                bodyStyle={{ padding: '0' }}
+            >
+                <div className="p-0">
+                    {/* Header Section */}
+                    <div className="bg-gradient-to-r from-blue-600 to-green-500 p-6 rounded-t-lg">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <h1 className="text-2xl font-bold text-white mb-2">
+                                    {reservationDetails.reservation_event_title || reservationDetails.reservation_destination}
+                                </h1>
+                                <div className="flex items-center gap-2">
+                                </div>
+                            </div>
+                            <div className="text-white text-right">
+                                <p className="text-white opacity-90 text-sm">Created on</p>
+                                <p className="font-semibold">
+                                    {new Date(reservationDetails.reservation_created_at).toLocaleString()}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Tabs Section */}
+                    <Tabs defaultActiveKey="1" className="p-6">
+                        <TabPane tab={<span><InfoCircleOutlined /> Details</span>} key="1">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                {/* Left Column */}
+                                <div className="space-y-6">
+                                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                        <h3 className="text-lg font-medium text-gray-800 mb-3 flex items-center gap-2">
+                                            <UserOutlined className="text-blue-500" /> Requester Information
+                                        </h3>
+                                        <div className="space-y-3">
+                                            <div className="flex items-center gap-2">
+                                                <div className="bg-blue-100 p-2 rounded-full">
+                                                    <UserOutlined className="text-blue-600" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-gray-500 text-xs">Name</p>
+                                                    <p className="font-medium">{reservationDetails.requester_name}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <div className="bg-green-100 p-2 rounded-full">
+                                                    <TeamOutlined className="text-green-600" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-gray-500 text-xs">Department</p>
+                                                    <p className="font-medium">{reservationDetails.department_name}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Right Column */}
+                                <div className="space-y-6">
+                                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                        <h3 className="text-lg font-medium text-gray-800 mb-3 flex items-center gap-2">
+                                            <CalendarOutlined className="text-orange-500" /> Schedule Information
+                                        </h3>
+                                        <div className="space-y-2">
+                                            {reservationDetails.reservation_start_date && (
+                                                <div className="flex items-center gap-2">
+                                                    <div className="bg-orange-100 p-2 rounded-full">
+                                                        <CalendarOutlined className="text-orange-600" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-gray-500 text-xs">Date & Time</p>
+                                                        <p className="font-medium">
+                                                            {format(new Date(reservationDetails.reservation_start_date), 'MMM dd, yyyy h:mm a')} - 
+                                                            {format(new Date(reservationDetails.reservation_end_date), 'h:mm a')}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Description Section */}
+                            {reservationDetails.reservation_description && (
+                                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mt-6">
+                                    <h3 className="text-lg font-medium text-gray-800 mb-3">Description</h3>
+                                    <p className="text-gray-700">{reservationDetails.reservation_description}</p>
+                                </div>
+                            )}
+                        </TabPane>
+
+                        <TabPane tab={<span><AppstoreOutlined /> Resources</span>} key="2">
+                            <div className="space-y-8">
+                                {reservationDetails.venues?.length > 0 && (
+                                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                                        <div className="bg-purple-50 p-4 border-b border-purple-100">
+                                            <h3 className="text-lg font-medium text-purple-800 flex items-center">
+                                                <BuildOutlined className="mr-2" /> Venue Information
+                                            </h3>
+                                        </div>
+                                        <div className="p-4">
+                                            <Table 
+                                                dataSource={reservationDetails.venues} 
+                                                columns={venueColumns}
+                                                pagination={false}
+                                                rowKey="venue_id"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {reservationDetails.equipment?.length > 0 && (
+                                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                                        <div className="bg-orange-50 p-4 border-b border-orange-100">
+                                            <h3 className="text-lg font-medium text-orange-800 flex items-center">
+                                                <ToolOutlined className="mr-2" /> Equipment Information
+                                            </h3>
+                                        </div>
+                                        <div className="p-4">
+                                            <Table 
+                                                dataSource={reservationDetails.equipment} 
+                                                columns={equipmentColumns}
+                                                pagination={false}
+                                                rowKey="equipment_id"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </TabPane>
+
+                        <TabPane tab={<span><CalendarOutlined /> Status Log</span>} key="3">
+                            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                                <div className="bg-gray-50 p-4 border-b border-gray-200">
+                                    <h3 className="text-lg font-medium text-gray-800 flex items-center gap-2">
+                                        <CalendarOutlined className="text-blue-500" /> Status History
+                                    </h3>
+                                </div>
+                                <div className="divide-y divide-gray-200">
+                                    {reservationDetails.statusHistory && reservationDetails.statusHistory.map((status, index) => (
+                                        <div key={index} className="p-4 hover:bg-gray-50 transition-colors">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center space-x-3">
+                                                    <div className={`w-2 h-2 rounded-full ${
+                                                        status.status_name?.toLowerCase() === 'approved' ? 'bg-green-500' :
+                                                        status.status_name?.toLowerCase() === 'declined' ? 'bg-red-500' :
+                                                        'bg-yellow-500'
+                                                    }`} />
+                                                    <div>
+                                                        <p className="font-medium text-gray-900">{status.status_name}</p>
+                                                        <p className="text-sm text-gray-500">
+                                                            {formatStatusDate(status.updated_at)}
+                                                            {status.updated_by_full_name && status.status_name !== 'Pending' && (
+                                                                <span className="ml-2 text-gray-400">
+                                                                    • Updated by {status.updated_by_full_name}
+                                                                </span>
+                                                            )}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {(!reservationDetails.statusHistory || reservationDetails.statusHistory.length === 0) && (
+                                        <div className="p-4 text-center text-gray-500">
+                                            No status history available
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </TabPane>
+                    </Tabs>
+                </div>
+            </Modal>
+        );
+    };
 
     return (
         <div className="flex h-screen bg-gray-50">
@@ -328,7 +550,7 @@ const ViewReserve = () => {
                             ))}
                         </div>
 
-                        {/* Reservations grid */}
+                        {/* Enhanced Reservations Grid */}
                         <div className="grid gap-6">
                             {filteredReservations.map((reservation) => (
                                 <motion.div 
@@ -336,68 +558,32 @@ const ViewReserve = () => {
                                     initial={{ opacity: 0, y: 20 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ duration: 0.3 }}
-                                    className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300 border border-gray-100"
+                                    className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 border border-gray-100 overflow-hidden"
                                 >
-                                    <div className="flex justify-between items-start">
-                                        <div className="space-y-2">
-                                            {/* Add type indicator */}
-                                            <div className="flex items-center gap-2">
-                                                <span className={`px-2 py-1 rounded-md text-xs font-medium ${
-                                                    reservation.type === 'venue' 
-                                                        ? 'bg-purple-100 text-purple-700' 
-                                                        : 'bg-orange-100 text-orange-700'
-                                                }`}>
-                                                    {reservation.type === 'venue' ? 'Venue' : 'Vehicle'}
-                                                </span>
-                                                <h3 className="text-xl font-semibold text-gray-800">{reservation.name}</h3>
+                                    <div className="p-6">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div>
+                                                <h3 className="text-xl font-semibold text-gray-800 mb-2">
+                                                    {reservation.title}
+                                                </h3>
+                                                <div className="flex items-center gap-2 text-sm text-gray-500">
+                                                    <FaCalendar size={14} className="text-blue-500" />
+                                                    <span>Created on {reservation.createdAt}</span>
+                                                </div>
                                             </div>
-                                            
-                                            <div className="flex gap-4 text-gray-600">
-                                                <span className="flex items-center gap-2">
-                                                    <FaCalendar className="text-blue-500" />
-                                                    {reservation.date}
-                                                </span>
-                                                <span className="flex items-center gap-2">
-                                                    <FaClock className="text-blue-500" />
-                                                    {reservation.time}
-                                                </span>
-                                            </div>
-
-                                            
-                                        </div>
-
-                                        {/* Status and action buttons */}
-                                        <div className="flex flex-col items-end gap-2">
                                             <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[reservation.status]}`}>
                                                 {reservation.status}
                                             </span>
-                                            <div className="flex items-center gap-2 mt-2">
-                                                <button
-                                                    onClick={() => handleViewReservation(reservation)}
-                                                    className="flex items-center gap-1 px-3 py-1 text-blue-600 hover:bg-blue-50 rounded-full transition-all duration-300"
-                                                >
-                                                    <FaEye size={16} />
-                                                    <span className="text-sm">View</span>
-                                                </button>
-                                                {reservation.status !== 'cancelled' && (
-                                                    <>
-                                                        <button
-                                                            onClick={() => handleEdit(reservation)}
-                                                            className="flex items-center gap-1 px-3 py-1 text-green-600 hover:bg-green-50 rounded-full transition-all duration-300"
-                                                        >
-                                                            <FaEdit size={16} />
-                                                            <span className="text-sm">Edit</span>
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleCancelReservation(reservation)}
-                                                            className="flex items-center gap-1 px-3 py-1 text-red-600 hover:bg-red-50 rounded-full transition-all duration-300"
-                                                        >
-                                                            <FaTrash size={16} />
-                                                            <span className="text-sm">Cancel Reservation</span>
-                                                        </button>
-                                                    </>
-                                                )}
-                                            </div>
+                                        </div>
+
+                                        <div className="flex justify-end mt-4 gap-2">
+                                            <button
+                                                onClick={() => handleViewReservation(reservation)}
+                                                className="flex items-center gap-1 px-3 py-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-300"
+                                            >
+                                                <FaEye size={16} />
+                                                <span className="text-sm">View Details</span>
+                                            </button>
                                         </div>
                                     </div>
                                 </motion.div>
@@ -703,141 +889,23 @@ const ViewReserve = () => {
                                 </motion.div>
                             </div>
                         )}
-
-                        {/* Edit Reservation Modal */}
-                        {editModalOpen && currentReservation && (
-                            <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-                                <motion.div 
-                                    initial={{ scale: 0.8, opacity: 0 }}
-                                    animate={{ scale: 1, opacity: 1 }}
-                                    transition={{ duration: 0.3 }}
-                                    className="bg-white rounded-2xl p-8 w-full max-w-4xl transform transition-all duration-300 ease-in-out"
-                                >
-                                    <div className="flex justify-between items-center mb-6">
-                                        <h2 className="text-2xl font-bold text-gray-800">
-                                            Edit Reservation
-                                        </h2>
-                                        <button onClick={() => setEditModalOpen(false)} className="text-gray-400 hover:text-gray-600">
-                                            &times;
-                                        </button>
-                                    </div>
-                                    <form onSubmit={handleSubmit} className="space-y-6">
-                                        <div className="grid grid-cols-2 gap-6">
-                                            {/* Basic Information */}
-                                            <div className="space-y-4">
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700">Event Title</label>
-                                                    <input
-                                                        type="text"
-                                                        name="eventTitle"
-                                                        value={currentReservation.eventTitle}
-                                                        onChange={handleChange}
-                                                        className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700">Description</label>
-                                                    <textarea
-                                                        name="description"
-                                                        value={currentReservation.description}
-                                                        onChange={handleChange}
-                                                        rows={3}
-                                                        className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            {/* Date and Time */}
-                                            <div className="space-y-4">
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div>
-                                                        <label className="block text-sm font-medium text-gray-700">Start Date</label>
-                                                        <input
-                                                            type="date"
-                                                            name="startDate"
-                                                            value={currentReservation.startDate}
-                                                            onChange={handleChange}
-                                                            className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-sm font-medium text-gray-700">Start Time</label>
-                                                        <input
-                                                            type="time"
-                                                            name="startTime"
-                                                            value={currentReservation.startTime}
-                                                            onChange={handleChange}
-                                                            className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                                        />
-                                                    </div>
-                                                </div>
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div>
-                                                        <label className="block text-sm font-medium text-gray-700">End Date</label>
-                                                        <input
-                                                            type="date"
-                                                            name="endDate"
-                                                            value={currentReservation.endDate}
-                                                            onChange={handleChange}
-                                                            className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-sm font-medium text-gray-700">End Time</label>
-                                                        <input
-                                                            type="time"
-                                                            name="endTime"
-                                                            value={currentReservation.endTime}
-                                                            onChange={handleChange}
-                                                            className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Display read-only information */}
-                                        <div className="mt-6 bg-gray-50 p-4 rounded-lg">
-                                            <h3 className="font-medium text-gray-900 mb-4">Additional Information</h3>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <p className="text-sm text-gray-500">Venues</p>
-                                                    <p className="text-gray-700">{currentReservation.venues?.map(v => v.ven_name).join(', ') || 'None'}</p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm text-gray-500">Equipment</p>
-                                                    <p className="text-gray-700">{currentReservation.equipment?.map(e => `${e.equip_name} (${e.quantity})`).join(', ') || 'None'}</p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm text-gray-500">Vehicles</p>
-                                                    <p className="text-gray-700">{currentReservation.vehicles?.map(v => v.vehicle_license).join(', ') || 'None'}</p>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex justify-end gap-4">
-                                            <button
-                                                type="button"
-                                                onClick={() => setEditModalOpen(false)}
-                                                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-                                            >
-                                                Cancel
-                                            </button>
-                                            <button
-                                                type="submit"
-                                                className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-                                            >
-                                                Save Changes
-                                            </button>
-                                        </div>
-                                    </form>
-                                </motion.div>
-                            </div>
-                        )}
                     </div>
                 </div>
             </div>
+
+            {isDetailModalOpen && (
+            <DetailModal 
+                visible={isDetailModalOpen}
+                onClose={() => {
+                    setIsDetailModalOpen(false);
+                    setCurrentRequest(null);
+                    setReservationDetails(null);
+                }}
+                reservationDetails={reservationDetails}
+            />
+        )}
         </div>
+        
     );
 };
 

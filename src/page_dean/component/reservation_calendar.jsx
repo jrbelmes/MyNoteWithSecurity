@@ -2,37 +2,36 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog } from '@headlessui/react';
 import axios from 'axios';
-import { format, isSameDay } from 'date-fns';
+import { format, isSameDay, isPast, endOfDay, addDays, isBefore } from 'date-fns';
 import { toast } from 'react-toastify';
 import { DatePicker, TimePicker, Spin } from 'antd';
 import dayjs from 'dayjs';
 import { isHoliday } from './holiday_utils';
 import { HolidaysAPI } from '../../api/holidaysAPI';
 
-// Update the availabilityStatus object with more sophisticated styling
 const availabilityStatus = {
   past: {
-    className: 'bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/80 dark:to-gray-800/90 opacity-60',
+    className: 'bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800/70 dark:to-gray-800/80 opacity-60 shadow-inner',
     hoverClass: 'cursor-not-allowed select-none',
     textClass: 'text-gray-400 dark:text-gray-500 line-through'
   },
   available: {
-    className: 'bg-gradient-to-br from-emerald-50 to-green-100 dark:from-emerald-900/20 dark:to-green-900/30',
-    hoverClass: 'hover:shadow-lg hover:scale-[1.02] hover:z-10 transition-all duration-200 cursor-pointer',
+    className: 'bg-gradient-to-br from-emerald-50 to-green-100 dark:from-emerald-900/20 dark:to-green-900/30 border-emerald-200 dark:border-emerald-800/30',
+    hoverClass: 'hover:shadow-md hover:shadow-emerald-100/50 dark:hover:shadow-emerald-900/20 hover:scale-[1.02] hover:z-10 transition-all duration-200 cursor-pointer',
     textClass: 'text-emerald-800 dark:text-emerald-300'
   },
   partial: {
-    className: 'bg-gradient-to-br from-amber-50 to-yellow-100 dark:from-amber-900/20 dark:to-yellow-900/30',
-    hoverClass: 'hover:shadow-lg hover:scale-[1.02] hover:z-10 transition-all duration-200 cursor-pointer',
+    className: 'bg-gradient-to-br from-amber-50 to-yellow-100 dark:from-amber-900/20 dark:to-yellow-900/30 border-amber-200 dark:border-amber-800/30',
+    hoverClass: 'hover:shadow-md hover:shadow-amber-100/50 dark:hover:shadow-amber-900/20 hover:scale-[1.02] hover:z-10 transition-all duration-200 cursor-pointer',
     textClass: 'text-amber-800 dark:text-amber-300'
   },
   reserved: {
-    className: 'bg-gradient-to-br from-rose-50 to-red-100 dark:from-rose-900/20 dark:to-red-900/30',
+    className: 'bg-gradient-to-br from-rose-50 to-red-100 dark:from-rose-900/20 dark:to-red-900/30 border-rose-200 dark:border-rose-800/30',
     hoverClass: 'cursor-not-allowed select-none',
     textClass: 'text-rose-800 dark:text-rose-300'
   },
   holiday: {
-    className: 'bg-gradient-to-br from-purple-50 to-violet-100 dark:from-purple-900/20 dark:to-violet-900/30',
+    className: 'bg-gradient-to-br from-purple-50 to-violet-100 dark:from-purple-900/20 dark:to-violet-900/30 border-violet-200 dark:border-violet-800/30',
     hoverClass: 'cursor-not-allowed select-none',
     textClass: 'text-purple-800 dark:text-violet-300'
   }
@@ -57,6 +56,13 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
     message: ''
   });
 
+  // Define now and today as constants that are used throughout the component
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  // Business hours from 5 AM to 7 PM
+  const businessHours = [...Array(15)].map((_, i) => i + 5);
+
   const [isLoading, setIsLoading] = useState(false);
 
   const [isSelectionComplete] = useState(false);
@@ -65,16 +71,15 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [isDatePickerModalOpen, setIsDatePickerModalOpen] = useState(false);
   const [startDate, setStartDate] = useState(null);
-  const [endDate, setEndDate] = useState(null); // Add this line
+  const [endDate, setEndDate] = useState(null);
   const [holidays, setHolidays] = useState([]);
 
-  // Add this new state
   const [selectedTimeSlot, setSelectedTimeSlot] = useState(null);
 
-  // Add these new state variables after other state declarations
-  const [selectionMode, setSelectionMode] = useState('full'); // 'full' for monthly, 'end-only' for weekly/daily
+  const [selectionMode, setSelectionMode] = useState('full');
 
-  // Add this function after the state declarations and before other functions
+  const [equipmentAvailability, setEquipmentAvailability] = useState([]);
+
   const isSelectionValid = () => {
     if (selectionMode === 'full') {
       return (
@@ -95,7 +100,6 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
     }
   };
 
-  // Add this function right after the state declarations
   const getReservedTimeSlots = (date) => {
     if (!date) return { hours: [], timeRanges: [] };
     
@@ -114,7 +118,6 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
         end: end
       });
       
-      // Add all hours within the reservation
       for (let hour = start.getHours(); hour <= end.getHours(); hour++) {
         reservedHours.add(hour);
       }
@@ -127,20 +130,20 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
   };
 
   useEffect(() => {
-    fetchReservations();
+    if (selectedResource.type === 'equipment') {
+      fetchEquipmentAvailability();
+    } else {
+      fetchReservations();
+    }
   }, [selectedResource]);
 
-  // Add this useEffect to fetch holidays
   useEffect(() => {
     const loadHolidays = async () => {
       try {
         const currentYear = new Date().getFullYear();
-        console.log('Fetching holidays for year:', currentYear);
         const holidaysList = await HolidaysAPI.fetchHolidays(currentYear);
-        console.log('Fetched holidays:', holidaysList);
         setHolidays(holidaysList);
       } catch (error) {
-        console.error('Failed to load holidays:', error);
         toast.error('Failed to load holiday information');
       }
     };
@@ -150,6 +153,9 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
   const fetchReservations = async () => {
     setIsLoading(true);
     try {
+      // Ensure selectedResource.id is treated as an array
+      const itemIds = Array.isArray(selectedResource.id) ? selectedResource.id : [selectedResource.id];
+      
       const response = await axios.post(
         'http://localhost/coc/gsd/user.php',
         {
@@ -164,20 +170,63 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
         }
       );
 
+      console.log(response.data); // Debugging line
+
       if (response.data.status === 'success') {
         const formattedReservations = response.data.data.map(res => ({
-          id: res.reservation_form_venue_id || res.reservation_form_vehicle_id,
-          startDate: new Date(res.reservation_form_start_date),
-          endDate: new Date(res.reservation_form_end_date),
+          id: res.reservation_form_venue_id || res.reservation_form_vehicle_id || res.reservation_form_equipment_id,
+          startDate: new Date(res.reservation_start_date),
+          endDate: new Date(res.reservation_end_date),
           status: res.reservation_status_status_id,
           isReserved: res.reservation_status_status_id === '6',
-          name: res.ven_name // Venue name if available
+          venueName: res.ven_name // Store venue name
         }));
         setReservations(formattedReservations);
       }
     } catch (error) {
       toast.error('Failed to fetch reservations');
-      console.error('Error:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchEquipmentAvailability = async () => {
+    setIsLoading(true);
+    try {
+      const equipments = selectedResource.id.map((item, index) => ({
+        id: item.id,
+        quantity: item.quantity
+      }));
+
+      const response = await axios.post(
+        'http://localhost/coc/gsd/user.php',
+        {
+          operation: 'fetchAvailability',
+          itemType: 'equipment',
+          itemId: equipments.map(e => e.id),
+          quantity: equipments.map(e => e.quantity)
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (response.data.status === 'success') {
+        setEquipmentAvailability(response.data.data.map(item => ({
+          equipId: item.equip_id,
+          name: item.equip_name,
+          currentQuantity: parseInt(item.current_quantity),
+          totalReserved: parseInt(item.total_reserved),
+          totalAvailable: parseInt(item.total_available),
+          startDate: new Date(item.reservation_start_date),
+          endDate: new Date(item.reservation_end_date),
+          requestedQuantity: item.inputted_quantity
+        })));
+      }
+    } catch (error) {
+      toast.error('Failed to fetch equipment availability');
     } finally {
       setIsLoading(false);
     }
@@ -191,7 +240,6 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
       const resEnd = new Date(res.endDate);
       const current = new Date(date);
       
-      // Set all dates to midnight for proper day comparison
       current.setHours(0, 0, 0, 0);
       const startDay = new Date(resStart).setHours(0, 0, 0, 0);
       const endDay = new Date(resEnd).setHours(0, 0, 0, 0);
@@ -200,36 +248,97 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
     });
   };
 
-
   const handleDateClick = (date) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const compareDate = new Date(date);
-    compareDate.setHours(0, 0, 0, 0);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const compareDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     
+    // Check if date is in the past
     if (compareDate < today) {
-      toast.error('Cannot select past dates');
+      toast.error('Cannot select past dates', {
+        position: 'top-center',
+        icon: '⏰',
+        className: 'font-medium'
+      });
       return;
     }
+    
+    // Check if it's today but after business hours
+    if (compareDate.getTime() === today.getTime()) {
+      const currentHour = now.getHours();
+      if (currentHour >= 19) {
+        toast.error('Bookings for today are closed (after 7:00 PM)', {
+          position: 'top-center',
+          icon: '⏱️',
+          className: 'font-medium'
+        });
+        return;
+      }
+    }
   
+    // Check reservation status
     const status = getAvailabilityStatus(date, reservations);
-    const holidayInfo = holidays.find(h => h.date === date.toISOString().split('T')[0]);
+    
+    
+    // Check if date is a holiday
+    const formattedDate = date.toISOString().split('T')[0];
+    const holidayInfo = holidays.find(h => h.date === formattedDate);
   
     if (status === 'reserved') {
-      toast.error('This date is already fully reserved');
+      toast.error('This date is already fully reserved for the business hours (5AM-7PM)', {
+        position: 'top-center',
+        icon: '❌',
+        className: 'font-medium'
+      });
       return;
     }
     
     if (holidayInfo) {
-      toast.error(`Reservations not allowed on ${holidayInfo.name}`);
+      toast.error(`Reservations not allowed on ${holidayInfo.name} (Holiday)`, {
+        position: 'top-center',
+        icon: '🏖️',
+        className: 'font-medium'
+      });
       return;
     }
-  
-    // Set the selected start date and open modal
+    
+    // If checks pass, set the selected dates and open the modal
     setSelectedStartDate(date);
     setStartDate(date);
     setEndDate(null);
     setSelectedEndDate(null);
+    
+    // Set default times based on current time if it's today
+    if (isSameDay(date, new Date())) {
+      const currentHour = now.getHours();
+      const defaultStartHour = Math.max(currentHour + 1, 5); // Start at next hour, minimum 5 AM
+      
+      if (defaultStartHour < 19) { // Only set if within business hours
+        setSelectedTimes(prev => ({
+          ...prev,
+          startTime: defaultStartHour,
+          startMinute: 0,
+          endTime: null,
+          endMinute: null
+        }));
+      } else {
+        setSelectedTimes({
+          startTime: null,
+          endTime: null,
+          startMinute: null,
+          endMinute: null
+        });
+      }
+    } else {
+      // Default times for future dates
+      setSelectedTimes({
+        startTime: 9, // Default to 9 AM
+        startMinute: 0,
+        endTime: null,
+        endMinute: null
+      });
+    }
+    
     setIsDatePickerModalOpen(true);
   };
 
@@ -258,69 +367,118 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
   };
 
   const handleReservationClick = (reservation) => {
-    // Implement if needed
     console.log('Reservation clicked:', reservation);
   };
 
-// First, update the getAvailabilityStatus function to always return one of our defined statuses
-const getAvailabilityStatus = (date, allReservations) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const compareDate = new Date(date);
-  compareDate.setHours(0, 0, 0, 0);
+  const getAvailabilityStatus = (date, allReservations) => {
+    if (selectedResource.type === 'equipment') {
+      const compareDate = new Date(date);
+      compareDate.setHours(0, 0, 0, 0);
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (compareDate < today) return 'past';
+
+      const formattedDate = compareDate.toISOString().split('T')[0];
+      if (holidays.find(h => h.date === formattedDate)) return 'holiday';
+
+      // Filter equipment availability for this date
+      const dayEquipment = equipmentAvailability.filter(item => {
+        const itemDate = new Date(item.startDate);
+        itemDate.setHours(0, 0, 0, 0);
+        return isSameDay(compareDate, itemDate);
+      });
+
+      if (dayEquipment.length === 0) return 'available';
+
+      // Check if any equipment is completely unavailable for the whole day
+      const hasCompletelyUnavailable = dayEquipment.some(item => {
+        const itemStart = new Date(item.startDate);
+        const itemEnd = new Date(item.endDate);
+        
+        // Check if it spans the whole business day (5 AM to 7 PM)
+        const spansWholeDay = itemStart.getHours() <= 5 && itemEnd.getHours() >= 19;
+        return spansWholeDay && item.totalAvailable < item.requestedQuantity;
+      });
+
+      if (hasCompletelyUnavailable) return 'reserved';
+
+      const hasPartial = dayEquipment.some(item => {
+        const itemStart = new Date(item.startDate);
+        const itemEnd = new Date(item.endDate);
+
+        return (item.totalAvailable < item.requestedQuantity && 
+                (itemStart.getHours() > 5 || itemEnd.getHours() < 19)) ||
+               (item.totalAvailable < parseInt(item.currentQuantity) && 
+                item.totalAvailable >= item.requestedQuantity);
+      });
+
+      return hasPartial ? 'partial' : 'available';
+    }
+
+    // Original logic for non-equipment resources
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const compareDate = new Date(date);
+    compareDate.setHours(0, 0, 0, 0);
+    
+    if (compareDate < today) {
+      return 'past';
+    }
+
+    const formattedDate = compareDate.toISOString().split('T')[0];
+    if (holidays.find(h => h.date === formattedDate)) {
+      return 'holiday';
+    }
+
+  // If there are no reservations, the date is fully available
+  if (!allReservations.length) {
+    return 'available';
+  }
+
+  // Group reservations by venue for the current date
+  const venueReservations = new Map();
   
-  // Past dates check
-  if (compareDate < today) {
-    return 'past';
-  }
-
-  // Check for holidays
-  const formattedDate = compareDate.toISOString().split('T')[0];
-  if (holidays.find(h => h.date === formattedDate)) {
-    return 'holiday';
-  }
-
-  // Filter reservations for the current date
-  const dayReservations = allReservations.filter(res => {
-    if (!res.isReserved) return false;
+  allReservations.forEach(res => {
+    if (!res.isReserved) return;
 
     const resStart = new Date(res.startDate);
     const resEnd = new Date(res.endDate);
     resStart.setHours(0, 0, 0, 0);
-    resEnd.setHours(0, 0, 0, 0);
+    resEnd.setHours(23, 59, 59, 999);
     
-    return compareDate >= resStart && compareDate <= resEnd;
+    if (compareDate >= resStart && compareDate <= resEnd) {
+      if (!venueReservations.has(res.venueName)) {
+        venueReservations.set(res.venueName, []);
+      }
+      venueReservations.get(res.venueName).push({
+        ...res,
+        startHour: new Date(res.startDate).getHours(),
+        endHour: new Date(res.endDate).getHours()
+      });
+    }
   });
 
-  if (dayReservations.length === 0) {
-    return 'available';
+  // Check for full-day reservations (5AM to 7PM)
+  const hasFullDayReservation = Array.from(venueReservations.values()).some(venueRes => 
+    venueRes.some(res => 
+      res.startHour <= 5 && res.endHour >= 19
+    )
+  );
+
+  // If any venue has a full-day reservation, mark as reserved
+  if (hasFullDayReservation) {
+    return 'reserved';
   }
 
-  // Check if any reservation covers the entire business hours (5AM to 7PM)
-  const hasFullDayReservation = dayReservations.some(res => {
-    const resStart = new Date(res.startDate);
-    const resEnd = new Date(res.endDate);
-    return resStart.getHours() <= 5 && resEnd.getHours() >= 19;
-  });
+  // Check if there are any partial reservations
+  const hasPartialReservations = venueReservations.size > 0;
 
-  return hasFullDayReservation ? 'reserved' : 'partial';
+  return hasPartialReservations ? 'partial' : 'available';
 };
 
 // Add new function to get business hours status
-const getBusinessHoursStatus = (date) => {
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const compareDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  
-  if (compareDate < today) return 'past';
-  if (compareDate.getTime() === today.getTime()) {
-    const currentHour = now.getHours();
-    if (currentHour >= 19) return 'past'; // After business hours
-    if (currentHour < 5) return 'upcoming'; // Before business hours
-    return 'current';
-  }
-  return 'upcoming';
-};
+
 
 // Then update the renderCalendarGrid function to handle the status more safely
 const renderCalendarGrid = () => {
@@ -348,331 +506,677 @@ const renderCalendarGrid = () => {
     days.push(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, i));
   }
 
-  return (
-    <motion.div className="grid grid-cols-7 gap-1 sm:gap-2">
-      {days.map((day, index) => {
-        const isCurrentMonth = day.getMonth() === currentDate.getMonth();
-        // Format the date consistently for comparison
-        const formattedDate = new Date(
-          day.getFullYear(),
-          day.getMonth(),
-          day.getDate()
-        ).toISOString().split('T')[0];
-        const holidayInfo = holidays.find(h => h.date === formattedDate);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const compareDate = new Date(day);
-        compareDate.setHours(0, 0, 0, 0);
-        
-        // Check if the date is in the past or today but after business hours
-        const isPastDate = compareDate < today;
-        
-        // Determine the style based on date status
+    return (
+      <motion.div 
+        className="grid grid-cols-7 gap-1 sm:gap-2"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        {days.map((day, index) => {
+          const isCurrentMonth = day.getMonth() === currentDate.getMonth();
+          // Format the date consistently for comparison
+          const formattedDate = new Date(
+            day.getFullYear(),
+            day.getMonth(),
+            day.getDate()
+          ).toISOString().split('T')[0];
+          const holidayInfo = holidays.find(h => h.date === formattedDate);
+          
+          const compareDate = new Date(day);
+          compareDate.setHours(0, 0, 0, 0);
+          
+          // Check if the date is in the past
+          const isPastDate = compareDate < today;
+          const isPresentDate = isSameDay(day, today);
+          const currentTime = now.getHours();
+          const isAfterBusinessHours = isPresentDate && currentTime >= 19;
+          const isBeforeBusinessHours = isPresentDate && currentTime < 5;
+          
+          // Determine if day is unavailable (either past or after business hours today)
+          const isUnavailable = isPastDate || isAfterBusinessHours;
+          
+          // Add selected date range highlighting
+          const isSelected = selectedStartDate && day >= selectedStartDate && 
+                           (selectedEndDate ? day <= selectedEndDate : day === selectedStartDate);
 
-
-        // Add selected date range highlighting
-        const isSelected = selectedStartDate && day >= selectedStartDate && 
-                         (selectedEndDate ? day <= selectedEndDate : day === selectedStartDate);
-
-        const businessHoursStatus = getBusinessHoursStatus(day);
-        const status = businessHoursStatus === 'past' ? 'past' : getAvailabilityStatus(day, reservations);
-        const statusStyle = availabilityStatus[status];
-        
-        // Enhanced cell content
-        return (
-          <motion.div
-            key={day.toISOString()}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.2, delay: index * 0.01 }}
-            onClick={() => handleDateClick(day, status)}
-            className={`
-              relative min-h-[60px] sm:min-h-[100px] p-2 sm:p-3
-              border dark:border-gray-700/50 rounded-xl
-              backdrop-blur-sm
-              ${isCurrentMonth ? statusStyle.className : 'opacity-40'}
-              ${statusStyle.hoverClass}
-              ${isSelected ? 'ring-2 ring-blue-500 dark:ring-blue-400' : ''}
-              transition-all duration-200
-              ${isSameDay(day, new Date()) ? 'ring-2 ring-blue-500 dark:ring-blue-400 ring-offset-2 dark:ring-offset-gray-900' : ''}
-            `}
-          >
-            <div className="flex flex-col h-full">
-              <div className="flex items-center justify-between mb-2">
-                <span className={`
-                  text-sm sm:text-base font-semibold
-                  ${isCurrentMonth ? statusStyle.textClass : 'text-gray-400'}
-                  ${isSameDay(day, new Date()) ? '!text-blue-600 dark:!text-blue-400' : ''}
-                `}>
-                  {format(day, 'd')}
-                </span>
-                {holidayInfo && (
-                  <span className="text-[8px] sm:text-xs px-2 py-0.5 rounded-full 
-                                 bg-violet-100 dark:bg-violet-900/30 text-violet-800 dark:text-violet-300
-                                 font-medium truncate max-w-[80px]">
-                    {holidayInfo.name.split(' ')[0]}
+          // Get the status based on availability, considering past dates first
+          let status = isPastDate ? 'past' : getAvailabilityStatus(day, reservations);
+          
+          // Override the status if it's today but after business hours
+          if (isPresentDate && isAfterBusinessHours) {
+            status = 'past';
+          }
+          
+          
+          const statusStyle = availabilityStatus[status];
+          
+          // Enhanced cell content
+          return (
+            <motion.div
+              key={day.toISOString()}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.2, delay: index * 0.01 }}
+              onClick={() => isUnavailable ? null : handleDateClick(day)}
+              className={`
+                relative min-h-[65px] sm:min-h-[100px] p-2 sm:p-3
+                border dark:border-gray-700/50 rounded-xl
+                backdrop-blur-sm
+                ${isCurrentMonth ? statusStyle.className : 'opacity-40 bg-gray-50 dark:bg-gray-800/40'}
+                ${!isUnavailable ? statusStyle.hoverClass : 'cursor-not-allowed select-none'}
+                ${isSelected ? 'ring-2 ring-blue-500 dark:ring-blue-400' : ''}
+                transition-all duration-200
+                ${isSameDay(day, today) ? 'ring-2 ring-blue-500 dark:ring-blue-400 ring-offset-2 dark:ring-offset-gray-900' : ''}
+              `}
+            >
+              <div className="flex flex-col h-full">
+                <div className="flex items-center justify-between mb-2">
+                  <span className={`
+                    text-sm sm:text-base font-semibold
+                    ${isCurrentMonth ? statusStyle.textClass : 'text-gray-400'}
+                    ${isSameDay(day, today) ? '!text-blue-600 dark:!text-blue-400' : ''}
+                  `}>
+                    {format(day, 'd')}
                   </span>
+                  {holidayInfo && (
+                    <span className="text-[8px] sm:text-xs px-2 py-0.5 rounded-full 
+                                   bg-violet-100 dark:bg-violet-900/30 text-violet-800 dark:text-violet-300
+                                   font-medium truncate max-w-[80px]">
+                      {holidayInfo.name.split(' ')[0]}
+                    </span>
+                  )}
+                </div>
+                
+                {/* Current time indicator for today */}
+                {isPresentDate && !isAfterBusinessHours && !isBeforeBusinessHours && (
+                  <div className="mb-1.5 px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 rounded text-[8px] sm:text-xs text-blue-700 dark:text-blue-300 w-fit">
+                    Current time: {format(now, 'h:mm a')}
+                  </div>
+                )}
+                
+                {/* Equipment availability display */}
+                {isCurrentMonth && selectedResource.type === 'equipment' && !isPastDate && (
+                  <div className="mt-1 space-y-1">
+                    {equipmentAvailability
+                      .filter(item => {
+                        const itemDate = new Date(item.startDate);
+                        return isSameDay(day, itemDate);
+                      })
+                      .map((item, idx) => {
+                        const availableRatio = parseInt(item.totalAvailable);
+                        const totalQuantity = parseInt(item.currentQuantity);
+                        const requested = parseInt(item.requestedQuantity);
+                        
+                        let statusColor = '';
+                        if (availableRatio < requested) {
+                          statusColor = 'bg-rose-100 dark:bg-rose-900/30 text-rose-800 dark:text-rose-300 border-rose-200 dark:border-rose-800/30';
+                        } else if (availableRatio < totalQuantity) {
+                          statusColor = 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800/30';
+                        } else {
+                          statusColor = 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/30';
+                        }
+
+                        return (
+                          <div
+                            key={idx}
+                            className={`text-[8px] sm:text-xs py-0.5 px-1.5 rounded-md border ${statusColor}`}
+                          >
+                            {item.name}: {item.totalAvailable}/{item.currentQuantity} units
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+
+                {/* Keep existing time slot indicators for non-equipment resources */}
+                {isCurrentMonth && selectedResource.type !== 'equipment' && status !== 'past' && (
+                  <div className="mt-1 space-y-1">
+                    {getReservedTimeSlots(day).timeRanges.map((range, idx) => (
+                      <div
+                        key={idx}
+                        className="text-[8px] sm:text-xs py-0.5 px-1.5 rounded-md border
+                                 bg-gray-100 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700/30
+                                 text-gray-600 dark:text-gray-400"
+                        title={`${format(range.start, 'HH:mm')} - ${format(range.end, 'HH:mm')}`}
+                      >
+                        {format(range.start, 'HH:mm')} - {format(range.end, 'HH:mm')}
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
-              
-              {/* Enhanced time slot indicators */}
-              {isCurrentMonth && status !== 'past' && (
-                <div className="mt-1 space-y-1">
-                  {getReservedTimeSlots(day).timeRanges.map((range, idx) => (
-                    <div
-                      key={idx}
-                      className="text-[8px] sm:text-xs py-0.5 px-1.5 rounded-md
-                               bg-gray-100 dark:bg-gray-800/60
-                               text-gray-600 dark:text-gray-400"
-                      title={`${format(range.start, 'HH:mm')} - ${format(range.end, 'HH:mm')}`}
-                    >
-                      {format(range.start, 'HH:mm')} - {format(range.end, 'HH:mm')}
-                    </div>
-                  ))}
+
+              {/* Enhanced status indicator */}
+              <div className="absolute bottom-2 right-2">
+                <div className={`
+                  w-2 h-2 sm:w-3 sm:h-3 rounded-full
+                  ${status === 'available' ? 'bg-emerald-400 animate-pulse' : ''}
+                  ${status === 'partial' ? 'bg-amber-400' : ''}
+                  ${status === 'reserved' ? 'bg-rose-400' : ''}
+                  ${status === 'holiday' ? 'bg-violet-400' : ''}
+                  ${status === 'past' ? 'bg-gray-400' : ''}
+                `}/>
+              </div>
+
+              {/* Add a "Past" indicator for past dates */}
+              {isPastDate && (
+                <div className="absolute top-1 left-1 text-[8px] sm:text-[10px] text-gray-500 dark:text-gray-600 uppercase tracking-tight font-semibold">
+                  Past
                 </div>
               )}
-            </div>
+            </motion.div>
+          );
+        })}
+      </motion.div>
+    );
+  };
 
-            {/* Enhanced status indicator */}
-            <div className="absolute bottom-2 right-2">
-              <div className={`
-                w-2 h-2 rounded-full
-                ${status === 'available' ? 'bg-emerald-400 animate-pulse' : ''}
-                ${status === 'partial' ? 'bg-amber-400' : ''}
-                ${status === 'reserved' ? 'bg-rose-400' : ''}
-                ${status === 'holiday' ? 'bg-violet-400' : ''}
-              `}/>
-            </div>
-          </motion.div>
-        );
-      })}
-    </motion.div>
-  );
-};
-
-// Update the getTimeSlotAvailability function to handle multi-day reservations
-const getTimeSlotAvailability = (date, hour, allReservations) => {
-  // Business hours are 5 AM to 7 PM
-  if (hour < 5 || hour >= 19) return 'outside';
-
-  const slotStart = new Date(date);
-  slotStart.setHours(hour, 0, 0, 0); // Start of the time slot
-  const slotEnd = new Date(date);
-  slotEnd.setHours(hour + 1, 0, 0, 0); // End of the time slot
-
-  // Check if the time slot overlaps with any reservation
-  const hasReservation = allReservations.some(res => {
-    if (!res.isReserved) return false;
-
-    const resStart = new Date(res.reservation_form_start_date);
-    const resEnd = new Date(res.reservation_form_end_date);
-
-    // Handle multi-day reservations
-    if (!isSameDay(resStart, resEnd)) {
-      if (isSameDay(date, resStart)) {
-        if (slotStart >= resStart && slotStart < resEnd) {
-          return true;
-        }
+  // Helper function to get time slot availability
+  const getTimeSlotAvailability = (date, hour) => {
+    // Check if outside business hours
+    if (hour < 5 || hour > 19) {
+      return 'outside';
+    }
+    
+    // Check if it's a holiday
+    if (holidays.some(holiday => isSameDay(new Date(holiday.date), date))) {
+      return 'holiday';
+    }
+    
+    // For equipment resources
+    if (selectedResource.type === 'equipment') {
+      const relevantEquipment = equipmentAvailability.filter(item => {
+        const itemDate = new Date(item.startDate);
+        const itemEnd = new Date(item.endDate);
+        return isSameDay(date, itemDate) && 
+               hour >= itemDate.getHours() && 
+               hour < itemEnd.getHours();
+      });
+      
+      // If no equipment is found for this time slot, it's available
+      if (relevantEquipment.length === 0) {
+        return 'available';
       }
+      
+      // Check if any equipment has insufficient availability for the requested quantity
+      const hasUnavailableEquipment = relevantEquipment.some(item => {
+        const available = parseInt(item.totalAvailable);
+        const requested = parseInt(item.requestedQuantity);
+        console.log(`Slot availability check for ${item.name}: Available=${available}, Requested=${requested}`);
+        return available < requested;
+      });
+      
+      if (hasUnavailableEquipment) {
+        return 'reserved';
+      }
+      
+      // Check if any equipment has partial availability (less than total but enough for request)
+      const hasPartialAvailability = relevantEquipment.some(item => {
+        const available = parseInt(item.totalAvailable);
+        const total = parseInt(item.currentQuantity);
+        const requested = parseInt(item.requestedQuantity);
+        return available < total && available >= requested;
+      });
+      
+      if (hasPartialAvailability) {
+        return 'partial';
+      }
+      
+      return 'available';
+    }
+    
+    // For venue/vehicle resources
+    const reservations = getReservedTimeSlots(date);
+    
+    // Check if there are any reservations for this time slot
+    const hasReservationsInHour = reservations.timeRanges.some(range => {
+      const rangeHour = new Date(range.start).getHours();
+      return rangeHour === hour;
+    });
+    
+    // Check for partial reservations (if there's space for some but not all)
+    const hasPartialReservations = reservations.timeRanges.some(range => {
+      const rangeHour = new Date(range.start).getHours();
+      return rangeHour === hour && range.isPartial;
+    });
+    
+    if (hasReservationsInHour) {
+      return hasPartialReservations ? 'partial' : 'reserved';
+    }
+    
+    return 'available';
+  };
 
-      if (isSameDay(date, resEnd)) {
-        if (slotEnd > resStart && slotEnd <= resEnd) {
-          return true;
-        }
-      }
-      if (date > resStart && date < resEnd) {
-        return true;
-      }
-    } else {
-      if (slotStart < resEnd && slotEnd > resStart) {
-        return true;
-      }
+  // Update the renderWeekView function
+  const renderWeekView = () => {
+    const daysOfWeek = [];
+    const startOfWeek = new Date(currentDate);
+    startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+    
+    // Generate days of the week
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(startOfWeek);
+      day.setDate(startOfWeek.getDate() + i);
+      daysOfWeek.push(day);
     }
 
-    return false;
-  });
-
-  return hasReservation ? 'reserved' : 'available';
-};
-
-
-// Update the renderWeekView function
-const renderWeekView = () => {
-  const startOfWeek = new Date(currentDate);
-  startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const day = new Date(startOfWeek);
-    day.setDate(startOfWeek.getDate() + i);
-    return day;
-  });
-
-  const timeSlots = Array.from({ length: 14 }, (_, i) => i + 5); // This will create an array from 5 to 18 (5 AM to 6 PM)
- // Show all hours
-  const now = new Date();
-
-  return (
-    <div className="overflow-x-auto">
-      <div className="min-w-full bg-white dark:bg-gray-900 rounded-xl shadow-sm">
-        <div className="grid grid-cols-[80px_repeat(7,1fr)] border-b dark:border-gray-700/50">
-          <div className="p-3 text-sm font-medium text-gray-500">Time</div>
-          {days.map((day) => {
+    return (
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col h-full">
+        {/* Week header showing dates */}
+        <div className="grid grid-cols-8 border-b border-gray-200 dark:border-gray-700">
+          <div className="py-2 px-2 border-r border-gray-200 dark:border-gray-700 font-medium text-gray-500 dark:text-gray-400 text-center text-xs sm:text-sm">
+            Time
+          </div>
+          {daysOfWeek.map((day, index) => {
             const isToday = isSameDay(day, new Date());
-            const isPast = day < new Date(now.setHours(0, 0, 0, 0));
-            const holidayInfo = holidays.find(h => h.date === day.toISOString().split('T')[0]);
-
+            const isPastDate = isPast(endOfDay(day));
+            const isHoliday = holidays.some(holiday => 
+              isSameDay(new Date(holiday.date), day)
+            );
+            
             return (
               <div 
-                key={day.toISOString()} 
-                className={`
-                  p-3 text-center border-l dark:border-gray-700/50
-                  ${isToday ? 'bg-blue-50 dark:bg-blue-900/20' : ''}
-                  ${isPast ? 'bg-gray-50 dark:bg-gray-800/50' : ''}
-                  ${holidayInfo ? 'bg-violet-50 dark:bg-violet-900/20' : ''}
+                key={index} 
+                className={`py-2 px-1 sm:px-2 text-center text-xs sm:text-sm 
+                  ${isToday ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-semibold' : ''}
+                  ${isPastDate ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'}
+                  ${isHoliday ? 'bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300' : ''}
                 `}
               >
-                <div className="text-sm font-semibold">{format(day, 'EEE')}</div>
-                <div className="text-xs text-gray-500 mt-1">{format(day, 'MMM d')}</div>
-                {holidayInfo && (
-                  <div className="text-[10px] text-violet-600 dark:text-violet-400 mt-1 truncate">
-                    {holidayInfo.name.split(' ')[0]}
+                <div className="font-medium">{format(day, 'EEE')}</div>
+                <div className={`text-xs ${isToday ? 'text-blue-600 dark:text-blue-400 font-semibold' : ''}`}>
+                  {format(day, 'MMM d')}
+                </div>
+                {isHoliday && (
+                  <div className="text-[10px] text-violet-600 dark:text-violet-400 font-medium mt-0.5">
+                    {holidays.find(holiday => isSameDay(new Date(holiday.date), day))?.name || 'Holiday'}
                   </div>
                 )}
               </div>
             );
           })}
         </div>
-
-        {timeSlots.map((hour) => (
-          <div 
-            key={hour} 
-            className="grid grid-cols-[80px_repeat(7,1fr)] border-b dark:border-gray-700/50 last:border-b-0"
-          >
-            <div className="p-3 text-sm font-medium text-gray-500 bg-gray-50 dark:bg-gray-800/30">
-              {format(new Date().setHours(hour), 'ha')}
-            </div>
-            {days.map((day) => {
-              const conflicts = checkTimeSlotConflicts(day, hour);
-              const isReserved = conflicts.length > 0;
-              const isPast = new Date(day.setHours(hour)) < now;
-              const holidayInfo = holidays.find(h => h.date === day.toISOString().split('T')[0]);
-
-              return (
-                <motion.div
-                  key={`${day.toISOString()}-${hour}`}
-                  whileHover={!isPast && !isReserved && !holidayInfo ? { scale: 1.02 } : {}}
-                  className={`
-                    p-3 border-l dark:border-gray-700/50 min-h-[60px] relative
-                    transition-colors duration-200
-                    ${isReserved ? 'bg-rose-50 dark:bg-rose-900/20' : ''}
-                    ${!isReserved && !isPast && !holidayInfo ? 'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/10 cursor-pointer' : ''}
-                    ${isPast ? 'bg-gray-50 dark:bg-gray-800/50' : ''}
-                    ${holidayInfo ? 'bg-violet-50 dark:bg-violet-900/20' : ''}
-                  `}
-                  onClick={() => !isPast && !isReserved && !holidayInfo && handleTimeSlotClick(day, hour)}
+        
+        {/* Time slots grid */}
+        <div className="flex-grow overflow-y-auto">
+          <div className="grid grid-cols-8 h-full">
+            {/* Time column */}
+            <div className="border-r border-gray-200 dark:border-gray-700">
+              {businessHours.map((hour) => (
+                <div 
+                  key={hour} 
+                  className="h-14 sm:h-20 border-b border-gray-200 dark:border-gray-700 px-1.5 flex items-center justify-center text-xs text-gray-500 dark:text-gray-400"
                 >
-                  {isReserved && conflicts.map((conflict, idx) => (
-                    <div key={idx} className="text-[10px] text-rose-600 dark:text-rose-400 mb-1">
-                      Reserved: {format(new Date(conflict.startDate), 'HH:mm')}
-                    </div>
-                  ))}
-                </motion.div>
+                  {format(new Date().setHours(hour, 0, 0), 'h a')}
+                </div>
+              ))}
+            </div>
+            
+            {/* Days columns */}
+            {daysOfWeek.map((day, dayIndex) => {
+              const isPastDate = isPast(endOfDay(day));
+              const isHoliday = holidays.some(holiday => 
+                isSameDay(new Date(holiday.date), day)
+              );
+              
+              return (
+                <div key={dayIndex} className="border-r last:border-r-0 border-gray-200 dark:border-gray-700">
+                  {businessHours.map((hour) => {
+                    const isPastHour = isBefore(
+                      new Date(day.getFullYear(), day.getMonth(), day.getDate(), hour),
+                      new Date()
+                    );
+                    const currentHour = new Date().getHours() === hour && isSameDay(day, new Date());
+                    
+                    // Get the availability status for this time slot
+                    const status = getTimeSlotAvailability(day, hour);
+                    
+                    // Determine background and text colors based on status
+                    let bgClass = "";
+                    let textClass = "";
+                    let hoverClass = "";
+                    
+                    if (isPastDate || isPastHour) {
+                      bgClass = "bg-gray-50 dark:bg-gray-850";
+                      textClass = "text-gray-400 dark:text-gray-500";
+                    } else if (isHoliday) {
+                      bgClass = "bg-violet-50/30 dark:bg-violet-900/10";
+                      textClass = "text-violet-700 dark:text-violet-400";
+                      hoverClass = "hover:bg-violet-100 dark:hover:bg-violet-900/20";
+                    } else if (status === 'reserved') {
+                      bgClass = "bg-rose-50/30 dark:bg-rose-900/10";
+                      textClass = "text-rose-700 dark:text-rose-400";
+                      hoverClass = "hover:bg-rose-100 dark:hover:bg-rose-900/20";
+                    } else if (status === 'partial') {
+                      bgClass = "bg-amber-50/30 dark:bg-amber-900/10";
+                      textClass = "text-amber-700 dark:text-amber-400";
+                      hoverClass = "hover:bg-amber-100 dark:hover:bg-amber-900/20";
+                    } else {
+                      bgClass = "bg-white dark:bg-gray-800";
+                      textClass = "text-gray-700 dark:text-gray-300";
+                      hoverClass = "hover:bg-emerald-50 dark:hover:bg-emerald-900/10";
+                    }
+                    
+                    return (
+                      <div
+                        key={hour}
+                        className={`h-14 sm:h-20 border-b border-gray-200 dark:border-gray-700 p-0.5 sm:p-1 relative ${bgClass} ${!isPastHour && !isHoliday ? hoverClass : ''} transition-colors duration-150 ease-in-out`}
+                        onClick={() => {
+                          if (!isPastHour && !isHoliday) {
+                            handleTimeSlotClick(day, hour);
+                          }
+                        }}
+                      >
+                        {/* Current time indicator */}
+                        {currentHour && (
+                          <div className="absolute top-0 left-0 w-full border-t-2 border-blue-500 dark:border-blue-400 z-10">
+                            <div className="absolute -top-1 -left-1 w-2 h-2 rounded-full bg-blue-500 dark:bg-blue-400" />
+                          </div>
+                        )}
+                        
+                        {/* Content container */}
+                        <div className="h-full">
+                          {selectedResource.type === 'equipment' && (
+                            <div className="space-y-1">
+                              {equipmentAvailability
+                                .filter(item => {
+                                  const itemDate = new Date(item.startDate);
+                                  const itemEnd = new Date(item.endDate);
+                                  return isSameDay(day, itemDate) &&
+                                        hour >= itemDate.getHours() &&
+                                        hour < itemEnd.getHours();
+                                })
+                                .map((item, idx) => {
+                                  const available = parseInt(item.totalAvailable);
+                                  const requested = parseInt(item.requestedQuantity);
+                                  const total = parseInt(item.currentQuantity);
+                                  let statusColor = '';
+
+                                  if (available < requested) {
+                                    statusColor = 'bg-rose-100 dark:bg-rose-900/30 text-rose-800 dark:text-rose-300 border-rose-200 dark:border-rose-800/30';
+                                  } else if (available < total) {
+                                    statusColor = 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800/30';
+                                  } else {
+                                    statusColor = 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/30';
+                                  }
+
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className={`text-[8px] sm:text-xs py-0.5 px-1.5 rounded-md mb-1 border ${statusColor} ${isPastHour ? 'opacity-60' : ''}`}
+                                    >
+                                      {item.name}: {available}/{total}
+                                    </div>
+                                  );
+                                })
+                              }
+                            </div>
+                          )}
+
+                          {/* Venue/vehicle rendering */}
+                          {!selectedResource.type === 'equipment' && (
+                            <div className="space-y-1">
+                              {getReservedTimeSlots(day).timeRanges
+                                .filter(range => {
+                                  const rangeHour = new Date(range.start).getHours();
+                                  return rangeHour === hour;
+                                })
+                                .map((range, idx) => (
+                                  <div
+                                    key={idx}
+                                    className={`text-[8px] sm:text-xs py-0.5 px-1.5 rounded-md mb-1 border border-gray-200 dark:border-gray-700/30 ${textClass} ${isPastHour ? 'opacity-60' : ''}`}
+                                  >
+                                    {format(range.start, 'HH:mm')} - {format(range.end, 'HH:mm')}
+                                  </div>
+                                ))
+                              }
+                            </div>
+                          )}
+                          
+                          {/* Status indicators */}
+                          {!isPastHour && (
+                            <div className="absolute bottom-1 right-1">
+                              <div className={`
+                                w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full
+                                ${status === 'available' ? 'bg-emerald-400 animate-pulse' : ''}
+                                ${status === 'partial' ? 'bg-amber-400' : ''}
+                                ${status === 'reserved' ? 'bg-rose-400' : ''}
+                                ${status === 'holiday' ? 'bg-violet-400' : ''}
+                              `}/>
+                            </div>
+                          )}
+                          
+                          {/* Empty state for available slots */}
+                          {!isPastHour && status === 'available' && 
+                            !selectedResource.type === 'equipment' && 
+                            getReservedTimeSlots(day).timeRanges.filter(range => {
+                              const rangeHour = new Date(range.start).getHours();
+                              return rangeHour === hour;
+                            }).length === 0 && 
+                            equipmentAvailability.filter(item => {
+                              const itemDate = new Date(item.startDate);
+                              const itemEnd = new Date(item.endDate);
+                              return isSameDay(day, itemDate) &&
+                                    hour >= itemDate.getHours() &&
+                                    hour < itemEnd.getHours();
+                            }).length === 0 &&
+                            (
+                              <div className="flex items-center justify-center h-full opacity-50">
+                                <div className="text-[8px] sm:text-xs text-emerald-600 dark:text-emerald-400">Available</div>
+                              </div>
+                            )
+                          }
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               );
             })}
           </div>
-        ))}
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
-// Update renderDayView function
-const renderDayView = () => {
-  const timeSlots = Array.from({ length: 24 }, (_, i) => i);
-  const now = new Date();
-  const isPastDay = currentDate < new Date(now.setHours(0, 0, 0, 0));
-  const holidayInfo = holidays.find(h => h.date === currentDate.toISOString().split('T')[0]);
+  const renderDayView = () => {
+    const timeSlots = Array.from({ length: 14 }, (_, i) => i + 5);
+    const now = new Date();
+    const isPastDay = currentDate < new Date(now.setHours(0, 0, 0, 0));
+    const isToday = isSameDay(currentDate, new Date());
+    const holidayInfo = holidays.find(h => h.date === currentDate.toISOString().split('T')[0]);
+    const currentHour = new Date().getHours();
 
-  return (
-    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm overflow-hidden">
-      <div className="p-4 border-b dark:border-gray-700/50 bg-gray-50 dark:bg-gray-800/30">
-        <h3 className="text-lg font-semibold">
-          {format(currentDate, 'EEEE, MMMM d, yyyy')}
-        </h3>
-        {holidayInfo && (
-          <div className="mt-1 text-sm text-violet-600 dark:text-violet-400">
-            Holiday: {holidayInfo.name}
+    return (
+      <motion.div 
+        className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700/30 overflow-hidden"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        <div className="p-4 border-b dark:border-gray-700/50 bg-gray-50/80 dark:bg-gray-800/40">
+          <div className="flex items-center justify-between">
+            <h3 className={`text-lg font-semibold ${isPastDay ? 'text-gray-500 dark:text-gray-400' : ''}`}>
+              {format(currentDate, 'EEEE, MMMM d, yyyy')}
+            </h3>
+            
+            {isToday && (
+              <div className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded-full">
+                Today
+              </div>
+            )}
+            
+            {isPastDay && (
+              <div className="px-2 py-1 bg-gray-100 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 text-xs rounded-full">
+                Past Date
+              </div>
+            )}
           </div>
-        )}
-      </div>
-
-      {timeSlots.map((hour) => {
-        const conflicts = checkTimeSlotConflicts(currentDate, hour);
-        const isReserved = conflicts.length > 0;
-        const isPastHour = new Date(currentDate.setHours(hour)) < now;
-
-        return (
-          <motion.div
-            key={hour}
-            whileHover={!isPastHour && !isReserved && !holidayInfo ? { scale: 1.01 } : {}}
-            className={`
-              flex items-stretch border-b dark:border-gray-700/50 last:border-b-0
-              ${isReserved ? 'bg-rose-50 dark:bg-rose-900/20' : ''}
-              ${!isReserved && !isPastHour && !holidayInfo ? 'hover:bg-emerald-50 dark:hover:bg-emerald-900/10 cursor-pointer' : ''}
-              ${isPastHour || isPastDay ? 'bg-gray-50 dark:bg-gray-800/50' : ''}
-              ${holidayInfo ? 'bg-violet-50 dark:bg-violet-900/20' : ''}
-              transition-colors duration-200
-            `}
-            onClick={() => !isPastHour && !isReserved && !holidayInfo && handleTimeSlotClick(currentDate, hour)}
-          >
-            <div className="w-24 p-4 text-sm font-medium text-gray-500 border-r dark:border-gray-700/50 bg-gray-50/50 dark:bg-gray-800/20">
-              {format(new Date().setHours(hour), 'h:mm a')}
+          
+          {holidayInfo && (
+            <div className="mt-1.5 px-3 py-1 bg-violet-100 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 text-sm rounded-lg inline-block">
+              <span className="font-medium">Holiday:</span> {holidayInfo.name}
             </div>
-            <div className="flex-1 p-4">
-              {isReserved ? (
-                <div className="space-y-2">
-                  {conflicts.map((conflict, idx) => (
-                    <div key={idx} className="flex items-center space-x-2">
-                      <div className="w-2 h-2 rounded-full bg-rose-400" />
-                      <span className="text-sm text-rose-600 dark:text-rose-400">
-                        Reserved: {format(new Date(conflict.startDate), 'h:mm a')} - {format(new Date(conflict.endDate), 'h:mm a')}
+          )}
+        </div>
+
+        <div className="divide-y dark:divide-gray-700/50">
+          {timeSlots.map((hour) => {
+            const isPastHour = isPastDay || (isToday && hour < currentHour);
+            const isCurrentHour = isToday && hour === currentHour;
+            const status = getTimeSlotAvailability(currentDate, hour, reservations);
+            
+            let bgClass = '';
+            let hoverClass = '';
+            let textClass = '';
+
+            switch (status) {
+              case 'available':
+                bgClass = 'bg-emerald-50 dark:bg-emerald-900/20';
+                hoverClass = 'hover:bg-emerald-100 dark:hover:bg-emerald-800/30 cursor-pointer';
+                textClass = 'text-emerald-800 dark:text-emerald-300';
+                break;
+              case 'partial':
+                bgClass = 'bg-amber-50 dark:bg-amber-900/20';
+                hoverClass = 'hover:bg-amber-100 dark:hover:bg-amber-800/30 cursor-pointer';
+                textClass = 'text-amber-800 dark:text-amber-300';
+                break;
+              case 'reserved':
+                bgClass = 'bg-rose-50 dark:bg-rose-900/20';
+                hoverClass = 'cursor-not-allowed';
+                textClass = 'text-rose-800 dark:text-rose-300';
+                break;
+              default:
+                bgClass = 'bg-gray-50 dark:bg-gray-800/50';
+                hoverClass = 'cursor-not-allowed';
+                textClass = 'text-gray-400';
+            }
+
+            const isClickable = !isPastHour && !holidayInfo && status !== 'reserved';
+
+            return (
+              <div
+                key={hour}
+                onClick={() => {
+                  if (isClickable) {
+                    const clickedDate = new Date(currentDate);
+                    clickedDate.setHours(hour, 0, 0, 0);
+                    setSelectedStartDate(clickedDate);
+                    setStartDate(clickedDate);
+                    setSelectedTimes({
+                      startTime: hour,
+                      startMinute: 0,
+                      endTime: null,
+                      endMinute: null
+                    });
+                    setSelectedEndDate(clickedDate);
+                    setEndDate(null);
+                    setIsDatePickerModalOpen(true);
+                  } else if (isPastHour) {
+                    toast.error('Cannot select past time slots');
+                  }
+                }}
+                className={`
+                  flex items-stretch relative
+                  ${isPastHour ? 'bg-gray-50 dark:bg-gray-800/50 opacity-75' : bgClass}
+                  ${isPastHour ? 'cursor-not-allowed' : (isClickable ? hoverClass : 'cursor-not-allowed')}
+                  ${holidayInfo ? 'bg-violet-50 dark:bg-violet-900/20 cursor-not-allowed' : ''}
+                  ${isCurrentHour ? 'ring-1 ring-inset ring-blue-400 dark:ring-blue-600' : ''}
+                  transition-colors duration-200
+                `}
+              >
+                {/* Current time indicator */}
+                {isCurrentHour && (
+                  <div className="absolute left-0 w-1 inset-y-0 bg-blue-500 dark:bg-blue-600"></div>
+                )}
+                
+                <div className="w-24 p-4 text-sm font-medium text-gray-500 border-r dark:border-gray-700/50 bg-gray-50/70 dark:bg-gray-800/30">
+                  <div className="flex items-center space-x-2">
+                    <span className={isPastHour ? 'text-gray-400 dark:text-gray-500' : ''}>
+                      {format(new Date().setHours(hour), 'h:mm a')}
+                    </span>
+                    
+                    {isPastHour && !isCurrentHour && (
+                      <span className="text-[9px] uppercase tracking-tight text-gray-400 dark:text-gray-500 font-medium">
+                        Past
                       </span>
+                    )}
+                    
+                    {isCurrentHour && (
+                      <span className="w-2 h-2 rounded-full bg-blue-500 dark:bg-blue-400 animate-pulse"></span>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex-1 p-4">
+                  {selectedResource.type === 'equipment' && (
+                    equipmentAvailability
+                      .filter(item => {
+                        const itemDate = new Date(item.startDate);
+                        return isSameDay(currentDate, itemDate) &&
+                              hour >= itemDate.getHours() &&
+                              hour < new Date(item.endDate).getHours();
+                      })
+                      .map((item, idx) => {
+                        let statusColor = '';
+                        const available = parseInt(item.totalAvailable);
+                        const requested = parseInt(item.requestedQuantity);
+                        const total = parseInt(item.currentQuantity);
+                        
+                        if (available < requested) {
+                          statusColor = 'bg-rose-100 dark:bg-rose-900/30 text-rose-800 dark:text-rose-300 border-rose-200 dark:border-rose-800/30';
+                        } else if (available < total) {
+                          statusColor = 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800/30';
+                        } else {
+                          statusColor = 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/30';
+                        }
+
+                        return (
+                          <div
+                            key={idx}
+                            className={`text-sm py-1 px-2 rounded-md mb-2 border ${statusColor} ${isPastHour ? 'opacity-60' : ''}`}
+                          >
+                            {item.name}: {available}/{total} units available
+                          </div>
+                        );
+                      })
+                  )}
+
+                  {!selectedResource.type === 'equipment' && getReservedTimeSlots(currentDate).timeRanges
+                    .filter(range => {
+                      const rangeHour = new Date(range.start).getHours();
+                      return rangeHour === hour;
+                    })
+                    .map((range, idx) => (
+                      <div
+                        key={idx}
+                        className={`text-sm py-1 px-2 rounded-md mb-2 border border-gray-200 dark:border-gray-700/30 ${textClass} ${isPastHour ? 'opacity-60' : ''}`}
+                      >
+                        {format(range.start, 'HH:mm')} - {format(range.end, 'HH:mm')}
+                      </div>
+                    ))
+                  }
+                  
+                  {/* Empty state for available slots */}
+                  {!isPastHour && status === 'available' && (
+                    <div className="flex items-center justify-center h-full opacity-50">
+                      <div className="text-sm text-emerald-600 dark:text-emerald-400">Available for booking</div>
                     </div>
-                  ))}
+                  )}
                 </div>
-              ) : !isPastHour && !holidayInfo ? (
-                <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-sm text-emerald-600 dark:text-emerald-400">Available</span>
-                </div>
-              ) : null}
-            </div>
-          </motion.div>
-        );
-      })}
-    </div>
-  );
-};
+              </div>
+            );
+          })}
+        </div>
+      </motion.div>
+    );
+  };
 
-const isDateInReservationRange = (date) => {
-  return reservations.some(res => {
-    if (!res.isReserved) return false;
-    const resStart = new Date(res.reservation_form_start_date);
-    const resEnd = new Date(res.reservation_form_end_date);
-    const targetDate = new Date(date);
-    
-    // Set all dates to midnight for proper day comparison
-    targetDate.setHours(0, 0, 0, 0);
-    const startDay = new Date(resStart).setHours(0, 0, 0, 0);
-    const endDay = new Date(resEnd).setHours(0, 0, 0, 0);
-    
-    return targetDate >= startDay && targetDate <= endDay;
-  });
-};
+  // Add this new time conflict check utility function
 
-// Add this new time conflict check utility function
-
-// Add helper function to determine conflict type
-const getConflictType = (newStart, newEnd, existingStart, existingEnd) => {
+  // Add helper function to determine conflict type
+  const getConflictType = (newStart, newEnd, existingStart, existingEnd) => {
   if (newStart < existingStart && newEnd > existingEnd) {
     return 'COMPLETE_OVERLAP';
   } else if (newStart >= existingStart && newEnd <= existingEnd) {
@@ -684,7 +1188,7 @@ const getConflictType = (newStart, newEnd, existingStart, existingEnd) => {
   } else {
     return 'ADJACENT';
   }
-};
+  };
 
 // Update the handleTimeSelection function
 const handleTimeSelection = () => {
@@ -694,19 +1198,27 @@ const handleTimeSelection = () => {
   }
 
   try {
+    // Create safe Date objects
     const startDateTime = new Date(selectedStartDate);
     const endDateTime = new Date(selectedEndDate || selectedStartDate);
 
+    // Validate the base dates
+    if (!isValidDate(startDateTime) || !isValidDate(endDateTime)) {
+      toast.error('Invalid date selection');
+      return;
+    }
+
+    // Safely set hours and minutes
     startDateTime.setHours(selectedTimes.startTime || 0);
     startDateTime.setMinutes(selectedTimes.startMinute || 0);
     endDateTime.setHours(selectedTimes.endTime || 0);
     endDateTime.setMinutes(selectedTimes.endMinute || 0);
 
-    // For debugging
-    console.log('Attempting booking:', {
-      start: format(startDateTime, 'yyyy-MM-dd HH:mm'),
-      end: format(endDateTime, 'yyyy-MM-dd HH:mm')
-    });
+    // Validate the resulting dates
+    if (!isValidDate(startDateTime) || !isValidDate(endDateTime)) {
+      toast.error('Invalid time selection');
+      return;
+    }
 
     // Validate business hours
     if (startDateTime.getHours() < 5 || endDateTime.getHours() > 19) {
@@ -714,15 +1226,16 @@ const handleTimeSelection = () => {
       return;
     }
 
+    // Check for valid chronological order
+    if (endDateTime <= startDateTime) {
+      toast.error('End time must be after start time');
+      return;
+    }
+
     // Check for conflicts
     const conflicts = checkConflicts(startDateTime, endDateTime);
     
     if (conflicts.length > 0) {
-      console.log('Conflicts found:', conflicts.map(c => ({
-        start: format(new Date(c.startDate), 'yyyy-MM-dd HH:mm'),
-        end: format(new Date(c.endDate), 'yyyy-MM-dd HH:mm')
-      })));
-
       setConflictDetails({
         conflicts,
         attemptedBooking: {
@@ -734,7 +1247,7 @@ const handleTimeSelection = () => {
       return;
     }
 
-    // If no conflicts, proceed with the reservation
+    // If all validations pass, proceed with the reservation
     onDateSelect(startDateTime, endDateTime);
     setIsDatePickerModalOpen(false);
   } catch (error) {
@@ -742,58 +1255,146 @@ const handleTimeSelection = () => {
     toast.error('An error occurred while processing your selection');
   }
 };
-  
 
-const renderConflictModal = () => (
+// Add utility function to validate dates
+const isValidDate = (date) => {
+  return date instanceof Date && !isNaN(date);
+};
+
+const checkConflicts = (attemptedStart, attemptedEnd) => {
+  if (!attemptedStart || !attemptedEnd) return [];
+
+  if (selectedResource.type === 'equipment') {
+    const conflicts = [];
+
+    console.log('Checking equipment conflicts for:', {
+      start: format(attemptedStart, 'yyyy-MM-dd HH:mm'),
+      end: format(attemptedEnd, 'yyyy-MM-dd HH:mm')
+    });
+
+    selectedResource.id.forEach(selectedEquip => {
+      // Find overlapping availability records
+      const overlappingAvailability = equipmentAvailability.filter(item => {
+        const availStart = new Date(item.startDate);
+        const availEnd = new Date(item.endDate);
+        
+        // Check if the attempted booking period overlaps with an existing reservation period
+        return (attemptedStart <= availEnd && attemptedEnd >= availStart);
+      });
+
+      overlappingAvailability.forEach(avail => {
+        const available = parseInt(avail.totalAvailable);
+        const requested = parseInt(selectedEquip.quantity);
+        
+        console.log('Availability check:', {
+          equipmentName: avail.name,
+          available: available,
+          requested: requested,
+          hasConflict: requested > available
+        });
+
+        // Create conflict if requested quantity exceeds available quantity
+        if (requested > available) {
+          conflicts.push({
+            equipmentName: avail.name,
+            available: available,
+            requested: requested,
+            startDate: new Date(avail.startDate),
+            endDate: new Date(avail.endDate)
+          });
+        }
+      });
+    });
+
+    return conflicts;
+  }
+
+  // Original venue/vehicle conflict checking logic
+  return reservations.filter(res => {
+    if (!res.isReserved) return false;
+    const resStart = new Date(res.startDate);
+    const resEnd = new Date(res.endDate);
+    return (attemptedStart < resEnd && attemptedEnd > resStart);
+  });
+};
+
+  const renderConflictModal = () => (
   <Dialog
     open={showConflictModal}
     onClose={() => setShowConflictModal(false)}
     className="relative z-50"
   >
-    <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" aria-hidden="true" />
 
     <div className="fixed inset-0 flex items-center justify-center p-4">
-      <Dialog.Panel className="bg-white rounded-lg p-6 max-w-md w-full">
-        <div className="mb-4">
-          <div className="flex items-center mb-2">
-            <span className="text-red-500 text-xl mr-2">⚠️</span>
-            <Dialog.Title className="text-lg font-medium text-red-700">
+      <Dialog.Panel className="bg-white dark:bg-gray-800 rounded-xl p-5 sm:p-6 max-w-md w-full shadow-xl border border-gray-200 dark:border-gray-700/30">
+        <div className="mb-5">
+          <div className="flex items-center mb-4">
+            <div className="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mr-3">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6 text-red-600 dark:text-red-400">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+              </svg>
+            </div>
+            <Dialog.Title className="text-lg sm:text-xl font-semibold text-red-700 dark:text-red-400">
               Scheduling Conflict Detected
             </Dialog.Title>
           </div>
           
-          <p className="text-gray-600 mb-4">
+          <p className="text-gray-600 dark:text-gray-300 mb-4 pl-1">
             Your selected time slot conflicts with existing reservations:
           </p>
 
           {conflictDetails && (
             <>
-              <div className="bg-red-50 p-4 rounded-lg mb-4">
-                <p className="font-medium text-red-800 mb-2">Your attempted booking:</p>
-                <p className="text-red-600">
-                  From: {dayjs(conflictDetails.attemptedBooking.start).format('MMMM D, YYYY h:mm A')}
+              <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-xl mb-4 border border-red-100 dark:border-red-900/20">
+                <p className="font-medium text-red-800 dark:text-red-300 mb-2 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-1.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                  </svg>
+                  Your attempted booking:
+                </p>
+                <p className="text-red-600 dark:text-red-300 pl-7">
+                  <span className="font-medium">From:</span> {dayjs(conflictDetails.attemptedBooking.start).format('MMMM D, YYYY h:mm A')}
                   <br/>
-                  To: {dayjs(conflictDetails.attemptedBooking.end).format('MMMM D, YYYY h:mm A')}
+                  <span className="font-medium">To:</span> {dayjs(conflictDetails.attemptedBooking.end).format('MMMM D, YYYY h:mm A')}
                 </p>
               </div>
 
-              <div className="bg-yellow-50 p-4 rounded-lg">
-                <p className="font-medium text-yellow-800 mb-2">Existing reservations:</p>
-                <ul className="space-y-2">
+              <div className="bg-amber-50 dark:bg-amber-900/10 p-4 rounded-xl border border-amber-100 dark:border-amber-900/20">
+                <p className="font-medium text-amber-800 dark:text-amber-300 mb-2 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-1.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 5.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 9v7.5m-9-6h.008v.008H12v-.008ZM12 15h.008v.008H12V15Zm0 2.25h.008v.008H12v-.008ZM9.75 15h.008v.008H9.75V15Zm0 2.25h.008v.008H9.75v-.008ZM7.5 15h.008v.008H7.5V15Zm0 2.25h.008v.008H7.5v-.008Zm6.75-4.5h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V15Zm0 2.25h.008v.008h-.008v-.008Zm2.25-4.5h.008v.008H16.5v-.008Zm0 2.25h.008v.008H16.5V15Z" />
+                  </svg>
+                  Existing reservations:
+                </p>
+                <ul className="space-y-3 pl-7">
                   {conflictDetails.conflicts.map((conflict, index) => {
                     const startDate = dayjs(conflict.startDate);
                     const endDate = dayjs(conflict.endDate);
                     const isSameDay = startDate.isSame(endDate, 'day');
                     
                     return (
-                      <li key={index} className="text-yellow-700">
-                        {conflict.venueName && <span className="font-medium">{conflict.venueName}</span>}
-                        <br />
-                        {isSameDay ? (
-                          `${startDate.format('MMMM D, YYYY')} from ${startDate.format('h:mm A')} to ${endDate.format('h:mm A')}`
-                        ) : (
-                          `${startDate.format('MMMM D')} - ${endDate.format('MMMM D, YYYY')} from ${startDate.format('h:mm A')} to ${endDate.format('h:mm A')}`
+                      <li key={index} className="text-amber-700 dark:text-amber-300 border-l-2 border-amber-300 dark:border-amber-600 pl-3 py-1">
+                        {conflict.venueName && (
+                          <div className="font-medium mb-1 text-amber-800 dark:text-amber-200">
+                            {conflict.venueName}
+                          </div>
                         )}
+                        <div className="text-sm">
+                          {isSameDay ? (
+                            <>
+                              <span className="inline-block w-16">Date:</span> {startDate.format('MMMM D, YYYY')}
+                              <br />
+                              <span className="inline-block w-16">Time:</span> {startDate.format('h:mm A')} - {endDate.format('h:mm A')}
+                            </>
+                          ) : (
+                            <>
+                              <span className="inline-block w-16">From:</span> {startDate.format('MMMM D, h:mm A')}
+                              <br />
+                              <span className="inline-block w-16">To:</span> {endDate.format('MMMM D, YYYY h:mm A')}
+                            </>
+                          )}
+                        </div>
                       </li>
                     );
                   })}
@@ -803,9 +1404,15 @@ const renderConflictModal = () => (
           )}
         </div>
 
-        <div className="mt-6 flex justify-end space-x-3">
+        <div className="flex justify-end space-x-3">
           <button
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            className="px-4 py-2.5 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+            onClick={() => setShowConflictModal(false)}
+          >
+            Cancel
+          </button>
+          <button
+            className="px-4 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors shadow-sm"
             onClick={() => {
               setShowConflictModal(false);
               setSelectedTimes({
@@ -823,32 +1430,51 @@ const renderConflictModal = () => (
       </Dialog.Panel>
     </div>
   </Dialog>
-);
+  );
   // Update the RangePicker in renderEnhancedDateTimeSelection
   
-
+  const getBusinessHoursStatus = (date) => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const compareDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    
+    if (compareDate < today) return 'past';
+    if (compareDate.getTime() === today.getTime()) {
+      const currentHour = now.getHours();
+      if (currentHour >= 19) return 'past'; // After business hours
+      if (currentHour < 5) return 'upcoming'; // Before business hours
+      return 'current';
+    }
+    return 'upcoming';
+  };
   // Update renderAvailabilityLegend to include yellow option
   const renderAvailabilityLegend = () => (
-    <div className="flex flex-wrap gap-1 sm:gap-2 items-center mb-2 p-1 sm:p-2 bg-white rounded-lg text-[10px] sm:text-sm">
-      <div className="flex items-center gap-1">
-        <div className="w-2 h-2 sm:w-3 sm:h-3 rounded bg-green-100"></div>
-        <span>Available</span>
+    <div className="flex flex-wrap gap-2 items-center mb-3 sm:mb-4 p-2 sm:p-3 bg-white dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700/30 shadow-sm text-[10px] sm:text-xs">
+      <div className="font-medium mr-1 text-gray-700 dark:text-gray-300">Status:</div>
+      
+      <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+        <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-emerald-400 animate-pulse"></div>
+        <span className="text-emerald-700 dark:text-emerald-300">Available</span>
       </div>
-      <div className="flex items-center gap-1">
-        <div className="w-2 h-2 sm:w-3 sm:h-3 rounded bg-yellow-100"></div>
-        <span>Partially Reserved</span>
+      
+      <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+        <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-amber-400"></div>
+        <span className="text-amber-700 dark:text-amber-300">Partially Reserved</span>
       </div>
-      <div className="flex items-center gap-1">
-        <div className="w-2 h-2 sm:w-3 sm:h-3 rounded bg-red-100"></div>
-        <span>Fully Reserved (5AM-7PM)</span>
+      
+      <div className="flex items-center gap-1.5 px-2 py-1 bg-rose-50 dark:bg-rose-900/20 rounded-lg">
+        <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-rose-400"></div>
+        <span className="text-rose-700 dark:text-rose-300">Fully Reserved</span>
       </div>
-      <div className="flex items-center gap-1">
-        <div className="w-2 h-2 sm:w-3 sm:h-3 rounded bg-gray-100"></div>
-        <span>Past</span>
+      
+      <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-50 dark:bg-gray-800/70 rounded-lg">
+        <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-gray-400"></div>
+        <span className="text-gray-700 dark:text-gray-400">Past</span>
       </div>
-      <div className="flex items-center gap-1">
-        <div className="w-2 h-2 sm:w-3 sm:h-3 rounded bg-violet-100"></div>
-        <span>Holiday</span>
+      
+      <div className="flex items-center gap-1.5 px-2 py-1 bg-violet-50 dark:bg-violet-900/20 rounded-lg">
+        <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-violet-400"></div>
+        <span className="text-violet-700 dark:text-violet-300">Holiday</span>
       </div>
     </div>
   );
@@ -893,30 +1519,67 @@ const renderConflictModal = () => (
     const now = new Date();
     const selectedDateTime = new Date(day);
     selectedDateTime.setHours(hour, 0, 0, 0);
-
+  
+    // Check if the selected time is in the past
     if (selectedDateTime < now) {
-      toast.error('Cannot select past dates');
+      toast.error('Cannot select past time slots', {
+        position: 'top-center',
+        icon: '⏰',
+        className: 'font-medium'
+      });
       return;
     }
-
+    
+    // Check if it's today but we're trying to book for earlier than the next hour
+    if (isSameDay(day, now) && hour <= now.getHours()) {
+      toast.error('Please select a future time slot', {
+        position: 'top-center',
+        icon: '⏱️',
+        className: 'font-medium'
+      });
+      return;
+    }
+    
+    // Check if the time slot is already reserved
     const status = getTimeSlotAvailability(day, hour, reservations);
-    if (status === 'full' || status === 'reserved') {
-      toast.error('This time slot is already reserved');
+    if (status === 'reserved') {
+      toast.error('This time slot is already reserved', {
+        position: 'top-center',
+        icon: '❌',
+        className: 'font-medium'
+      });
       return;
     }
-
-    // Set start date and time, then open modal
-    setSelectedStartDate(selectedDateTime);
-    setStartDate(selectedDateTime);
+    
+    // Check if it's a holiday
+    const formattedDate = day.toISOString().split('T')[0];
+    const holidayInfo = holidays.find(h => h.date === formattedDate);
+    if (holidayInfo) {
+      toast.error(`Reservations not allowed on ${holidayInfo.name} (Holiday)`, {
+        position: 'top-center',
+        icon: '🏖️',
+        className: 'font-medium'
+      });
+      return;
+    }
+  
+    // Set start date and initial time
+    setSelectedStartDate(day);
+    setStartDate(day);
     setSelectedTimes(prev => ({
       ...prev,
       startTime: hour,
-      startMinute: 0
+      startMinute: 0,
+      endTime: hour + 1 >= 19 ? 19 : hour + 1, // Default end time to 1 hour later, capped at 7 PM
+      endMinute: 0
     }));
+    
+    // Reset end date
     setEndDate(null);
-    setSelectedEndDate(null);
+    setSelectedEndDate(day); // Set same day as default end date
+    
+    // Show modal
     setIsDatePickerModalOpen(true);
-    setSelectionMode('end-only');
   };
 
   // Add this new function to render the date range modal
@@ -1048,36 +1711,43 @@ const renderConflictModal = () => (
       onClose={() => setIsDatePickerModalOpen(false)}
       className="relative z-50"
     >
-      <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" aria-hidden="true" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
-        <Dialog.Panel className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-4 sm:p-6 w-full max-w-[340px] sm:max-w-md">
-          <div className="flex items-center justify-between mb-4">
-            <Dialog.Title className="text-base sm:text-lg font-semibold">
-              Select Reservation Period
+        <Dialog.Panel className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-5 sm:p-6 w-full max-w-md border border-gray-200 dark:border-gray-700/30">
+          <div className="flex items-center justify-between mb-5">
+            <Dialog.Title className="text-lg sm:text-xl font-semibold">
+              Schedule Reservation
             </Dialog.Title>
             <button
               onClick={() => setIsDatePickerModalOpen(false)}
-              className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+              className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
             >
-              <span className="sr-only">Close</span>
-              ✕
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 01-1.414 1.414z" clipRule="evenodd" />
+              </svg>
             </button>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-5">
             {/* Start Date Display (not editable) */}
-            <div>
-              <label className="block text-xs sm:text-sm font-medium mb-1">Start Date</label>
-              <div className="w-full p-2 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
-                {dayjs(selectedStartDate).format('MMMM D, YYYY')}
+            <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-xl border border-blue-100 dark:border-blue-800/30">
+              <label className="block text-xs sm:text-sm font-medium mb-2 text-blue-700 dark:text-blue-300">Selected Date</label>
+              <div className="text-base sm:text-lg font-medium text-blue-800 dark:text-blue-200">
+                {dayjs(selectedStartDate).format('dddd, MMMM D, YYYY')}
+              </div>
+              <div className="mt-2 text-xs text-blue-600 dark:text-blue-400 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0 1 16 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+                Business hours: 5:00 AM - 7:00 PM
               </div>
             </div>
 
             {/* End Date Selection */}
             <div>
-              <label className="block text-xs sm:text-sm font-medium mb-1">End Date</label>
+              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">End Date</label>
               <DatePicker
-                className="w-full"
+                className="w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg"
                 value={selectedEndDate ? dayjs(selectedEndDate) : null}
                 onChange={(date) => setSelectedEndDate(date.toDate())}
                 disabledDate={(current) => {
@@ -1088,11 +1758,11 @@ const renderConflictModal = () => (
             </div>
 
             {/* Time Selection */}
-            <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs sm:text-sm font-medium mb-1">Start Time</label>
+                <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Start Time</label>
                 <TimePicker
-                  className="w-full text-xs sm:text-sm"
+                  className="w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg"
                   format="HH:mm"
                   minuteStep={30}
                   popupClassName="text-xs sm:text-sm"
@@ -1113,12 +1783,13 @@ const renderConflictModal = () => (
                       }));
                     }
                   }}
+                  placeholder="5:00 AM - 7:00 PM"
                 />
               </div>
               <div>
-                <label className="block text-xs sm:text-sm font-medium mb-1">End Time</label>
+                <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">End Time</label>
                 <TimePicker
-                  className="w-full text-xs sm:text-sm"
+                  className="w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg"
                   format="HH:mm"
                   minuteStep={30}
                   popupClassName="text-xs sm:text-sm"
@@ -1146,23 +1817,48 @@ const renderConflictModal = () => (
                       }));
                     }
                   }}
+                  placeholder="5:00 AM - 7:00 PM"
                 />
               </div>
+            </div>
+            
+            {/* Validation guidelines */}
+            <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg border border-gray-200 dark:border-gray-600/30 text-xs text-gray-600 dark:text-gray-400 space-y-1.5">
+              <div className="flex items-start">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                <span>Select a time between 5:00 AM and 7:00 PM</span>
+              </div>
+              <div className="flex items-start">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                <span>End time must be after start time</span>
+              </div>
+              {selectedStartDate !== selectedEndDate && (
+                <div className="flex items-start">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  <span>You've selected a multi-day reservation</span>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Action Buttons */}
-          <div className="mt-4 sm:mt-6 flex gap-2 sm:gap-3">
+          <div className="mt-6 flex gap-3">
             <button
-              className="flex-1 px-3 py-2 text-xs sm:text-sm font-medium text-gray-600 bg-gray-100 
-                       hover:bg-gray-200 rounded-lg transition-colors"
+              className="w-1/3 px-3 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700
+                       hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors border border-gray-200 dark:border-gray-600"
               onClick={() => setIsDatePickerModalOpen(false)}
             >
               Cancel
             </button>
             <button
-              className="flex-1 px-3 py-2 text-xs sm:text-sm font-medium text-white bg-blue-500 
-                       hover:bg-blue-600 rounded-lg transition-colors disabled:opacity-50"
+              className="w-2/3 px-3 py-2.5 text-sm font-medium text-white bg-blue-500 
+                       hover:bg-blue-600 rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={() => {
                 // Validate date selection
                 if (!selectedStartDate || !selectedEndDate) {
@@ -1212,7 +1908,7 @@ const renderConflictModal = () => (
               }}
               disabled={!selectedStartDate || !selectedEndDate || !selectedTimes.startTime || !selectedTimes.endTime}
             >
-              Confirm
+              Confirm Reservation
             </button>
           </div>
         </Dialog.Panel>
@@ -1221,7 +1917,7 @@ const renderConflictModal = () => (
   );
 
   // Add this new function before the return statement
-const renderTimeSelectionModal = () => (
+  const renderTimeSelectionModal = () => (
   <Dialog
     open={timeModalOpen}
     onClose={() => setTimeModalOpen(false)}
@@ -1298,90 +1994,54 @@ const renderTimeSelectionModal = () => (
       </Dialog.Panel>
     </div>
   </Dialog>
-);
+  );
 
-// Update the checkTimeSlotConflicts function
-const checkTimeSlotConflicts = (date, hour) => {
-  return reservations.filter(res => {
-    if (!res.isReserved) return false;
-
-    const resStart = new Date(res.startDate);
-    const resEnd = new Date(res.endDate);
-    const slotDate = new Date(date);
-    slotDate.setHours(hour, 0, 0, 0);
-
-    // Check if the day and hour falls within any reservation period
-    if (slotDate >= resStart && slotDate <= resEnd) {
-      const slotHour = hour;
-      const resStartHour = resStart.getHours();
-      const resEndHour = resEnd.getHours();
+  // Update the checkTimeSlotConflicts function
+  const checkTimeSlotConflicts = (start, end) => {
+    if (selectedResource.type === 'equipment') {
+      const conflicts = [];
       
-      // Check if current hour falls within reservation hours
-      return slotHour >= resStartHour && slotHour < resEndHour;
+      selectedResource.id.forEach(equipment => {
+        const overlappingItems = equipmentAvailability.filter(item => {
+          const itemStart = new Date(item.startDate);
+          const itemEnd = new Date(item.endDate);
+          
+          // Check if the time slot overlaps with the equipment reservation period
+          return (start <= itemEnd && end >= itemStart);
+        });
+        
+        overlappingItems.forEach(item => {
+          const available = parseInt(item.totalAvailable);
+          const requested = parseInt(equipment.quantity);
+          
+          // Add conflict if requested quantity exceeds available quantity
+          if (available < requested) {
+            conflicts.push({
+              equipId: item.equipId,
+              name: item.name,
+              available: available,
+              requested: requested,
+              startDate: new Date(item.startDate),
+              endDate: new Date(item.endDate)
+            });
+          }
+        });
+      });
+      
+      return conflicts;
     }
-    return false;
-  });
-};
 
-// Update renderWeekView function
+    // Original conflict checking for venues/vehicles
+    return reservations.filter(res => {
+      if (!res.isReserved) return false;
 
-
-// Update renderDayView function
-
-
-const checkConflicts = (attemptedStart, attemptedEnd) => {
-  if (!attemptedStart || !attemptedEnd) return [];
-
-  return reservations.filter(res => {
-    if (!res.isReserved) return false;
-
-    const resStart = new Date(res.startDate);
-    const resEnd = new Date(res.endDate);
-
-    // For debugging
-    console.log('Checking conflict:', {
-      attempted: {
-        start: format(attemptedStart, 'yyyy-MM-dd HH:mm'),
-        end: format(attemptedEnd, 'yyyy-MM-dd HH:mm')
-      },
-      existing: {
-        start: format(resStart, 'yyyy-MM-dd HH:mm'),
-        end: format(resEnd, 'yyyy-MM-dd HH:mm')
-      }
+      const resStart = new Date(res.startDate);
+      const resEnd = new Date(res.endDate);
+      
+      // Check if time periods overlap
+      return (start < resEnd && end > resStart);
     });
-
-    // Compare dates and times separately for more precise overlap checking
-    const sameStartDay = isSameDay(attemptedStart, resStart);
-    const sameEndDay = isSameDay(attemptedEnd, resEnd);
-    
-    // If it's the same day, check time overlaps
-    if (sameStartDay || sameEndDay) {
-      const attemptedStartTime = attemptedStart.getHours() * 60 + attemptedStart.getMinutes();
-      const attemptedEndTime = attemptedEnd.getHours() * 60 + attemptedEnd.getMinutes();
-      const resStartTime = resStart.getHours() * 60 + resStart.getMinutes();
-      const resEndTime = resEnd.getHours() * 60 + resEnd.getMinutes();
-
-      // Check if times overlap on the same day
-      if (sameStartDay && sameEndDay) {
-        return !(attemptedEndTime <= resStartTime || attemptedStartTime >= resEndTime);
-      }
-    }
-
-    // For different days, check if reservation periods overlap at all
-    const midnightAttemptedStart = new Date(attemptedStart);
-    midnightAttemptedStart.setHours(0, 0, 0, 0);
-    const midnightAttemptedEnd = new Date(attemptedEnd);
-    midnightAttemptedEnd.setHours(23, 59, 59, 999);
-
-    const midnightResStart = new Date(resStart);
-    midnightResStart.setHours(0, 0, 0, 0);
-    const midnightResEnd = new Date(resEnd);
-    midnightResEnd.setHours(23, 59, 59, 999);
-
-    // No overlap if either period is entirely before or after the other
-    return !(midnightAttemptedEnd < midnightResStart || midnightAttemptedStart > midnightResEnd);
-  });
-};
+  };
 
   // Enhanced calendar view with loading state
   return (
@@ -1464,6 +2124,8 @@ const checkConflicts = (attemptedStart, attemptedEnd) => {
     </div>
   );
 };
+
+
 
 export default ReservationCalendar;
 

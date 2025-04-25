@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import NotAuthorize from '../components/NotAuthorize';
+import { SecureStorage } from './encryption';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
     const [showModal, setShowModal] = useState(false);
     const [shouldNavigate, setShouldNavigate] = useState(false);
-    const isLoggedIn = localStorage.getItem('loggedIn') === 'true';
-    const userRole = localStorage.getItem('user_level');
+    // Check both regular localStorage and SecureStorage for backward compatibility
+    const isLoggedIn = SecureStorage.getLocalItem('loggedIn') === 'true' || SecureStorage.getSessionItem('loggedIn');
+    const userRole = SecureStorage.getSessionItem('user_level');
 
     useEffect(() => {
         if (allowedRoles && !allowedRoles.includes(userRole)) {
@@ -30,7 +32,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
         if (userRole === 'Super Admin' || userRole === 'Admin') return '/adminDashboard';
         if (userRole === 'Personnel') return '/personnelDashboard';
         if (userRole === 'Dean' || userRole === 'Secretary') return '/deanDashboard';
-        if (userRole === 'user') return '/dashboard';
+        if (userRole === 'Faculty/Staff') return '/dashboard';
         return '/gsd';
     };
 

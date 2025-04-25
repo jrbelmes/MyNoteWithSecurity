@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { sanitizeInput, validateInput } from '../utils/sanitize';
+import { SecureStorage } from '../utils/encryption';
 
 const Conditions = () => {
     const navigate = useNavigate();
@@ -17,17 +18,19 @@ const Conditions = () => {
     const [showModal, setShowModal] = useState(false);
     const [showConfirmDelete, setShowConfirmDelete] = useState(false);
     const [selectedConditionId, setSelectedConditionId] = useState(null);
-    const [editMode, setEditMode] = useState(false);
+    const [ setEditMode] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const user_level_id = localStorage.getItem('user_level_id');
 
     useEffect(() => {
-        if (user_level_id !== '1' && user_level_id !== '2' && user_level_id !== '4') {
-            localStorage.clear();
-            navigate('/gsd');
-        }
-    }, [user_level_id, navigate]);
+          const encryptedUserLevel = SecureStorage.getSessionItem("user_level_id"); 
+          console.log("this is encryptedUserLevel", encryptedUserLevel);
+          if (encryptedUserLevel !== '1' && encryptedUserLevel !== '2' && encryptedUserLevel !== '4') {
+              localStorage.clear();
+              navigate('/gsd');
+          }
+      }, [navigate]);
 
     useEffect(() => {
         fetchConditions();

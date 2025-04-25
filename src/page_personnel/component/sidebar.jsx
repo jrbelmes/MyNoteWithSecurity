@@ -143,7 +143,7 @@ const Sidebar = () => {
 
             <div className="border-t border-green-200 p-4">
               <Popover className="relative">
-                <Popover.Button className="flex items-center space-x-3 w-full hover:bg-green-50 p-2 rounded-lg foc</nav>us:outline-none focus:ring-2 focus:ring-green-500">
+                <Popover.Button className="flex items-center space-x-3 w-full hover:bg-green-50 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
                   <FaUserCircle className="text-2xl text-green-600" />
                   {isSidebarOpen && (
                     <div className="flex-1 text-left">

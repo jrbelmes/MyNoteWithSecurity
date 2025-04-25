@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { sanitizeInput, validateInput } from '../utils/sanitize';
+import { SecureStorage } from '../utils/encryption';
 
 const EquipmentCategories = () => {
     const navigate = useNavigate();
@@ -20,14 +21,16 @@ const EquipmentCategories = () => {
     const [selectedCategoryId, setSelectedCategoryId] = useState(null);
     const [editMode, setEditMode] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const user_level_id = localStorage.getItem('user_level_id');
+    const encryptedUrl = SecureStorage.getLocalItem("url");
 
     useEffect(() => {
-        if (user_level_id !== '1' && user_level_id !== '2' && user_level_id !== '4') {
+        const encryptedUserLevel = SecureStorage.getSessionItem("user_level_id"); 
+        console.log("this is encryptedUserLevel", encryptedUserLevel);
+        if (encryptedUserLevel !== '1' && encryptedUserLevel !== '2' && encryptedUserLevel !== '4') {
             localStorage.clear();
             navigate('/gsd');
         }
-    }, [user_level_id, navigate]);
+    }, [navigate]);
 
     useEffect(() => {
         fetchCategories();
@@ -36,7 +39,7 @@ const EquipmentCategories = () => {
     const fetchCategories = async () => {
         setLoading(true);
         try {
-            const response = await axios.post('http://localhost/coc/gsd/fetchMaster.php', new URLSearchParams({ operation: 'fetchEquipments' }));
+            const response = await axios.post(`${encryptedUrl}fetchMaster.php`, new URLSearchParams({ operation: 'fetchEquipments' }));
             if (response.data.status === 'success') {
                 setCategories(response.data.data);
                 setFilteredCategories(response.data.data);
@@ -71,11 +74,17 @@ const EquipmentCategories = () => {
         }
 
         try {
-            const response = await axios.post('http://localhost/coc/gsd/delete_master.php', 
-                new URLSearchParams({ 
-                    operation: 'deleteEquipmentCategory', 
-                    equipment_category_id: selectedCategoryId  // Changed from categoryId to equipment_category_id
-                })
+            const response = await axios.post(
+                'http://localhost/coc/gsd/delete_master.php',
+                JSON.stringify({
+                    operation: 'deleteEquipmentCategory',
+                    equipmentCategoryId: selectedCategoryId
+                }),
+                {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }
             );
             
             if (response.data.status === 'success') {
@@ -117,7 +126,7 @@ const EquipmentCategories = () => {
             };
 
             const response = await axios.post(
-                'http://localhost/coc/gsd/update_master1.php',
+                `${encryptedUrl}update_master1.php`,
                 JSON.stringify(requestData),
                 {
                     headers: {

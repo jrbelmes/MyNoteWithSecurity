@@ -3,12 +3,11 @@ import Sidebar from './Sidebar';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import axios from 'axios';
 import { toast } from 'sonner';
-import { FiFilter, FiEye, FiCalendar, FiSearch, FiPrinter, FiArrowUp, FiArrowDown, FiBarChart2, FiDownload } from 'react-icons/fi';
+import { FiFilter, FiEye, FiCalendar, FiSearch, FiPrinter, FiArrowUp, FiArrowDown } from 'react-icons/fi';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
-import { Pie } from 'react-chartjs-2';
 import { useNavigate } from 'react-router-dom';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
@@ -71,23 +70,7 @@ const ReservationReport = ({ reservations, reportType, reportDate, getStatusClas
         cancelled: reservations.filter(r => r.reservation_status_name === 'cancelled').length
     };
 
-    // Calculate resource usage statistics
-    const resourceStats = reservations.reduce((acc, res) => {
-        if (res.vehicle_ids) acc.vehicles++;
-        if (res.venue_names) acc.venues++;
-        if (res.equipment_names) acc.equipment++;
-        return acc;
-    }, { vehicles: 0, venues: 0, equipment: 0 });
 
-    // Prepare chart data
-    const chartData = {
-        labels: ['Pending', 'Approved', 'Declined', 'Cancelled'],
-        datasets: [{
-            data: [stats.pending, stats.approved, stats.declined, stats.cancelled],
-            backgroundColor: ['#FCD34D', '#34D399', '#EF4444', '#9CA3AF'],
-            borderWidth: 1
-        }]
-    };
 
     return (
         <div className="p-8 bg-white font-sans max-w-4xl mx-auto">
@@ -250,7 +233,6 @@ const ViewReservations = () => {
     const [rangeEndDate, setRangeEndDate] = useState(null);
     const [filteredReservations, setFilteredReservations] = useState([]);
     const navigate = useNavigate();
-    const user_id = localStorage.getItem('user_id');
     const user_level_id = localStorage.getItem('user_level_id');
     
 
@@ -298,10 +280,7 @@ const ViewReservations = () => {
         }
     };
 
-    useEffect(() => {
-        const level = localStorage.getItem('user_level');
-        fetchReservations();
-    }, []);
+
 
     const filteredAndSortedReservations = reservations
         .filter((reservation) => {

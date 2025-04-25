@@ -15,9 +15,9 @@ import {
   isSameDay,
   addDays,
   addWeeks,
-  subWeeks,
-  setHours
+  subWeeks
 } from 'date-fns';
+import { SecureStorage } from '../utils/encryption';
 
 // Updated theme constants
 const themeColors = {
@@ -62,6 +62,8 @@ const useKeyboardNavigation = (currentDate, setCurrentDate) => {
         case 'ArrowDown':
           setCurrentDate(prev => addWeeks(prev, 1));
           break;
+        default:
+          break;
       }
     };
 
@@ -73,13 +75,10 @@ const useKeyboardNavigation = (currentDate, setCurrentDate) => {
 const Calendar = () => {
   const navigate = useNavigate();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [view, setView] = useState('month');
-  const [showYearSelect, setShowYearSelect] = useState(false);
+  const [view] = useState('month');
+  const [setShowYearSelect] = useState(false);
   const [isYearModalOpen, setIsYearModalOpen] = useState(false);
   const [reservations, setReservations] = useState([]);
-  const [selectedReservation, setSelectedReservation] = useState(null);
-  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
-  const [reservationDetails, setReservationDetails] = useState(null);
   const user_level_id = localStorage.getItem('user_level_id');
   const [isVenueModalOpen, setIsVenueModalOpen] = useState(false);
   const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
@@ -87,10 +86,7 @@ const Calendar = () => {
   const [vehicleDetails, setVehicleDetails] = useState(null);
   const [equipmentDetails, setEquipmentDetails] = useState(null);
 
-  // Status color mapping
-  const statusColors = {
-    Reserved: 'bg-blue-100 text-blue-800'
-  };
+  const encryptedUrl = SecureStorage.getLocalItem("url");
 
   // Add venue and vehicle color mapping
   const resourceColors = {
@@ -103,17 +99,19 @@ const Calendar = () => {
   }, []);
 
   useEffect(() => {
-    if (user_level_id !== '1' && user_level_id !== '2' && user_level_id !== '4') {
+    const encryptedUserLevel = SecureStorage.getSessionItem("user_level_id"); 
+    console.log("this is encryptedUserLevel", encryptedUserLevel);
+    if (encryptedUserLevel !== '1' && encryptedUserLevel !== '2' && encryptedUserLevel !== '4') {
         localStorage.clear();
         navigate('/gsd');
     }
-  }, [user_level_id, navigate]);
+}, [navigate]);
 
   const fetchReservations = async () => {
     try {
       const response = await axios({
         method: 'POST',
-        url: 'http://localhost/coc/gsd/records&reports.php',
+        url: `${encryptedUrl}records&reports.php`,
         data: JSON.stringify({ operation: 'fetchRecord' }),
         headers: {
           'Content-Type': 'application/json'
@@ -199,24 +197,6 @@ const Calendar = () => {
     }));
   };
 
-  const getStatusColor = (status) => {
-    // Remove toLowerCase() since your API returns exact status names
-    switch (status) {
-      case 'pending': return statusColors.pending;
-      case 'approved': return statusColors.accepted;
-      case 'decline': return statusColors.declined;
-      case 'expired': return statusColors.expired;
-      case 'cancelled': return statusColors.cancelled;
-      default: 
-        console.log('Unknown status:', status);
-        return '';
-    }
-  };
-
-  // Generate array of years (current year ± 10 years)
-  const years = Array.from({ length: 21 }, (_, i) => 
-    new Date().getFullYear() - 10 + i
-  );
 
   const handleDateNavigation = (direction) => {
     switch (view) {
@@ -228,6 +208,9 @@ const Calendar = () => {
         break;
       case 'day':
         setCurrentDate(prev => direction === 'prev' ? addDays(prev, -1) : addDays(prev, 1));
+        break;
+      default:
+        setCurrentDate(prev => direction === 'prev' ? subMonths(prev, 1) : addMonths(prev, 1));
         break;
     }
   };
@@ -373,7 +356,7 @@ const Calendar = () => {
     try {
       const response = await axios({
         method: 'POST',
-        url: 'http://localhost/coc/gsd/records&reports.php',
+        url: `${encryptedUrl}records&reports.php`,
         data: JSON.stringify({
           operation: 'getReservationDetailsById',
           json: {

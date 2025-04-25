@@ -7,6 +7,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { sanitizeInput, validateInput } from '../utils/sanitize';
+import { SecureStorage } from '../utils/encryption';
 
 const VehicleMakes = () => {
   const navigate = useNavigate();
@@ -19,20 +20,21 @@ const VehicleMakes = () => {
   const [editMode, setEditMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const user_level_id = localStorage.getItem('user_level_id');
-
+  const encryptedUrl = SecureStorage.getLocalItem("url");
 
   useEffect(() => {
-      if (user_level_id !== '1' && user_level_id !== '2' && user_level_id !== '4') {
-          localStorage.clear();
-          navigate('/gsd');
-      }
-  }, [user_level_id, navigate]);
+    const encryptedUserLevel = SecureStorage.getSessionItem("user_level_id"); 
+    console.log("this is encryptedUserLevel", encryptedUserLevel);
+    if (encryptedUserLevel !== '1' && encryptedUserLevel !== '2' && encryptedUserLevel !== '4') {
+        localStorage.clear();
+        navigate('/gsd');
+    }
+  }, [navigate]);
 
   useEffect(() => {
     const fetchMakes = async () => {
       try {
-        const response = await fetch('http://localhost/coc/gsd/fetchMaster.php', {
+        const response = await fetch(`${encryptedUrl}fetchMaster.php`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -58,7 +60,7 @@ const VehicleMakes = () => {
     };
 
     fetchMakes();
-  }, []);
+  }, [encryptedUrl]);
 
   const filteredMakes = useMemo(() => {
     return makes.filter(make => 
@@ -82,7 +84,7 @@ const VehicleMakes = () => {
 
   const confirmDelete = async () => {
     try {
-      const response = await fetch('http://localhost/coc/gsd/delete_master.php', {
+      const response = await fetch(`${encryptedUrl}delete_master.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -120,7 +122,7 @@ const VehicleMakes = () => {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch('http://localhost/coc/gsd/update_master1.php', {
+      const response = await fetch(`${encryptedUrl}update_master1.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

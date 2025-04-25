@@ -1,26 +1,34 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Tabs, Tab, Typography, Grid, Paper, Container } from '@mui/material';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Box, Tabs, Tab, Typography, Paper, useTheme, alpha } from '@mui/material';
 import { styled } from '@mui/material/styles';
-import { Table, Button, Space, Popconfirm, message, Tag } from 'antd';
-import { UndoOutlined } from '@ant-design/icons';
+import { Table, Button, Space, Popconfirm, message, Tag, Empty, Skeleton } from 'antd';
+import { UndoOutlined, FileSearchOutlined, UserOutlined, CarOutlined, HomeOutlined, ToolOutlined } from '@ant-design/icons';
 import Sidebar from './Sidebar';
 import axios from 'axios';
 import { toast } from 'react-toastify';
+import { SecureStorage } from '../utils/encryption';
+import { useNavigate } from 'react-router-dom';
 
 // Enhanced styled components
 const StyledTabs = styled(Tabs)(({ theme }) => ({
-  borderBottom: '1px solid #e8e8e8',
+  borderBottom: 'none',
   '& .MuiTabs-indicator': {
     backgroundColor: theme.palette.primary.main,
-    height: '3px',
+    height: '4px',
+    borderRadius: '4px 4px 0 0',
   },
   '& .MuiTab-root': {
     textTransform: 'none',
-    fontSize: '1rem',
-    fontWeight: 500,
-    minWidth: 120,
+    fontSize: '1.05rem',
+    fontWeight: 600,
+    minWidth: 140,
+    transition: 'all 0.2s ease',
     '&.Mui-selected': {
       color: theme.palette.primary.main,
+    },
+    '&:hover': {
+      color: theme.palette.primary.light,
+      backgroundColor: alpha(theme.palette.primary.main, 0.04),
     },
   },
 }));
@@ -30,12 +38,17 @@ const ContentWrapper = styled(Box)(({ theme }) => ({
   padding: theme.spacing(3),
   height: '100vh',
   overflow: 'auto',
-  backgroundColor: theme.palette.grey[100],
+  backgroundColor: theme.palette.background.default,
 }));
 
 const StyledPaper = styled(Paper)(({ theme }) => ({
-  borderRadius: theme.spacing(1),
-  boxShadow: '0 2px 12px rgba(0,0,0,0.1)',
+  borderRadius: theme.spacing(1.5),
+  boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+  overflow: 'hidden',
+  transition: 'transform 0.3s, box-shadow 0.3s',
+  '&:hover': {
+    boxShadow: '0 8px 30px rgba(0,0,0,0.08)',
+  },
   '& .ant-table-wrapper': {
     border: 'none',
     borderRadius: theme.spacing(1),
@@ -45,24 +58,67 @@ const StyledPaper = styled(Paper)(({ theme }) => ({
     backgroundColor: theme.palette.grey[50],
     color: theme.palette.text.primary,
     fontWeight: 600,
+    padding: '16px',
+    fontSize: '0.9rem',
   },
   '& .ant-table-tbody > tr > td': {
     borderBottom: `1px solid ${theme.palette.grey[200]}`,
+    padding: '12px 16px',
+    fontSize: '0.9rem',
   },
-  '& .ant-tag': {
-    borderRadius: '4px',
-    padding: '2px 8px',
+  '& .ant-table-tbody > tr:hover > td': {
+    backgroundColor: alpha(theme.palette.primary.main, 0.02),
+  },
+  '& .ant-empty': {
+    margin: '40px 0',
   },
 }));
 
 const StyledButton = styled(Button)(({ theme }) => ({
-  borderRadius: '6px',
+  borderRadius: '8px',
   boxShadow: 'none',
+  fontWeight: 500,
+  display: 'flex',
+  alignItems: 'center',
+  gap: '6px',
   '&:hover': {
     opacity: 0.9,
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+    transform: 'translateY(-1px)',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
   },
 }));
+
+const StatusTag = styled(Tag)(({ color }) => ({
+  borderRadius: '6px',
+  padding: '4px 10px',
+  fontWeight: 500,
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '4px',
+  boxShadow: `0 2px 6px ${alpha(color === 'blue' ? '#1890ff' : color === 'green' ? '#52c41a' : '#722ed1', 0.2)}`,
+}));
+
+const HeaderBox = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  marginBottom: theme.spacing(3),
+  padding: theme.spacing(2, 0),
+  gap: theme.spacing(2),
+  borderBottom: `1px solid ${theme.palette.grey[200]}`,
+}));
+
+const TabIconWrapper = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+}));
+
+const CustomTab = ({ label, icon }) => (
+  <TabIconWrapper>
+    {icon}
+    {label}
+  </TabIconWrapper>
+);
 
 const TabPanel = ({ children, value, index }) => {
   return (
@@ -73,12 +129,8 @@ const TabPanel = ({ children, value, index }) => {
       aria-labelledby={`archive-tab-${index}`}
     >
       {value === index && (
-        <Box sx={{ p: 3 }}>
-          <Container maxWidth="lg">
-            <Grid container spacing={3}>
-              {children}
-            </Grid>
-          </Container>
+        <Box sx={{ p: { xs: 1, md: 2 } }}>
+          {children}
         </Box>
       )}
     </div>
@@ -86,12 +138,24 @@ const TabPanel = ({ children, value, index }) => {
 };
 
 const Archive = () => {
+  const theme = useTheme();
   const [value, setValue] = useState(0);
   const [users, setUsers] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [venues, setVenues] = useState([]);
   const [equipment, setEquipment] = useState([]);
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const encryptedUrl = SecureStorage.getLocalItem("url");
+
+  useEffect(() => {
+    const encryptedUserLevel = SecureStorage.getSessionItem("user_level_id"); 
+    console.log("this is encryptedUserLevel", encryptedUserLevel);
+    if (encryptedUserLevel !== '1' && encryptedUserLevel !== '2' && encryptedUserLevel !== '4') {
+        localStorage.clear();
+        navigate('/gsd');
+    }
+  }, [navigate]);
 
   const handleChange = (event, newValue) => {
     setValue(newValue);
@@ -108,10 +172,10 @@ const Archive = () => {
     return typeMapping[userType] || userType.toLowerCase();
   };
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await axios.post("http://localhost/coc/gsd/delete_master.php",
+      const response = await axios.post(`${encryptedUrl}/delete_master.php`,
         { operation: "fetchAllUserTypes" },
         {
           headers: { 'Content-Type': 'application/json' }
@@ -130,7 +194,7 @@ const Archive = () => {
           users_pic: user.pic,
           departments_name: user.departments_name,
           user_level_name: user.user_level_name,
-          role: convertUserType(user.user_level_desc), // Convert the user type
+          role: convertUserType(user.user_level_desc),
           user_type: user.type
         }));
         setUsers(allUsers);
@@ -143,12 +207,12 @@ const Archive = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [encryptedUrl]);
 
-  const fetchVehicles = async () => {
+  const fetchVehicles = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await axios.post("http://localhost/coc/gsd/delete_master.php",
+      const response = await axios.post(`${encryptedUrl}/delete_master.php`,
         { operation: "fetchAllVehicles" },
         { headers: { 'Content-Type': 'application/json' } }
       );
@@ -160,12 +224,12 @@ const Archive = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [encryptedUrl]);
 
-  const fetchVenues = async () => {
+  const fetchVenues = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await axios.post("http://localhost/coc/gsd/delete_master.php",
+      const response = await axios.post(`${encryptedUrl}/delete_master.php`,
         { operation: "fetchVenue" },
         { headers: { 'Content-Type': 'application/json' } }
       );
@@ -177,12 +241,12 @@ const Archive = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [encryptedUrl]);
 
-  const fetchEquipment = async () => {
+  const fetchEquipment = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await axios.post("http://localhost/coc/gsd/delete_master.php",
+      const response = await axios.post(`${encryptedUrl}/delete_master.php`,
         { operation: "fetchEquipmentsWithStatus" },
         { headers: { 'Content-Type': 'application/json' } }
       );
@@ -194,18 +258,35 @@ const Archive = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [encryptedUrl]);
 
   useEffect(() => {
     fetchUsers();
-    fetchVehicles();
-    fetchVenues();
-    fetchEquipment();
-  }, []);
+  }, [fetchUsers]);
+
+  useEffect(() => {
+    // Fetch data based on selected tab
+    switch (value) {
+      case 0:
+        fetchUsers();
+        break;
+      case 1:
+        fetchVehicles();
+        break;
+      case 2:
+        fetchVenues();
+        break;
+      case 3:
+        fetchEquipment();
+        break;
+      default:
+        break;
+    }
+  }, [value, fetchUsers, fetchVehicles, fetchVenues, fetchEquipment]);
 
   const handleRestoreUser = async (record) => {
     try {
-      const response = await axios.post("http://localhost/coc/gsd/delete_master.php", {
+      const response = await axios.post(`${encryptedUrl}/delete_master.php`, {
         operation: "unarchiveUser",
         userType: convertUserType(record.user_level_name),
         userId: record.users_id
@@ -225,7 +306,7 @@ const Archive = () => {
 
   const handleRestoreVehicle = async (record) => {
     try {
-      const response = await axios.post("http://localhost/coc/gsd/delete_master.php", {
+      const response = await axios.post(`${encryptedUrl}/delete_master.php`, {
         operation: "unarchiveResource",
         resourceType: "vehicle",
         resourceId: record.vehicle_id
@@ -245,7 +326,7 @@ const Archive = () => {
 
   const handleRestoreVenue = async (record) => {
     try {
-      const response = await axios.post("http://localhost/coc/gsd/delete_master.php", {
+      const response = await axios.post(`${encryptedUrl}/delete_master.php`, {
         operation: "unarchiveResource",
         resourceType: "venue",
         resourceId: record.ven_id
@@ -265,7 +346,7 @@ const Archive = () => {
 
   const handleRestoreEquipment = async (record) => {
     try {
-      const response = await axios.post("http://localhost/coc/gsd/delete_master.php", {
+      const response = await axios.post(`${encryptedUrl}/delete_master.php`, {
         operation: "unarchiveResource",
         resourceType: "equipment",
         resourceId: record.equip_id
@@ -284,36 +365,72 @@ const Archive = () => {
   };
 
   const userColumns = [
-    { title: 'School ID', dataIndex: 'users_school_id', key: 'school_id' },
+    { 
+      title: 'School ID', 
+      dataIndex: 'users_school_id', 
+      key: 'school_id',
+      sorter: (a, b) => a.users_school_id.localeCompare(b.users_school_id),
+    },
     {
       title: 'Name',
       key: 'name',
-      render: (text, record) => `${record.users_fname} ${record.users_mname} ${record.users_lname}`
+      render: (text, record) => `${record.users_fname} ${record.users_mname} ${record.users_lname}`,
+      sorter: (a, b) => `${a.users_fname} ${a.users_lname}`.localeCompare(`${b.users_fname} ${b.users_lname}`),
     },
-    { title: 'Email', dataIndex: 'users_email', key: 'email' },
+    { 
+      title: 'Email', 
+      dataIndex: 'users_email', 
+      key: 'email',
+      ellipsis: true, 
+    },
     {
       title: 'Department',
       dataIndex: 'departments_name',
       key: 'department',
-      render: (text) => <Tag color="blue">{text}</Tag>
+      render: (text) => (
+        <StatusTag color="blue">
+          {text}
+        </StatusTag>
+      ),
+      filters: [...new Set(users.map(user => user.departments_name))].map(dept => ({
+        text: dept,
+        value: dept,
+      })),
+      onFilter: (value, record) => record.departments_name === value,
     },
     {
       title: 'User Level',
       dataIndex: 'user_level_name',
       key: 'userLevel',
-      render: (text) => <Tag color="green">{text}</Tag>
+      render: (text) => (
+        <StatusTag color="green">
+          {text}
+        </StatusTag>
+      ),
+      filters: [...new Set(users.map(user => user.user_level_name))].map(level => ({
+        text: level,
+        value: level,
+      })),
+      onFilter: (value, record) => record.user_level_name === value,
     },
-    { title: 'Contact', dataIndex: 'users_contact_number', key: 'contact' },
+    { 
+      title: 'Contact', 
+      dataIndex: 'users_contact_number', 
+      key: 'contact',
+      responsive: ['lg'],
+    },
     {
       title: 'Action',
       key: 'action',
       render: (_, record) => (
         <Space>
           <Popconfirm
-            title="Are you sure you want to restore this user?"
+            title="Restore this user?"
+            description="This will move the user back to active status."
             onConfirm={() => handleRestoreUser(record)}
             okText="Yes"
             cancelText="No"
+            placement="left"
           >
             <StyledButton type="primary" icon={<UndoOutlined />}>
               Restore
@@ -325,21 +442,55 @@ const Archive = () => {
   ];
 
   const vehicleColumns = [
-    { title: 'License', dataIndex: 'vehicle_license', key: 'license' },
-    { title: 'Make', dataIndex: 'vehicle_make_name', key: 'make' },
-    { title: 'Model', dataIndex: 'vehicle_model_name', key: 'model' },
-    { title: 'Category', dataIndex: 'vehicle_category_name', key: 'category' },
-    { title: 'Year', dataIndex: 'year', key: 'year' },
+    { 
+      title: 'License', 
+      dataIndex: 'vehicle_license', 
+      key: 'license',
+      sorter: (a, b) => a.vehicle_license.localeCompare(b.vehicle_license),
+    },
+    { 
+      title: 'Make', 
+      dataIndex: 'vehicle_make_name', 
+      key: 'make',
+      filters: [...new Set(vehicles.map(vehicle => vehicle.vehicle_make_name))].map(make => ({
+        text: make,
+        value: make,
+      })),
+      onFilter: (value, record) => record.vehicle_make_name === value,
+    },
+    { 
+      title: 'Model', 
+      dataIndex: 'vehicle_model_name', 
+      key: 'model',
+    },
+    { 
+      title: 'Category', 
+      dataIndex: 'vehicle_category_name', 
+      key: 'category',
+      render: (text) => (
+        <StatusTag color="purple">
+          {text}
+        </StatusTag>
+      ),
+    },
+    { 
+      title: 'Year', 
+      dataIndex: 'year', 
+      key: 'year',
+      sorter: (a, b) => a.year - b.year,
+    },
     {
       title: 'Action',
       key: 'action',
       render: (_, record) => (
         <Space>
           <Popconfirm
-            title="Are you sure you want to restore this vehicle?"
+            title="Restore this vehicle?"
+            description="This will move the vehicle back to active status."
             onConfirm={() => handleRestoreVehicle(record)}
             okText="Yes"
             cancelText="No"
+            placement="left"
           >
             <StyledButton type="primary" icon={<UndoOutlined />}>
               Restore
@@ -351,19 +502,41 @@ const Archive = () => {
   ];
 
   const venueColumns = [
-    { title: 'Name', dataIndex: 'ven_name', key: 'name' },
-    { title: 'Occupancy', dataIndex: 'ven_occupancy', key: 'occupancy' },
-    { title: 'Operating Hours', dataIndex: 'ven_operating_hours', key: 'hours' },
+    { 
+      title: 'Name', 
+      dataIndex: 'ven_name', 
+      key: 'name',
+      sorter: (a, b) => a.ven_name.localeCompare(b.ven_name),
+    },
+    { 
+      title: 'Occupancy', 
+      dataIndex: 'ven_occupancy', 
+      key: 'occupancy',
+      sorter: (a, b) => a.ven_occupancy - b.ven_occupancy,
+      render: (text) => `${text} people`,
+    },
+    { 
+      title: 'Operating Hours', 
+      dataIndex: 'ven_operating_hours', 
+      key: 'hours',
+      render: (text) => (
+        <StatusTag color="blue">
+          {text}
+        </StatusTag>
+      ),
+    },
     {
       title: 'Action',
       key: 'action',
       render: (_, record) => (
         <Space>
           <Popconfirm
-            title="Are you sure you want to restore this venue?"
+            title="Restore this venue?"
+            description="This will move the venue back to active status."
             onConfirm={() => handleRestoreVenue(record)}
             okText="Yes"
             cancelText="No"
+            placement="left"
           >
             <StyledButton type="primary" icon={<UndoOutlined />}>
               Restore
@@ -375,20 +548,44 @@ const Archive = () => {
   ];
 
   const equipmentColumns = [
-    { title: 'Name', dataIndex: 'equip_name', key: 'name' },
-    { title: 'Quantity', dataIndex: 'equip_quantity', key: 'quantity' },
-    { title: 'Created At', dataIndex: 'equip_created_at', key: 'created' },
-    { title: 'Updated At', dataIndex: 'equip_updated_at', key: 'updated' },
+    { 
+      title: 'Name', 
+      dataIndex: 'equip_name', 
+      key: 'name',
+      sorter: (a, b) => a.equip_name.localeCompare(b.equip_name),
+    },
+    { 
+      title: 'Quantity', 
+      dataIndex: 'equip_quantity', 
+      key: 'quantity',
+      sorter: (a, b) => a.equip_quantity - b.equip_quantity,
+    },
+    { 
+      title: 'Created At', 
+      dataIndex: 'equip_created_at', 
+      key: 'created',
+      responsive: ['md'],
+      render: (text) => new Date(text).toLocaleDateString(),
+    },
+    { 
+      title: 'Updated At', 
+      dataIndex: 'equip_updated_at', 
+      key: 'updated',
+      responsive: ['lg'],
+      render: (text) => new Date(text).toLocaleDateString(),
+    },
     {
       title: 'Action',
       key: 'action',
       render: (_, record) => (
         <Space>
           <Popconfirm
-            title="Are you sure you want to restore this equipment?"
+            title="Restore this equipment?"
+            description="This will move the equipment back to active status."
             onConfirm={() => handleRestoreEquipment(record)}
             okText="Yes"
             cancelText="No"
+            placement="left"
           >
             <StyledButton type="primary" icon={<UndoOutlined />}>
               Restore
@@ -399,41 +596,121 @@ const Archive = () => {
     }
   ];
 
+  const renderEmptyState = () => (
+    <Empty
+      image={Empty.PRESENTED_IMAGE_SIMPLE}
+      description={
+        <Typography variant="body1" sx={{ color: 'text.secondary' }}>
+          No archived items found
+        </Typography>
+      }
+    />
+  );
+
+  const renderSkeletonLoader = () => (
+    <Box sx={{ padding: 2 }}>
+      <Skeleton active paragraph={{ rows: 6 }} />
+    </Box>
+  );
+
+  const tabIconStyle = { fontSize: '18px' };
+
   return (
     <Box sx={{ display: 'flex' }}>
       <Sidebar />
       <ContentWrapper>
+        <Box sx={{ 
+          p: { xs: 2, md: 3 }, 
+          borderRadius: 2,
+          background: `linear-gradient(145deg, ${alpha(theme.palette.primary.main, 0.05)} 0%, ${alpha(theme.palette.background.paper, 1)} 100%)`,
+          mb: 3,
+        }}>
+          <Typography 
+            variant="h4" 
+            sx={{ 
+              fontWeight: 700, 
+              color: theme.palette.text.primary,
+              mb: 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5
+            }}
+          >
+            <FileSearchOutlined style={{ fontSize: '1.7rem', color: theme.palette.primary.main }} />
+            Archive Management
+          </Typography>
+          <Typography 
+            variant="body1" 
+            sx={{ 
+              color: theme.palette.text.secondary,
+              maxWidth: '800px',
+            }}
+          >
+            View and restore archived items across the system. All items can be restored back to active status.
+          </Typography>
+        </Box>
+
         <StyledPaper elevation={0} sx={{ width: '100%', bgcolor: 'background.paper' }}>
           <StyledTabs
             value={value}
             onChange={handleChange}
             centered
             aria-label="archive sections"
+            variant="fullWidth"
+            sx={{ 
+              borderBottom: 1, 
+              borderColor: 'divider',
+              backgroundColor: alpha(theme.palette.primary.main, 0.03),
+              borderRadius: '12px 12px 0 0',
+            }}
           >
-            <Tab label="Users" id="archive-tab-0" aria-controls="archive-tabpanel-0" />
-            <Tab label="Vehicles" id="archive-tab-1" aria-controls="archive-tabpanel-1" />
-            <Tab label="Venues" id="archive-tab-2" aria-controls="archive-tabpanel-2" />
-            <Tab label="Equipment" id="archive-tab-3" aria-controls="archive-tabpanel-3" />
+            <Tab 
+              label={<CustomTab label="Users" icon={<UserOutlined style={tabIconStyle} />} />} 
+              id="archive-tab-0" 
+              aria-controls="archive-tabpanel-0" 
+            />
+            <Tab 
+              label={<CustomTab label="Vehicles" icon={<CarOutlined style={tabIconStyle} />} />} 
+              id="archive-tab-1" 
+              aria-controls="archive-tabpanel-1" 
+            />
+            <Tab 
+              label={<CustomTab label="Venues" icon={<HomeOutlined style={tabIconStyle} />} />} 
+              id="archive-tab-2" 
+              aria-controls="archive-tabpanel-2" 
+            />
+            <Tab 
+              label={<CustomTab label="Equipment" icon={<ToolOutlined style={tabIconStyle} />} />} 
+              id="archive-tab-3" 
+              aria-controls="archive-tabpanel-3" 
+            />
           </StyledTabs>
 
-          <TabPanel value={value} index={0}>
-            <Grid item xs={12}>
-              <StyledPaper elevation={2} sx={{ p: 2 }}>
+          <Box sx={{ px: { xs: 1, sm: 2, md: 3 }, mt: 2 }}>
+            <TabPanel value={value} index={0}>
+              <HeaderBox>
                 <Typography 
                   variant="h6" 
-                  gutterBottom 
                   sx={{ 
                     fontWeight: 600,
-                    color: (theme) => theme.palette.text.primary,
-                    mb: 3
+                    color: theme.palette.text.primary,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1
                   }}
                 >
-                  Users Archive
+                 
                 </Typography>
+                
+                
+              </HeaderBox>
+
+              {loading ? (
+                renderSkeletonLoader()
+              ) : (
                 <Table
                   columns={userColumns}
                   dataSource={users}
-                  loading={loading}
                   rowKey="users_id"
                   pagination={{
                     pageSize: 10,
@@ -441,16 +718,33 @@ const Archive = () => {
                     showTotal: (total) => `Total ${total} items`,
                     style: { marginTop: '16px' }
                   }}
-                  scroll={{ x: true }}
+                  scroll={{ x: 'max-content' }}
+                  locale={{ emptyText: renderEmptyState() }}
+                  rowClassName={(record, index) => index % 2 === 0 ? '' : alpha(theme.palette.primary.main, 0.02)}
                 />
-              </StyledPaper>
-            </Grid>
-          </TabPanel>
+              )}
+            </TabPanel>
 
-          <TabPanel value={value} index={1}>
-            <Grid item xs={12}>
-              <StyledPaper elevation={2} sx={{ p: 2 }}>
-                <Typography variant="h6" gutterBottom>Vehicles Archive</Typography>
+            <TabPanel value={value} index={1}>
+              <HeaderBox>
+                <Typography 
+                  variant="h6" 
+                  sx={{ 
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1
+                  }}
+                >
+                 
+                </Typography>
+              
+              </HeaderBox>
+
+              {loading ? (
+                renderSkeletonLoader()
+              ) : (
                 <Table
                   columns={vehicleColumns}
                   dataSource={vehicles}
@@ -461,15 +755,32 @@ const Archive = () => {
                     showSizeChanger: true,
                     showTotal: (total) => `Total ${total} items`
                   }}
+                  locale={{ emptyText: renderEmptyState() }}
+                  rowClassName={(record, index) => index % 2 === 0 ? '' : alpha(theme.palette.primary.main, 0.02)}
                 />
-              </StyledPaper>
-            </Grid>
-          </TabPanel>
+              )}
+            </TabPanel>
 
-          <TabPanel value={value} index={2}>
-            <Grid item xs={12}>
-              <StyledPaper elevation={2} sx={{ p: 2 }}>
-                <Typography variant="h6" gutterBottom>Venues Archive</Typography>
+            <TabPanel value={value} index={2}>
+              <HeaderBox>
+                <Typography 
+                  variant="h6" 
+                  sx={{ 
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1
+                  }}
+                >
+                  
+                </Typography>
+               
+              </HeaderBox>
+
+              {loading ? (
+                renderSkeletonLoader()
+              ) : (
                 <Table
                   columns={venueColumns}
                   dataSource={venues}
@@ -480,15 +791,33 @@ const Archive = () => {
                     showSizeChanger: true,
                     showTotal: (total) => `Total ${total} items`
                   }}
+                  locale={{ emptyText: renderEmptyState() }}
+                  rowClassName={(record, index) => index % 2 === 0 ? '' : alpha(theme.palette.primary.main, 0.02)}
                 />
-              </StyledPaper>
-            </Grid>
-          </TabPanel>
+              )}
+            </TabPanel>
 
-          <TabPanel value={value} index={3}>
-            <Grid item xs={12}>
-              <StyledPaper elevation={2} sx={{ p: 2 }}>
-                <Typography variant="h6" gutterBottom>Equipment Archive</Typography>
+            <TabPanel value={value} index={3}>
+              <HeaderBox>
+                <Typography 
+                  variant="h6" 
+                  sx={{ 
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1
+                  }}
+                >
+                 
+                </Typography>
+                <Box sx={{ flexGrow: 1 }} />
+               
+              </HeaderBox>
+
+              {loading ? (
+                renderSkeletonLoader()
+              ) : (
                 <Table
                   columns={equipmentColumns}
                   dataSource={equipment}
@@ -499,10 +828,12 @@ const Archive = () => {
                     showSizeChanger: true,
                     showTotal: (total) => `Total ${total} items`
                   }}
+                  locale={{ emptyText: renderEmptyState() }}
+                  rowClassName={(record, index) => index % 2 === 0 ? '' : alpha(theme.palette.primary.main, 0.02)}
                 />
-              </StyledPaper>
-            </Grid>
-          </TabPanel>
+              )}
+            </TabPanel>
+          </Box>
         </StyledPaper>
       </ContentWrapper>
     </Box>

@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { sanitizeInput, validateInput } from '../utils/sanitize';
+import { SecureStorage } from '../utils/encryption';
 
 const VehicleModels = () => {
   const navigate = useNavigate();
@@ -22,15 +23,17 @@ const VehicleModels = () => {
   const [selectedModelId, setSelectedModelId] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const user_level_id = localStorage.getItem('user_level_id');
   const [setEditingModel] = useState(null);
+  const encryptedUrl = SecureStorage.getLocalItem("url");
 
   useEffect(() => {
-      if (user_level_id !== '1' && user_level_id !== '2' && user_level_id !== '4') {
-          localStorage.clear();
-          navigate('/gsd');
-      }
-  }, [user_level_id, navigate]);
+    const encryptedUserLevel = SecureStorage.getSessionItem("user_level_id"); 
+    console.log("this is encryptedUserLevel", encryptedUserLevel);
+    if (encryptedUserLevel !== '1' && encryptedUserLevel !== '2' && encryptedUserLevel !== '4') {
+        localStorage.clear();
+        navigate('/gsd');
+    }
+  }, [navigate]);
 
   useEffect(() => {
     fetchModels();
@@ -40,7 +43,7 @@ const VehicleModels = () => {
 
   const fetchMakes = async () => {
     try {
-      const response = await axios.post('http://localhost/coc/gsd/fetchMaster.php', 
+      const response = await axios.post(`${encryptedUrl}fetchMaster.php`, 
         'operation=fetchMake',
         {
           headers: {
@@ -62,7 +65,7 @@ const VehicleModels = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.post('http://localhost/coc/gsd/fetchMaster.php', 
+      const response = await axios.post(`${encryptedUrl}fetchMaster.php`, 
         'operation=fetchVehicleCategories',
         {
           headers: {
@@ -85,7 +88,7 @@ const VehicleModels = () => {
   const fetchModels = async () => {
     setLoading(true);
     try {
-      const response = await axios.post('http://localhost/coc/gsd/fetchMaster.php', 
+      const response = await axios.post(`${encryptedUrl}fetchMaster.php`, 
         new URLSearchParams({ operation: 'fetchModels' })
       );
       if (response.data.status === 'success') {
@@ -103,7 +106,7 @@ const VehicleModels = () => {
 
   const fetchVehicleModelById = async (id) => {
     try {
-      const response = await axios.post('http://localhost/coc/gsd/fetchMaster.php',
+      const response = await axios.post(`${encryptedUrl}fetchMaster.php`,
         `operation=fetchModelById&id=${id}`,
         {
           headers: {
@@ -150,7 +153,15 @@ const VehicleModels = () => {
   const confirmDelete = async () => {
     try {
       const response = await axios.post('http://localhost/coc/gsd/delete_master.php', 
-        new URLSearchParams({ operation: 'deleteModel', model_id: selectedModelId })
+        {
+          operation: 'deleteModel',
+          modelId: selectedModelId
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
       );
       if (response.data.status === 'success') {
         setModels(models.filter(model => model.vehicle_model_id !== selectedModelId));
@@ -191,7 +202,7 @@ const VehicleModels = () => {
         }
       };
 
-      const response = await axios.post('http://localhost/coc/gsd/update_master1.php', 
+      const response = await axios.post(`${encryptedUrl}update_master1.php`, 
         requestData,
         {
           headers: {

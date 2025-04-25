@@ -22,6 +22,7 @@ import {
 import ReservationCalendar from '../components/ReservationCalendar';
 import Sidebar from './component/sidebar';  // Updated import path
 import { format } from 'timeago.js';
+import { SecureStorage } from '../utils/encryption'; // Ensure this path is correct
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -39,6 +40,15 @@ const Dashboard = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 3;
   const [recentActivities, setRecentActivities] = useState([]);
+
+  useEffect(() => {
+            const encryptedUserLevel = SecureStorage.getSessionItem("user_level_id"); 
+            console.log("this is encryptedUserLevel", encryptedUserLevel);
+            if (encryptedUserLevel !== '2' && encryptedUserLevel !== '2') {
+                localStorage.clear();
+                navigate('/gsd');
+            }
+      }, [navigate]);
 
   const statsData = [
     { title: "Assigned Tasks", value: statistics.assignedTasks, icon: FiClipboard, color: "bg-blue-600" },

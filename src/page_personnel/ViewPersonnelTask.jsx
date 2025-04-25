@@ -4,6 +4,8 @@ import axios from 'axios';
 import Sidebar from './component/sidebar';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { useNavigate } from 'react-router-dom';
+import { SecureStorage } from '../utils/encryption';
 
 const ViewPersonnelTask = () => {
   const [tasks, setTasks] = useState([]);
@@ -18,7 +20,18 @@ const ViewPersonnelTask = () => {
   const [modalLoading, setModalLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [filter, setFilter] = useState('ongoing'); // 'ongoing' or 'completed'
+  const navigate = useNavigate();
 
+  useEffect(() => {
+          const encryptedUserLevel = SecureStorage.getSessionItem("user_level_id"); 
+          console.log("this is encryptedUserLevel", encryptedUserLevel);
+          if (encryptedUserLevel !== '2' && encryptedUserLevel !== '2') {
+              localStorage.clear();
+              navigate('/gsd');
+          }
+    }, [navigate]);
+
+ 
   const fetchPersonnelTasks = async () => {
     try {
       setLoading(true);
