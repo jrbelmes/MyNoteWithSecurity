@@ -30,7 +30,7 @@ const Sidebar = () => {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState(0);
 
-  const name = SecureStorage.getItem('name') || 'User';
+  const name = SecureStorage.getLocalItem('name') || 'User';
   const user_level_id = localStorage.getItem('user_level_id');
 
   useEffect(() => {
@@ -55,7 +55,19 @@ const Sidebar = () => {
   const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
 
   const handleLogout = () => {
-    clearAllExceptLoginAttempts();
+    // Save loginAttempts
+    const loginAttempts = localStorage.getItem('loginAttempts');
+    const url = SecureStorage.getLocalItem('url');
+    
+    // Clear everything
+    sessionStorage.clear();
+    localStorage.clear();
+    
+    // Restore critical data
+    if (loginAttempts) localStorage.setItem('loginAttempts', loginAttempts);
+    if (url) SecureStorage.setLocalItem('url', url);
+    
+    // Navigate to login
     navigate('/gsd');
     window.location.reload();
   };
@@ -194,6 +206,14 @@ const Sidebar = () => {
               />
 
               <MiniSidebarItem 
+                icon={FaFileAlt} 
+                text="View Approvals" 
+                link="/viewApproval" 
+                active={activeItem === '/viewApproval'}
+                isExpanded={isDesktopSidebarOpen}
+              />
+
+              <MiniSidebarItem 
                 icon={FaComments} 
                 text="Chat" 
                 link="/chat" 
@@ -213,7 +233,7 @@ const Sidebar = () => {
               />
             </nav>
 
-            {/* User Profile */}
+            {/* User Profile - Show only icon when collapsed */}
             <div className="mt-auto border-t border-gray-200 dark:border-gray-800">
               <Popover className="relative w-full">
                 {({ open }) => (
@@ -248,23 +268,22 @@ const Sidebar = () => {
                       leaveFrom="opacity-100 translate-y-0"
                       leaveTo="opacity-0 translate-y-1"
                     >
-                      <Popover.Panel className="absolute bottom-full left-0 w-full mb-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5">
+                      <Popover.Panel className={`absolute ${!isDesktopSidebarOpen ? 'left-full ml-2' : 'right-0'} bottom-full mb-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 z-50`}>
                         <div className="p-3 border-b border-gray-100 dark:border-gray-700">
                           <p className="font-medium text-sm">{name}</p>
-                          <p className="text-xs text-gray-500">User</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">User</p>
                         </div>
                         <div className="p-2">
-                          <button
-                            onClick={() => setShowProfileModal(true)}
-                            className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
-                          >
-                            Profile
-                          </button>
+                          <Link to="/settings" className="block w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md flex items-center space-x-2">
+                            <FaCog size={14} />
+                            <span>Settings</span>
+                          </Link>
                           <button
                             onClick={handleLogout}
-                            className="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md"
+                            className="w-full mt-1 text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md flex items-center space-x-2"
                           >
-                            Logout
+                            <FaSignOutAlt size={14} />
+                            <span>Logout</span>
                           </button>
                         </div>
                       </Popover.Panel>
@@ -301,6 +320,13 @@ const Sidebar = () => {
                 text="View Reservations" 
                 link="/viewReserve" 
                 active={activeItem === '/viewReserve'} 
+              />
+
+              <SidebarItem 
+                icon={FaFileAlt} 
+                text="View Approvals" 
+                link="/viewApproval" 
+                active={activeItem === '/viewApproval'} 
               />
 
               <SidebarItem 
@@ -366,6 +392,9 @@ const HeaderUserMenu = ({ name, handleLogout }) => {
                 <p className="text-xs text-gray-500">User</p>
               </div>
               <div className="p-2">
+                <Link to="/settings" className="block px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md">
+                  Settings
+                </Link>
                 <button
                   onClick={handleLogout}
                   className="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md"

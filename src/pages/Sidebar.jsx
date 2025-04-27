@@ -271,13 +271,18 @@ const Sidebar = () => {
                 isExpanded={isDesktopSidebarOpen}
               />
 
+              {isDesktopSidebarOpen && <SectionLabel text="User Management" />}
 
+              <MiniSidebarItem 
+                icon={FaUserCircle} 
+                text="Faculty" 
+                link="/Faculty" 
+                active={activeItem === '/Faculty'}
+                isExpanded={isDesktopSidebarOpen}
+              />
 
               {isDesktopSidebarOpen && <SectionLabel text="Personal Info" />}
-
-              
-
-              
+  
               <MiniSidebarItem 
                 icon={FaCogs} 
                 text="Account Settings" 
@@ -312,7 +317,36 @@ const Sidebar = () => {
                         </div>
                       )}
                     </Popover.Button>
-                    {/* Rest of Popover.Panel remains the same */}
+                    <Transition
+                      show={open}
+                      as={React.Fragment}
+                      enter="transition ease-out duration-200"
+                      enterFrom="opacity-0 translate-y-1"
+                      enterTo="opacity-100 translate-y-0"
+                      leave="transition ease-in duration-150"
+                      leaveFrom="opacity-100 translate-y-0"
+                      leaveTo="opacity-0 translate-y-1"
+                    >
+                      <Popover.Panel className={`absolute ${!isDesktopSidebarOpen ? 'left-full ml-2' : 'right-0'} bottom-full mb-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 z-50`}>
+                        <div className="p-3 border-b border-gray-100 dark:border-gray-700">
+                          <p className="font-medium text-sm">{name}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Administrator</p>
+                        </div>
+                        <div className="p-2">
+                          <Link to="/settings" className="block w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md flex items-center space-x-2">
+                            <FaCog size={14} />
+                            <span>Settings</span>
+                          </Link>
+                          <button
+                            onClick={handleLogout}
+                            className="w-full mt-1 text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md flex items-center space-x-2"
+                          >
+                            <FaSignOutAlt size={14} />
+                            <span>Logout</span>
+                          </button>
+                        </div>
+                      </Popover.Panel>
+                    </Transition>
                   </>
                 )}
               </Popover>

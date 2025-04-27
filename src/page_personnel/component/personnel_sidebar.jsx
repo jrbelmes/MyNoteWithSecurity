@@ -53,6 +53,8 @@ const Sidebar = () => {
 
   const handleLogout = () => {
     clearAllExceptLoginAttempts();
+    localStorage.clear();
+    sessionStorage.clear();
     navigate('/gsd');
     window.location.reload();
   };
@@ -145,6 +147,8 @@ const Sidebar = () => {
                 isExpanded={isDesktopSidebarOpen}
               />
 
+              {isDesktopSidebarOpen && <SectionLabel text="Tasks Management" />}
+
               <MiniSidebarItem 
                 icon={FaTasks} 
                 text="View Tasks" 
@@ -160,6 +164,8 @@ const Sidebar = () => {
                 active={activeItem === '/personnel/taskHistory'}
                 isExpanded={isDesktopSidebarOpen}
               />
+
+              {isDesktopSidebarOpen && <SectionLabel text="Communication" />}
 
               <MiniSidebarItem 
                 icon={FaComments} 

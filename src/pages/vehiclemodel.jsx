@@ -177,7 +177,19 @@ const VehicleModels = () => {
     }
   };
 
+  const isWithinSubmissionWindow = () => {
+    const now = new Date();
+    const startDate = new Date('2025-04-25T10:00:00');
+    const endDate = new Date('2025-04-27T14:00:00');
+    return now >= startDate && now <= endDate;
+  };
+
   const handleSave = async () => {
+    if (!isWithinSubmissionWindow()) {
+      toast.error("Submissions are only allowed between April 25, 2025 10:00 AM and April 27, 2025 2:00 PM");
+      return;
+    }
+
     const sanitizedName = sanitizeInput(formData.name);
     
     if (!sanitizedName.trim() || !formData.makeId || !formData.categoryId) {

@@ -56,6 +56,8 @@ const Sidebar = () => {
 
   const handleLogout = () => {
     clearAllExceptLoginAttempts();
+    localStorage.clear();
+    sessionStorage.clear();
     navigate('/gsd');
     window.location.reload();
   };
@@ -238,6 +240,7 @@ const Sidebar = () => {
                         </div>
                       )}
                     </Popover.Button>
+
                     <Transition
                       show={open}
                       as={React.Fragment}
@@ -248,10 +251,13 @@ const Sidebar = () => {
                       leaveFrom="opacity-100 translate-y-0"
                       leaveTo="opacity-0 translate-y-1"
                     >
-                      <Popover.Panel className="absolute bottom-full left-0 w-full mb-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5">
+                      <Popover.Panel
+                        static
+                        className="absolute bottom-full left-0 w-full mb-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5"
+                      >
                         <div className="p-3 border-b border-gray-100 dark:border-gray-700">
                           <p className="font-medium text-sm">{name}</p>
-                          <p className="text-xs text-gray-500">User</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">User</p>
                         </div>
                         <div className="p-2">
                           <button
