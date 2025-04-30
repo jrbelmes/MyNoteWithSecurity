@@ -192,8 +192,8 @@ const Sidebar = () => {
               <MiniSidebarItem 
                 icon={FaCar} 
                 text="Make Reservation" 
-                link="/addReservation" 
-                active={activeItem === '/addReservation'}
+                link="/deanAddReservation" 
+                active={activeItem === '/deanAddReservation'}
                 isExpanded={isDesktopSidebarOpen}
               />
 

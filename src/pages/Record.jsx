@@ -233,10 +233,8 @@ const Record = () => {
   const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
-  const [activeTab, setActiveTab] = useState('1');
 
   useEffect(() => {
     fetchReservations();
@@ -245,33 +243,35 @@ const Record = () => {
   const fetchReservations = async () => {
     setLoading(true);
     try {
-        const response = await axios.post('http://localhost/coc/gsd/records&reports.php', {
-            operation: 'fetchRecord',
-            json: {}
-        }, {
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-
-        if (response.data?.status === 'success') {
-            const consolidatedData = consolidateReservations(response.data.data);
-            setReservations(consolidatedData);
-            console.log('Consolidated reservations:', consolidatedData);
-        } else { 
-            toast.error('No pending reservations found.');
-            setReservations([]);
+      const response = await axios.post('http://localhost/coc/gsd/records&reports.php', {
+        operation: 'fetchRecord',
+        json: {}
+      }, {
+        headers: {
+          'Content-Type': 'application/json'
         }
-    } catch (error) {
-        toast.error('Error fetching reservations. Please try again later.');
+      });
+
+      if (response.data?.status === 'success' && Array.isArray(response.data.data)) {
+        const uniqueData = [...new Map(response.data.data.map(item => [item.reservation_id, item])).values()];
+        const consolidatedData = consolidateReservations(uniqueData);
+        setReservations(consolidatedData);
+      } else { 
+        toast.error('No reservations found.');
         setReservations([]);
+      }
+    } catch (error) {
+      console.error('Error fetching reservations:', error);
+      toast.error('Error fetching reservations. Please try again later.');
+      setReservations([]);
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   };
 
   const consolidateReservations = (data) => {
     return data.map(item => ({
+      key: item.reservation_id,
       reservation_id: item.reservation_id,
       title: item.reservation_title,
       description: item.reservation_description,
@@ -281,7 +281,7 @@ const Record = () => {
       requester: item.user_full_name
     }));
   };
-  
+
   const columns = [
     {
       title: 'Title',
@@ -311,6 +311,12 @@ const Record = () => {
       render: (status) => (
         <Tag color={getStatusColor(status)}>{status}</Tag>
       ),
+      filters: [
+        { text: 'Reserved', value: 'Reserved' },
+        { text: 'Decline', value: 'Decline' },
+        { text: 'Completed', value: 'Completed' }
+      ],
+      onFilter: (value, record) => record.status === value,
     },
     {
       title: 'Requester',
@@ -332,71 +338,16 @@ const Record = () => {
     }
   ];
 
-  const getFilteredReservations = (status) => {
+  const getFilteredReservations = () => {
     return reservations.filter(reservation => {
       const searchLower = searchText.toLowerCase();
-      const matchesSearch = (
+      return (
         reservation.title?.toLowerCase().includes(searchLower) ||
         reservation.description?.toLowerCase().includes(searchLower) ||
         reservation.requester?.toLowerCase().includes(searchLower)
       );
-
-      if (status === 'active') {
-        return matchesSearch && reservation.status === 'Reserved';
-      } else {
-        return matchesSearch && reservation.status === 'Decline';
-      }
     });
   };
-
-  const tabItems = [
-    {
-      key: '1',
-      label: 'Active Reservations',
-      children: (
-        <Table
-          columns={columns}
-          dataSource={getFilteredReservations('active')}
-          rowKey="approval_id"
-          loading={loading}
-          pagination={{
-            pageSize: 10,
-            showSizeChanger: true,
-            showTotal: (total) => `Total ${total} reservations`,
-          }}
-          scroll={{ x: 1000 }}
-          style={{
-            borderRadius: '8px',
-            overflow: 'hidden'
-          }}
-          className="record-table"
-        />
-      )
-    },
-    {
-      key: '2',
-      label: 'Completed/Declined Reservations',
-      children: (
-        <Table
-          columns={columns}
-          dataSource={getFilteredReservations('completed')}
-          rowKey="approval_id"
-          loading={loading}
-          pagination={{
-            pageSize: 10,
-            showSizeChanger: true,
-            showTotal: (total) => `Total ${total} reservations`,
-          }}
-          scroll={{ x: 1000 }}
-          style={{
-            borderRadius: '8px',
-            overflow: 'hidden'
-          }}
-          className="record-table"
-        />
-      )
-    }
-  ];
 
   const showModal = (record) => {
     setSelectedRecord(record);
@@ -430,26 +381,25 @@ const Record = () => {
                 style={{ width: 300 }}
                 className="search-input"
               />
-              <Select
-                defaultValue="all"
-                style={{ width: 120 }}
-                className="status-select"
-                onChange={setStatusFilter}
-                options={[
-                  { value: 'all', label: 'All Status' },
-                  { value: '1', label: 'Pending' },
-                  { value: '2', label: 'Approved' },
-                  { value: '3', label: 'Declined' }
-                ]}
-              />
             </Space>
           </div>
 
-          <Tabs 
-            activeKey={activeTab}
-            onChange={setActiveTab}
-            items={tabItems}
-            style={{ marginTop: '16px' }}
+          <Table
+            columns={columns}
+            dataSource={getFilteredReservations()}
+            rowKey="reservation_id"
+            loading={loading}
+            pagination={{
+              pageSize: 10,
+              showSizeChanger: true,
+              showTotal: (total) => `Total ${total} reservations`,
+            }}
+            scroll={{ x: 1000 }}
+            style={{
+              borderRadius: '8px',
+              overflow: 'hidden'
+            }}
+            className="record-table"
           />
 
           <DetailModal
