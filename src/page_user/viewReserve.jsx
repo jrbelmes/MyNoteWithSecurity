@@ -232,9 +232,13 @@ const ViewReserve = () => {
             }
         };
 
-        // Check if reservation is cancelled
+        // Check if reservation is cancelled or completed
         const isCancelled = reservationDetails.statusHistory?.some(
             status => status.status_name === "Cancelled"
+        );
+        
+        const isCompleted = reservationDetails.statusHistory?.some(
+            status => status.status_name === "Completed" && status.active === "1"
         );
 
         const handleShowCancelModal = () => {
@@ -335,7 +339,7 @@ const ViewReserve = () => {
                     >
                         Close
                     </button>,
-                    !isCancelled && (
+                    (!isCancelled && !isCompleted) && (
                         <button
                             key="cancel"
                             onClick={handleShowCancelModal}
