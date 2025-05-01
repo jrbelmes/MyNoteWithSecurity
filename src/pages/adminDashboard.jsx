@@ -145,6 +145,7 @@ const Dashboard = () => {
     const [setReleaseFacilities] = useState([]);
     const [setPersonnel] = useState([]);
     const [ongoingReservations, setOngoingReservations] = useState([]);
+    const [completedReservations, setCompletedReservations] = useState([]);
 
     const [selectedReturnReservation, setSelectedReturnReservation] = useState(null);
     const [returnModalOpen, setReturnModalOpen] = useState(false);
@@ -230,7 +231,7 @@ const Dashboard = () => {
     useEffect(() => {
         const fetchReservationStats = async () => {
             try {
-                const response = await axios.post(`${encryptedUrl}/fetch_reserve.php`, {
+                const response = await axios.post(`${encryptedUrl}/user.php`, {
                     operation: 'getReservationStats'
                 });
                 if (response.data.status === 'success') {
@@ -301,31 +302,31 @@ const Dashboard = () => {
 
     const fetchReservations = useCallback(async () => {
         try {
-            const response = await axios.post(`${encryptedUrl}/fetch_reserve.php`, {
+            const response = await axios.post(`${encryptedUrl}/user.php`, {
                 operation: 'fetchAllReservations',
             });
 
             if (response.data && response.data.status === 'success') {
-                // Sort reservations by date_created in descending order and take the first 5
-                const sortedReservations = response.data.data
-                    .sort((a, b) => new Date(b.date_created) - new Date(a.date_created))
-                    .slice(0, 5);
-                setRecentReservations(sortedReservations);
-
-                // Filter ongoing reservations
+                // Filter and update ongoing reservations
                 const currentDate = new Date();
                 const ongoing = response.data.data.filter(reservation => {
                     const startDate = new Date(reservation.reservation_start_date);
                     const endDate = new Date(reservation.reservation_end_date);
-                    return startDate <= currentDate && currentDate <= endDate;
+                    return startDate <= currentDate && currentDate <= endDate && reservation.reservation_status === 'Reserved';
                 });
                 setOngoingReservations(ongoing);
+
+                // Filter and update completed reservations
+                const completed = response.data.data.filter(reservation => 
+                    reservation.reservation_status === 'Completed'
+                );
+                setCompletedReservations(completed);
             } else {
             }
         } catch (error) {
             toast.error('Error fetching reservations.');
         }
-    }, [setRecentReservations]);
+    }, []);
 
     const fetchReservationDetails = async (reservationId) => {
         try {
@@ -1081,6 +1082,110 @@ const Dashboard = () => {
                                     </div>
                                 </div>
                             </div>
+                            
+                            {/* Additional Sections for Ongoing and Completed Reservations */}
+                            <div className="mt-6 space-y-4">
+                                {/* Ongoing Reservations Section */}
+                                <div className="bg-white dark:bg-gray-700 p-4 rounded-lg">
+                                    <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 flex items-center">
+                                        <FaClock className="mr-2 text-green-500" /> Ongoing Reservations
+                                    </h3>
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+                                            <thead className="bg-gray-50 dark:bg-gray-800">
+                                                <tr>
+                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Title</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Description</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Start Date</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">End Date</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-700 dark:divide-gray-600">
+                                                {ongoingReservations.map((reservation, index) => (
+                                                    <tr key={index}>
+                                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                                            {reservation.reservation_title}
+                                                        </td>
+                                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                                                            {reservation.reservation_description}
+                                                        </td>
+                                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                                                            {formatDate(reservation.reservation_start_date)}
+                                                        </td>
+                                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                                                            {formatDate(reservation.reservation_end_date)}
+                                                        </td>
+                                                        <td className="px-4 py-3 whitespace-nowrap">
+                                                            <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                                                {reservation.reservation_status}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                {ongoingReservations.length === 0 && (
+                                                    <tr>
+                                                        <td colSpan="5" className="px-4 py-3 text-center text-gray-500 dark:text-gray-400">
+                                                            No ongoing reservations
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                {/* Completed Reservations Section */}
+                                <div className="bg-white dark:bg-gray-700 p-4 rounded-lg">
+                                    <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 flex items-center">
+                                        <FaCheckCircle className="mr-2 text-blue-500" /> Completed Reservations
+                                    </h3>
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+                                            <thead className="bg-gray-50 dark:bg-gray-800">
+                                                <tr>
+                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Title</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Description</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Start Date</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">End Date</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-700 dark:divide-gray-600">
+                                                {completedReservations.map((reservation, index) => (
+                                                    <tr key={index}>
+                                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                                            {reservation.reservation_title}
+                                                        </td>
+                                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                                                            {reservation.reservation_description}
+                                                        </td>
+                                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                                                            {formatDate(reservation.reservation_start_date)}
+                                                        </td>
+                                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                                                            {formatDate(reservation.reservation_end_date)}
+                                                        </td>
+                                                        <td className="px-4 py-3 whitespace-nowrap">
+                                                            <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                                                {reservation.reservation_status}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                {completedReservations.length === 0 && (
+                                                    <tr>
+                                                        <td colSpan="5" className="px-4 py-3 text-center text-gray-500 dark:text-gray-400">
+                                                            No completed reservations
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div className="bg-gray-50 dark:bg-gray-700 p-4 flex justify-end">
                                 <button
                                     onClick={() => setModalOpen(false)}
@@ -1215,7 +1320,7 @@ const FacilityList = ({ items, type, nameKey, idKey, ongoingReservations }) => {
                             className={`p-1 rounded-md ${currentPage === 1 ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-600'}`}
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                                <path fillRule="evenodd" d="M12.707 5.293a1 1 010 1.414L9.414 10l3.293 3.293a1 1 01-1.414 1.414l-4-4a1 1 010-1.414l4-4a1 1 011.414 0z" clipRule="evenodd" />
                             </svg>
                         </button>
                         
@@ -1247,7 +1352,7 @@ const FacilityList = ({ items, type, nameKey, idKey, ongoingReservations }) => {
                             className={`p-1 rounded-md ${currentPage === totalPages ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-600'}`}
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4-4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                                <path fillRule="evenodd" d="M7.293 14.707a1 1 010-1.414L10.586 10 7.293 6.707a1 1 011.414-1.414l4 4a1 1 010 1.414l-4-4a1 1 01-1.414 0z" clipRule="evenodd" />
                             </svg>
                         </button>
                     </nav>

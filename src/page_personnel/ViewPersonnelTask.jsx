@@ -21,6 +21,9 @@ const ViewPersonnelTask = () => {
   const [venueCondition, setVenueCondition] = useState('');
   const [vehicleCondition, setVehicleCondition] = useState('');
   const [equipmentCondition, setEquipmentCondition] = useState('');
+  const [otherVenueCondition, setOtherVenueCondition] = useState('');
+  const [otherVehicleCondition, setOtherVehicleCondition] = useState('');
+  const [otherEquipmentCondition, setOtherEquipmentCondition] = useState('');
 
   const formatDateTime = (dateString) => {
     const date = new Date(dateString);
@@ -263,68 +266,82 @@ const handleChecklistUpdate = async (type, checklistId, value) => {
   
 
 const handleSubmitTask = async () => {
-  // Check if we can submit the task
-  if (!selectedTask || !isTaskInProgress(selectedTask)) {
-    toast.error('This task can only be submitted during its scheduled time');
+  // Validate other condition inputs when "Other" is selected
+  if (venueCondition === 'Other' && !otherVenueCondition.trim()) {
+    toast.error('Please specify the venue condition');
     return;
   }
-
-  if (!isAllChecklistsCompleted(selectedTask)) {
-    toast.error('Please complete all checklist items before submitting.');
+  if (vehicleCondition === 'Other' && !otherVehicleCondition.trim()) {
+    toast.error('Please specify the vehicle condition');
+    return;
+  }
+  if (equipmentCondition === 'Other' && !otherEquipmentCondition.trim()) {
+    toast.error('Please specify the equipment condition');
     return;
   }
 
   try {
     setIsSubmitting(true);
-
-    // Build conditions payload
     const conditionsPayload = {
       operation: 'submitCondition',
       conditions: {}
     };
 
-    // Add venue conditions if venue exists and condition is selected
+    // Helper function to create the condition arrays
+    const createConditionPayload = (selectedCondition, otherConditionText, reservationId) => {
+      const conditionIds = [];
+      const otherReasons = [];
+      
+      // Find the condition ID for the selected condition name
+      const conditionId = conditions.find(c => c.condition_name === selectedCondition)?.id;
+      
+      if (conditionId) {
+        conditionIds.push(conditionId);
+        // If it's condition ID 6 (Other), add the other reason text, otherwise null
+        otherReasons.push(conditionId === '6' ? otherConditionText : null);
+      }
+
+      return {
+        reservation_ids: [reservationId],
+        condition_ids: conditionIds,
+        other_reasons: otherReasons
+      };
+    };
+
+    // Add venue conditions
     if (selectedTask.venue && venueCondition) {
-      const conditionId = conditions.find(c => c.condition_name === venueCondition)?.id;
-      if (conditionId && selectedTask.venue.reservation_venue_id) {
-        conditionsPayload.conditions.venue = {
-          reservation_ids: [selectedTask.venue.reservation_venue_id],
-          condition_ids: [conditionId]
-        };
+      if (selectedTask.venue.reservation_venue_id) {
+        conditionsPayload.conditions.venue = createConditionPayload(
+          venueCondition,
+          otherVenueCondition,
+          selectedTask.venue.reservation_venue_id
+        );
       }
     }
 
-    // Add vehicle conditions if vehicle exists and condition is selected
+    // Add vehicle conditions
     if (selectedTask.vehicle && vehicleCondition) {
-      const conditionId = conditions.find(c => c.condition_name === vehicleCondition)?.id;
-      if (conditionId && selectedTask.vehicle.reservation_vehicle_id) {
-        conditionsPayload.conditions.vehicle = {
-          reservation_ids: [selectedTask.vehicle.reservation_vehicle_id],
-          condition_ids: [conditionId]
-        };
+      if (selectedTask.vehicle.reservation_vehicle_id) {
+        conditionsPayload.conditions.vehicle = createConditionPayload(
+          vehicleCondition,
+          otherVehicleCondition,
+          selectedTask.vehicle.reservation_vehicle_id
+        );
       }
     }
 
-    // Add equipment conditions if equipment exists and condition is selected
+    // Add equipment conditions
     if (selectedTask.equipment && equipmentCondition) {
-      const conditionId = conditions.find(c => c.condition_name === equipmentCondition)?.id;
-      if (conditionId && selectedTask.equipment.reservation_equipment_id) {
-        conditionsPayload.conditions.equipment = {
-          reservation_ids: [selectedTask.equipment.reservation_equipment_id],
-          condition_ids: [conditionId]
-        };
+      if (selectedTask.equipment.reservation_equipment_id) {
+        conditionsPayload.conditions.equipment = createConditionPayload(
+          equipmentCondition,
+          otherEquipmentCondition,
+          selectedTask.equipment.reservation_equipment_id
+        );
       }
     }
 
-    // Check if at least one condition is selected
-    if (Object.keys(conditionsPayload.conditions).length === 0) {
-      toast.error('Please select at least one condition before submitting');
-      return;
-    }
-
-    console.log('Submitting conditions:', conditionsPayload); // For debugging
-
-    // Submit conditions
+    // ... rest of the submit function code ...
     const conditionResponse = await axios.post('http://localhost/coc/gsd/personnel.php', conditionsPayload, {
       headers: {
         'Content-Type': 'application/json'
@@ -346,13 +363,12 @@ const handleSubmitTask = async () => {
 
       if (statusResponse.data.status === 'success') {
         toast.success('Task completed successfully');
+        setIsModalOpen(false);
+        setSelectedTask(null);
+        fetchPersonnelTasks();
       } else {
         toast.error('Failed to update reservation status');
       }
-
-      setIsModalOpen(false);
-      setSelectedTask(null);
-      fetchPersonnelTasks(); // Refresh the task list
     } else {
       toast.error(conditionResponse.data.message || 'Failed to submit task');
     }
@@ -625,7 +641,7 @@ const handleSubmitTask = async () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
                     <p className="text-sm text-amber-700">
-                      This task can only be submitted during its scheduled time
+                      This task can only be submitted after its scheduled time
                     </p>
                   </div>
                 </div>
@@ -653,6 +669,15 @@ const handleSubmitTask = async () => {
                         </option>
                       ))}
                     </select>
+                    {venueCondition === 'Other' && (
+                      <input
+                        type="text"
+                        value={otherVenueCondition}
+                        onChange={(e) => setOtherVenueCondition(e.target.value)}
+                        placeholder="Specify condition"
+                        className="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    )}
                   </div>
                 </div>
                 <div className="space-y-3">
@@ -713,6 +738,15 @@ const handleSubmitTask = async () => {
                         </option>
                       ))}
                     </select>
+                    {vehicleCondition === 'Other' && (
+                      <input
+                        type="text"
+                        value={otherVehicleCondition}
+                        onChange={(e) => setOtherVehicleCondition(e.target.value)}
+                        placeholder="Specify condition"
+                        className="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    )}
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -775,6 +809,15 @@ const handleSubmitTask = async () => {
                         </option>
                       ))}
                     </select>
+                    {equipmentCondition === 'Other' && (
+                      <input
+                        type="text"
+                        value={otherEquipmentCondition}
+                        onChange={(e) => setOtherEquipmentCondition(e.target.value)}
+                        placeholder="Specify condition"
+                        className="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    )}
                   </div>
                 </div>
                 <div className="space-y-3">

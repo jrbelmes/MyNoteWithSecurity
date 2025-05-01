@@ -271,6 +271,14 @@ const Sidebar = () => {
                 isExpanded={isDesktopSidebarOpen}
               />
 
+              <MiniSidebarItem 
+                icon={FaChartBar} 
+                text="Reports" 
+                link="/Reports" 
+                active={activeItem === '/Reports'}
+                isExpanded={isDesktopSidebarOpen}
+              />
+
               {isDesktopSidebarOpen && <SectionLabel text="User Management" />}
 
               <MiniSidebarItem 

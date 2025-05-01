@@ -9,7 +9,6 @@ import Venue from './pages/Venue';
 import  Dashboard from './page_user/dashboard';
 import Equipment from './pages/Equipment';
 import ViewRequest from './pages/viewRequest';
-import Reports from './pages/Reports';
 import AddReservation from './page_user/AddReservation'; // Import the AddReservation component
 import { Toaster } from 'sonner';
 import './App.css'; 
@@ -37,8 +36,10 @@ import LandCalendar from './pages/landCalendar';
 import Archive from './pages/archive';
 import NotFound from './components/NotFound';
 import Checklists from './pages/Checklist';
+import Reports from './pages/Reports';
 import AccountSettings from './pages/accountSettings';
 import { SecureStorage } from './utils/encryption';
+
 
 export const ThemeContext = createContext();
 
@@ -77,13 +78,13 @@ const App = () => {
             '/vehiclemake', '/vehiclecategory', '/position',
             '/equipmentCategory', '/condition', '/vehiclemodel',
             '/AssignPersonnel', '/LandCalendar', '/record',
-            '/ViewRequest', '/Reports', '/Venue', '/equipmentCat',
+            '/ViewRequest', '/Venue', '/equipmentCat',
             '/archive', '/deanDashboard', '/deanViewReserve',
             '/deanAddReservation', '/viewApproval', '/dashboard',
             '/viewReserve', '/addReservation', '/profile1',
             '/settings', '/calendar', '/chat', '/personnelDashboard',
             '/viewTask', '/Master', '/vehicleCategory', '/',
-            '/Checklist', '/chatAdmin', '/AccountSettings', '/chatAdmin',
+            '/Checklist', '/chatAdmin', '/AccountSettings', '/chatAdmin', '/Reports',
         ];
 
         if (!validPaths.includes(location.pathname)) {
@@ -123,10 +124,11 @@ const App = () => {
 
                         <Route path="/record" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><Record /></ProtectedRoute>} />
                         <Route path="/ViewRequest" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><ViewRequest /></ProtectedRoute>} />
-                        <Route path="/Reports" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><Reports /></ProtectedRoute>} />
+
                         <Route path="/Venue" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><Venue /></ProtectedRoute>} />
                         <Route path="/equipmentCat" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><Equipmentc /></ProtectedRoute>} />
                         <Route path="/archive" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><Archive /></ProtectedRoute>} />
+                        <Route path="/Reports" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><Reports /></ProtectedRoute>} />
                         <Route path="/AccountSettings" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><AccountSettings /></ProtectedRoute>} />
                                                             
                         {/* Dean/Secretary Routes */}
