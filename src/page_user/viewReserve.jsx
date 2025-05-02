@@ -176,7 +176,7 @@ const ViewReserve = () => {
     const handleViewReservation = async (reservation) => {
         try {
             // Fetch reservation details
-            const response = await fetch(`http://localhost/coc/gsd/faculty&staff.php`, {
+            const detailsResponse = await fetch(`http://localhost/coc/gsd/faculty&staff.php`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -199,13 +199,30 @@ const ViewReserve = () => {
                 })
             });
 
-            const [result, statusResult] = await Promise.all([response.json(), statusResponse.json()]);
+            // Fetch maintenance resources
+            const maintenanceResponse = await fetch(`http://localhost/coc/gsd/faculty&staff.php`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    operation: 'displayedMaintenanceResources',
+                    reservationId: reservation.id
+                })
+            });
+
+            const [result, statusResult, maintenanceResult] = await Promise.all([
+                detailsResponse.json(),
+                statusResponse.json(),
+                maintenanceResponse.json()
+            ]);
             
             if (result.status === 'success') {
                 const details = result.data;
                 setReservationDetails({
                     ...details,
-                    statusHistory: statusResult.status === 'success' ? statusResult.data : []
+                    statusHistory: statusResult.status === 'success' ? statusResult.data : [],
+                    maintenanceResources: maintenanceResult.status === 'success' ? maintenanceResult.data : []
                 });
                 setIsDetailModalOpen(true);
             } else {
@@ -237,8 +254,9 @@ const ViewReserve = () => {
             status => status.status_name === "Cancelled"
         );
         
+        // Check if reservation is completed by looking for status_id "4"
         const isCompleted = reservationDetails.statusHistory?.some(
-            status => status.status_name === "Completed" && status.active === "1"
+            status => status.status_id === "4" && status.active === "1"
         );
 
         const handleShowCancelModal = () => {
@@ -324,6 +342,50 @@ const ViewReserve = () => {
                 key: 'quantity'
             }
         ];
+
+        // Format the maintenance resources if the reservation is completed
+        const MaintenanceResourcesSummary = () => {
+            if (!isCompleted || !reservationDetails.maintenanceResources?.length) return null;
+    
+            return (
+                <div className="mt-6 bg-white rounded-lg border border-gray-200 overflow-hidden">
+                    <div className="bg-orange-50 p-4 border-b border-orange-100">
+                        <h3 className="text-lg font-medium text-orange-800 flex items-center gap-2">
+                            <ToolOutlined className="text-orange-500" />
+                            Reservation Resources Summary: Completed
+                        </h3>
+                    </div>
+                    <div className="p-4">
+                        <div className="space-y-4">
+                            {reservationDetails.maintenanceResources.map((resource, index) => (
+                                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-orange-100 rounded-full">
+                                            <ToolOutlined className="text-orange-600" />
+                                        </div>
+                                        <div>
+                                            <p className="font-medium text-gray-900">{resource.resource_name}</p>
+                                            <p className="text-sm text-gray-500">
+                                                {resource.resource_type.charAt(0).toUpperCase() + resource.resource_type.slice(1)}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-medium">
+                                            {resource.condition_name}
+                                        </span>
+                                        {resource.resource_type.toLowerCase() !== 'venue' && 
+                                         resource.resource_type.toLowerCase() !== 'vehicle' && (
+                                            <p className="text-sm text-gray-500 mt-1">Quantity: {resource.quantity}</p>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
 
         return (
             <Modal
@@ -443,6 +505,9 @@ const ViewReserve = () => {
                                     <p className="text-gray-700">{reservationDetails.reservation_description}</p>
                                 </div>
                             )}
+
+                            {/* Add MaintenanceResourcesSummary to Details tab */}
+                            <MaintenanceResourcesSummary />
                         </TabPane>
 
                         <TabPane tab={<span><AppstoreOutlined /> Resources</span>} key="2">
@@ -524,6 +589,7 @@ const ViewReserve = () => {
                                     )}
                                 </div>
                             </div>
+                            <MaintenanceResourcesSummary />
                         </TabPane>
                     </Tabs>
                 </div>

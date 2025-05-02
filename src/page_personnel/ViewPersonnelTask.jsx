@@ -24,6 +24,43 @@ const ViewPersonnelTask = () => {
   const [otherVenueCondition, setOtherVenueCondition] = useState('');
   const [otherVehicleCondition, setOtherVehicleCondition] = useState('');
   const [otherEquipmentCondition, setOtherEquipmentCondition] = useState('');
+  const [equipmentDefectQty, setEquipmentDefectQty] = useState('');
+
+  // Helper function to determine if equipment condition needs defect quantity
+  const needsDefectQuantity = (conditionId) => {
+    // Only condition IDs 3 and 4 require defect quantity (needs repair, defective)
+    return ['3', '4'].includes(conditionId);
+  };
+
+  // Handle equipment condition change
+  const handleEquipmentConditionChange = (e) => {
+    const value = e.target.value;
+    setEquipmentCondition(value);
+    // Reset defect quantity when changing condition
+    if (!needsDefectQuantity(value)) {
+      setEquipmentDefectQty('');
+    }
+  };
+
+  const handleEquipmentDefectQtyChange = (e) => {
+    const value = e.target.value;
+    const totalQuantity = selectedTask?.equipment?.quantity || 0;
+    
+    // Ensure value is a positive number
+    if (value < 0) {
+      setEquipmentDefectQty('0');
+      return;
+    }
+    
+    // Ensure defect quantity doesn't exceed total quantity
+    if (parseInt(value) > parseInt(totalQuantity)) {
+      toast.error(`Defect quantity cannot exceed total quantity (${totalQuantity})`);
+      setEquipmentDefectQty(totalQuantity.toString());
+      return;
+    }
+    
+    setEquipmentDefectQty(value);
+  };
 
   const formatDateTime = (dateString) => {
     const date = new Date(dateString);
@@ -288,31 +325,34 @@ const handleSubmitTask = async () => {
     };
 
     // Helper function to create the condition arrays
-    const createConditionPayload = (selectedCondition, otherConditionText, reservationId) => {
+    const createConditionPayload = (selectedCondition, otherConditionText, reservationId, qty = '0') => {
       const conditionIds = [];
       const otherReasons = [];
-      
-      // Find the condition ID for the selected condition name
-      const conditionId = conditions.find(c => c.condition_name === selectedCondition)?.id;
-      
-      if (conditionId) {
-        conditionIds.push(conditionId);
+      const qtyBad = [];
+
+      // For equipment conditions
+      if (selectedCondition) {
+        conditionIds.push(selectedCondition);
         // If it's condition ID 6 (Other), add the other reason text, otherwise null
-        otherReasons.push(conditionId === '6' ? otherConditionText : null);
+        otherReasons.push(selectedCondition === '6' ? otherConditionText : null);
+        // Add quantity - if not provided or good condition (2), use '0'
+        qtyBad.push(selectedCondition === '2' ? '0' : (qty || '0'));
       }
 
       return {
         reservation_ids: [reservationId],
         condition_ids: conditionIds,
-        other_reasons: otherReasons
+        other_reasons: otherReasons,
+        qty_bad: qtyBad
       };
     };
 
     // Add venue conditions
     if (selectedTask.venue && venueCondition) {
-      if (selectedTask.venue.reservation_venue_id) {
+      const venueConditionId = conditions.find(c => c.condition_name === venueCondition)?.id;
+      if (selectedTask.venue.reservation_venue_id && venueConditionId) {
         conditionsPayload.conditions.venue = createConditionPayload(
-          venueCondition,
+          venueConditionId,
           otherVenueCondition,
           selectedTask.venue.reservation_venue_id
         );
@@ -321,9 +361,10 @@ const handleSubmitTask = async () => {
 
     // Add vehicle conditions
     if (selectedTask.vehicle && vehicleCondition) {
-      if (selectedTask.vehicle.reservation_vehicle_id) {
+      const vehicleConditionId = conditions.find(c => c.condition_name === vehicleCondition)?.id;
+      if (selectedTask.vehicle.reservation_vehicle_id && vehicleConditionId) {
         conditionsPayload.conditions.vehicle = createConditionPayload(
-          vehicleCondition,
+          vehicleConditionId,
           otherVehicleCondition,
           selectedTask.vehicle.reservation_vehicle_id
         );
@@ -336,12 +377,12 @@ const handleSubmitTask = async () => {
         conditionsPayload.conditions.equipment = createConditionPayload(
           equipmentCondition,
           otherEquipmentCondition,
-          selectedTask.equipment.reservation_equipment_id
+          selectedTask.equipment.reservation_equipment_id,
+          equipmentDefectQty
         );
       }
     }
 
-    // ... rest of the submit function code ...
     const conditionResponse = await axios.post('http://localhost/coc/gsd/personnel.php', conditionsPayload, {
       headers: {
         'Content-Type': 'application/json'
@@ -794,27 +835,34 @@ const handleSubmitTask = async () => {
                 <div className="flex justify-between items-center mb-4">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">Equipment Inspection</h3>
-                    <p className="text-sm text-gray-500">Equipment: {selectedTask.equipment.name}</p>
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <p>Equipment: {selectedTask.equipment.name}</p>
+                      <span className="text-gray-400">•</span>
+                      <p>Quantity: {selectedTask.equipment.quantity || '0'}</p>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <select
                       value={equipmentCondition}
-                      onChange={(e) => setEquipmentCondition(e.target.value)}
+                      onChange={handleEquipmentConditionChange}
                       className="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
                       <option value="">Select condition</option>
-                      {conditions.map((condition) => (
-                        <option key={condition.id} value={condition.condition_name}>
-                          {condition.condition_name}
-                        </option>
+                      {conditions
+                        .filter(condition => ['2', '3', '4', '6'].includes(condition.id))
+                        .map((condition) => (
+                          <option key={condition.id} value={condition.id}>
+                            {condition.condition_name}
+                          </option>
                       ))}
                     </select>
-                    {equipmentCondition === 'Other' && (
+                    {equipmentCondition && needsDefectQuantity(equipmentCondition) && (
                       <input
-                        type="text"
-                        value={otherEquipmentCondition}
-                        onChange={(e) => setOtherEquipmentCondition(e.target.value)}
-                        placeholder="Specify condition"
+                        type="number"
+                        min="1"
+                        value={equipmentDefectQty}
+                        onChange={handleEquipmentDefectQtyChange}
+                        placeholder="Enter quantity"
                         className="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     )}

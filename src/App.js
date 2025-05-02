@@ -138,9 +138,9 @@ const App = () => {
                         <Route path="/viewApproval" element={<ProtectedRoute allowedRoles={['Dean', 'Secretary']}><ViewApproval /></ProtectedRoute>} />
                         
                         {/* User Routes */}
-                        <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['Faculty/Staff']}><Dashboard /></ProtectedRoute>} />
-                        <Route path="/viewReserve" element={<ProtectedRoute allowedRoles={['Faculty/Staff']}><ViewReserve /></ProtectedRoute>} />
-                        <Route path="/addReservation" element={<ProtectedRoute allowedRoles={['Faculty/Staff']}><AddReservation /></ProtectedRoute>} />
+                        <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['Faculty/Staff', 'School Head']}><Dashboard /></ProtectedRoute>} />
+                        <Route path="/viewReserve" element={<ProtectedRoute allowedRoles={['Faculty/Staff', 'School Head']}><ViewReserve /></ProtectedRoute>} />
+                        <Route path="/addReservation" element={<ProtectedRoute allowedRoles={['Faculty/Staff', 'School Head']}><AddReservation /></ProtectedRoute>} />
                         
                         {/* Shared Routes (accessible by all authenticated users) */}
                         
