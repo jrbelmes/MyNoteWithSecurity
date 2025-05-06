@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog } from '@headlessui/react';
 import axios from 'axios';
-import { format, isSameDay, isPast, endOfDay, addDays, isBefore, isWithinInterval } from 'date-fns';
+import { format, isSameDay, isPast, endOfDay, addDays, isBefore, isWithinInterval, differenceInCalendarDays } from 'date-fns';
 import { toast } from 'react-toastify';
 import { DatePicker, TimePicker, Spin } from 'antd';
 import dayjs from 'dayjs';
@@ -133,6 +133,9 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
     if (selectedResource.type === 'equipment') {
       fetchEquipmentAvailability();
     } else {
+      // Ensure selectedResource.id is always an array
+      const itemIds = Array.isArray(selectedResource.id) ? selectedResource.id : [selectedResource.id].filter(Boolean);
+      
       fetchReservations();
     }
   }, [selectedResource]);
@@ -151,50 +154,56 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
   }, []);
 
   const fetchReservations = async () => {
-  setIsLoading(true);
-  try {
-    const itemIds = Array.isArray(selectedResource.id) ? selectedResource.id : [selectedResource.id];
-    
-    const response = await axios.post(
-      'http://localhost/coc/gsd/user.php',
-      {
-        operation: 'fetchAvailability',
+    setIsLoading(true);
+    try {
+      const itemIds = Array.isArray(selectedResource.id) ? selectedResource.id : [selectedResource.id].filter(Boolean);
+      
+      console.log('Fetching reservations with:', {
         itemType: selectedResource.type,
-        itemId: itemIds
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+        itemIds: itemIds
+      });
 
-    if (response.data.status === 'success') {
-      const formattedReservations = response.data.data.map(res => ({
-        id: res.reservation_id,
-        startDate: new Date(res.reservation_start_date),
-        endDate: new Date(res.reservation_end_date),
-        status: res.reservation_status_status_id,
-        isReserved: res.reservation_status_status_id === '6',
-        // Venue details
-        venueName: res.ven_name,
-        venueOccupancy: res.ven_occupancy,
-        // Vehicle details
-        vehicleMake: res.vehicle_make_name,
-        vehicleModel: res.vehicle_model_name,
-        vehicleLicense: res.vehicle_license,
-        // Common
-        resourceType: selectedResource.type,
-        title: res.reservation_title
-      }));
-      setReservations(formattedReservations);
+      const response = await axios.post(
+        'http://localhost/coc/gsd/user.php',
+        {
+          operation: 'fetchAvailability',
+          itemType: selectedResource.type,
+          itemId: itemIds
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      console.log('Reservations response:', response.data);
+
+      if (response.data.status === 'success') {
+        const formattedReservations = (response.data.data || []).map(res => ({
+          startDate: res.reservation_start_date,
+          endDate: res.reservation_end_date,
+          status: res.reservation_status_status_id,
+          isReserved: res.reservation_status_status_id === '6',
+          // Venue details
+          venueName: res.ven_name,
+          venueOccupancy: res.ven_occupancy,
+          // Vehicle details
+          vehicleMake: res.vehicle_make_name,
+          vehicleModel: res.vehicle_model_name,
+          vehicleLicense: res.vehicle_license,
+          // Common
+          resourceType: selectedResource.type,
+          title: res.reservation_title
+        }));
+        setReservations(formattedReservations);
+      }
+    } catch (error) {
+      toast.error('Failed to fetch reservations');
+    } finally {
+      setIsLoading(false);
     }
-  } catch (error) {
-    toast.error('Failed to fetch reservations');
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   const fetchEquipmentAvailability = async () => {
     setIsLoading(true);
@@ -254,6 +263,12 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
     });
   };
 
+  const isWithinSevenDays = (date, startDate) => {
+    if (!startDate || !date) return false;
+    const diffInDays = differenceInCalendarDays(date, startDate);
+    return diffInDays >= 0 && diffInDays <= 6;
+  };
+
   const handleDateClick = (date) => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -281,10 +296,31 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
         return;
       }
     }
+
+    // If we already have a start date selected
+    if (selectedStartDate && !selectedEndDate) {
+      // Check if the new date is within 7 days of the start date
+      if (!isWithinSevenDays(date, selectedStartDate)) {
+        toast.error('End date must be within 7 days of start date', {
+          position: 'top-center',
+          icon: '📅',
+          className: 'font-medium'
+        });
+        return;
+      }
+      // Check if the new date is before start date
+      if (isBefore(date, selectedStartDate)) {
+        toast.error('End date cannot be before start date', {
+          position: 'top-center',
+          icon: '❌',
+          className: 'font-medium'
+        });
+        return;
+      }
+    }
   
     // Check reservation status
     const status = getAvailabilityStatus(date, reservations);
-    
     
     // Check if date is a holiday
     const formattedDate = date.toISOString().split('T')[0];
@@ -308,11 +344,16 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
       return;
     }
     
-    // If checks pass, set the selected dates and open the modal
-    setSelectedStartDate(date);
-    setStartDate(date);
-    setEndDate(null);
-    setSelectedEndDate(null);
+    // Set the selected dates
+    if (!selectedStartDate) {
+      setSelectedStartDate(date);
+      setStartDate(date);
+      setEndDate(null);
+      setSelectedEndDate(null);
+    } else {
+      setSelectedEndDate(date);
+      setEndDate(date);
+    }
     
     // Set default times based on current time if it's today
     if (isSameDay(date, new Date())) {
@@ -390,33 +431,49 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
 
       // Filter equipment availability for this date
       const dayEquipment = equipmentAvailability.filter(item => {
-        const itemDate = new Date(item.startDate);
-        itemDate.setHours(0, 0, 0, 0);
-        return isSameDay(compareDate, itemDate);
+        const itemStartDate = new Date(item.startDate);
+        const itemStartDay = new Date(itemStartDate.getFullYear(), itemStartDate.getMonth(), itemStartDate.getDate());
+        const itemEndDate = new Date(item.endDate);
+        const itemEndDay = new Date(itemEndDate.getFullYear(), itemEndDate.getMonth(), itemEndDate.getDate());
+        
+        return compareDate >= itemStartDay && compareDate <= itemEndDay;
       });
 
       if (dayEquipment.length === 0) return 'available';
 
-      // Check if any equipment is completely unavailable for the whole day
+      // Check if any equipment is completely unavailable for the whole business day
       const hasCompletelyUnavailable = dayEquipment.some(item => {
         const itemStart = new Date(item.startDate);
         const itemEnd = new Date(item.endDate);
         
-        // Check if it spans the whole business day (5 AM to 7 PM)
-        const spansWholeDay = itemStart.getHours() <= 5 && itemEnd.getHours() >= 19;
-        return spansWholeDay && item.totalAvailable < item.requestedQuantity;
+        // Check if the reservation spans the whole business day
+        const startsBeforeOrAt5AM = itemStart.getHours() <= 5;
+        const endsAtOrAfter7PM = itemEnd.getHours() >= 19;
+        const spansWholeDay = startsBeforeOrAt5AM && endsAtOrAfter7PM;
+        
+        return spansWholeDay && (
+          parseInt(item.totalAvailable) < parseInt(item.requestedQuantity) ||
+          parseInt(item.totalAvailable) === 0
+        );
       });
 
       if (hasCompletelyUnavailable) return 'reserved';
 
+      // Check for partial availability
       const hasPartial = dayEquipment.some(item => {
         const itemStart = new Date(item.startDate);
         const itemEnd = new Date(item.endDate);
+        const totalAvailable = parseInt(item.totalAvailable);
+        const requestedQuantity = parseInt(item.requestedQuantity);
+        const currentQuantity = parseInt(item.currentQuantity);
 
-        return (item.totalAvailable < item.requestedQuantity && 
-                (itemStart.getHours() > 5 || itemEnd.getHours() < 19)) ||
-               (item.totalAvailable < parseInt(item.currentQuantity) && 
-                item.totalAvailable >= item.requestedQuantity);
+        return (
+          // Partial time range reservation
+          (totalAvailable < requestedQuantity && 
+            (itemStart.getHours() > 5 || itemEnd.getHours() < 19)) ||
+          // Partial quantity reservation
+          (totalAvailable < currentQuantity && totalAvailable >= requestedQuantity)
+        );
       });
 
       return hasPartial ? 'partial' : 'available';
@@ -483,10 +540,7 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
   return hasPartialReservations ? 'partial' : 'available';
 };
 
-// Add new function to get business hours status
 
-
-// Then update the renderCalendarGrid function to handle the status more safely
 const renderCalendarGrid = () => {
   const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
   const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
@@ -689,17 +743,41 @@ const renderCalendarGrid = () => {
     // For equipment resources
     if (selectedResource.type === 'equipment') {
       const relevantEquipment = equipmentAvailability.filter(item => {
-        const itemDate = new Date(item.startDate);
+        const itemStart = new Date(item.startDate);
         const itemEnd = new Date(item.endDate);
-        return isSameDay(date, itemDate) && 
-               hour >= itemDate.getHours() && 
-               hour < itemEnd.getHours();
+        const slotDate = new Date(date);
+        slotDate.setHours(hour, 0, 0, 0);
+      
+        // If it's a multi-day reservation
+        if (!isSameDay(itemStart, itemEnd)) {
+          const itemStartHour = itemStart.getHours();
+      
+          if (isWithinInterval(slotDate, { start: itemStart, end: itemEnd })) {
+            return hour >= itemStartHour && hour < itemEnd.getHours();
+          }
+        } else {
+          // Same day reservation
+          return isSameDay(slotDate, itemStart) &&
+                 hour >= itemStart.getHours() &&
+                 hour < itemEnd.getHours();
+        }
+      
+        return false;
       });
       
       // If no equipment is found for this time slot, it's available
       if (relevantEquipment.length === 0) {
         return 'available';
       }
+      
+      // If any fully booked equipment
+      if (relevantEquipment.some(item => !item.isPartial)) {
+        return 'reserved';
+      }
+      
+      // If only partials found
+      return 'partial';
+      
       
       // Check if any equipment has insufficient availability for the requested quantity
       const hasUnavailableEquipment = relevantEquipment.some(item => {
@@ -1469,7 +1547,7 @@ const checkConflicts = (attemptedStart, attemptedEnd) => {
             <>
               <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-xl mb-4 border border-red-100 dark:border-red-900/20">
                 <p className="font-medium text-red-800 dark:text-red-300 mb-2 flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-1.5">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-1.5">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                   </svg>
                   Your attempted booking:
@@ -1855,7 +1933,7 @@ const checkConflicts = (attemptedStart, attemptedEnd) => {
               className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 011.414 0L11.414 10l4.293 4.293a1 1 01-1.414 1.414z" clipRule="evenodd" />
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 011.414 0L10 8.586l4.293-4.293a1 1 011.414 0L11.414 10l4.293 4.293a1 1 01-1.414 1.414L11.414 10l4.293 4.293a1 1 01-1.414 1.414z" clipRule="evenodd" />
               </svg>
             </button>
           </div>
@@ -1869,7 +1947,7 @@ const checkConflicts = (attemptedStart, attemptedEnd) => {
               </div>
               <div className="mt-2 text-xs text-blue-600 dark:text-blue-400 flex items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0 1 16 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0 1 16 0zm-7-4a1 1 0 11-2 0 1 1 012 0zM9 9a1 1 000 2v3a1 1 001 1h1a1 1 100-2v-3a1 1 00-1-1H9z" clipRule="evenodd" />
                 </svg>
                 Business hours: 5:00 AM - 7:00 PM
               </div>
@@ -1884,7 +1962,8 @@ const checkConflicts = (attemptedStart, attemptedEnd) => {
                 onChange={(date) => setSelectedEndDate(date.toDate())}
                 disabledDate={(current) => {
                   return current < dayjs(selectedStartDate).startOf('day') ||
-                         current < dayjs().startOf('day');
+                         current < dayjs().startOf('day') ||
+                         !isWithinSevenDays(current.toDate(), selectedStartDate);
                 }}
               />
             </div>
@@ -1958,20 +2037,20 @@ const checkConflicts = (attemptedStart, attemptedEnd) => {
             <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg border border-gray-200 dark:border-gray-600/30 text-xs text-gray-600 dark:text-gray-400 space-y-1.5">
               <div className="flex items-start">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 01-1.414 0l-4-4a1 1 011.414-1.414L8 12.586l7.293-7.293a1 1 011.414 0z" clipRule="evenodd" />
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 010 1.414l-8 8a1 1 01-1.414 0l-4-4a1 1 011.414-1.414L8 12.586l7.293-7.293a1 1 011.414 1.414z" clipRule="evenodd" />
                 </svg>
                 <span>Select a time between 5:00 AM and 7:00 PM</span>
               </div>
               <div className="flex items-start">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 01-1.414 0l-4-4a1 1 011.414-1.414L8 12.586l7.293-7.293a1 1 011.414 0z" clipRule="evenodd" />
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 010 1.414l-8 8a1 1 01-1.414 0l-4-4a1 1 011.414-1.414L8 12.586l7.293-7.293a1 1 011.414 1.414z" clipRule="evenodd" />
                 </svg>
                 <span>End time must be after start time</span>
               </div>
               {selectedStartDate !== selectedEndDate && (
                 <div className="flex items-start">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 01-1.414 0l-4-4a1 1 011.414-1.414L8 12.586l7.293-7.293a1 1 011.414 0z" clipRule="evenodd" />
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 010 1.414l-8 8a1 1 01-1.414 0l-4-4a1 1 011.414-1.414L8 12.586l7.293-7.293a1 1 011.414 1.414z" clipRule="evenodd" />
                   </svg>
                   <span>You've selected a multi-day reservation</span>
                 </div>

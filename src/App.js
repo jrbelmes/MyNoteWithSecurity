@@ -39,6 +39,7 @@ import Checklists from './pages/Checklist';
 import Reports from './pages/Reports';
 import AccountSettings from './pages/accountSettings';
 import { SecureStorage } from './utils/encryption';
+import NotificationUser from './page_user/notification';
 
 
 export const ThemeContext = createContext();
@@ -84,7 +85,7 @@ const App = () => {
             '/viewReserve', '/addReservation', '/profile1',
             '/settings', '/calendar', '/chat', '/personnelDashboard',
             '/viewTask', '/Master', '/vehicleCategory', '/',
-            '/Checklist', '/chatAdmin', '/AccountSettings', '/chatAdmin', '/Reports',
+            '/Checklist', '/chatAdmin', '/AccountSettings', '/chatAdmin', '/Reports', '/notification',
         ];
 
         if (!validPaths.includes(location.pathname)) {
@@ -132,16 +133,16 @@ const App = () => {
                         <Route path="/AccountSettings" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><AccountSettings /></ProtectedRoute>} />
                                                             
                         {/* Dean/Secretary Routes */}
-                        <Route path="/deanDashboard" element={<ProtectedRoute allowedRoles={['Dean', 'Secretary']}><DeanDashboard /></ProtectedRoute>} />
-                        <Route path="/deanViewReserve" element={<ProtectedRoute allowedRoles={['Dean', 'Secretary']}><DeanViewReserve /></ProtectedRoute>} />
-                        <Route path="/deanAddReservation" element={<ProtectedRoute allowedRoles={['Dean', 'Secretary']}><DeanAddReservation /></ProtectedRoute>} />
-                        <Route path="/viewApproval" element={<ProtectedRoute allowedRoles={['Dean', 'Secretary']}><ViewApproval /></ProtectedRoute>} />
+                        <Route path="/deanDashboard" element={<ProtectedRoute allowedRoles={['Dean', 'Secretary', 'Department Head']}><DeanDashboard /></ProtectedRoute>} />
+                        <Route path="/deanViewReserve" element={<ProtectedRoute allowedRoles={['Dean', 'Secretary', 'Department Head']}><DeanViewReserve /></ProtectedRoute>} />
+                        <Route path="/deanAddReservation" element={<ProtectedRoute allowedRoles={['Dean', 'Secretary', 'Department Head']}><DeanAddReservation /></ProtectedRoute>} />
+                        <Route path="/viewApproval" element={<ProtectedRoute allowedRoles={['Dean', 'Secretary', 'Department Head']}><ViewApproval /></ProtectedRoute>} />
                         
                         {/* User Routes */}
-                        <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['Faculty/Staff', 'School Head']}><Dashboard /></ProtectedRoute>} />
-                        <Route path="/viewReserve" element={<ProtectedRoute allowedRoles={['Faculty/Staff', 'School Head']}><ViewReserve /></ProtectedRoute>} />
-                        <Route path="/addReservation" element={<ProtectedRoute allowedRoles={['Faculty/Staff', 'School Head']}><AddReservation /></ProtectedRoute>} />
-                        
+                        <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['Faculty/Staff', 'School Head', 'SBO PRESIDENT', 'CSG PRESIDENT']}><Dashboard /></ProtectedRoute>} />
+                        <Route path="/viewReserve" element={<ProtectedRoute allowedRoles={['Faculty/Staff', 'School Head', 'SBO PRESIDENT', 'CSG PRESIDENT']}><ViewReserve /></ProtectedRoute>} />
+                        <Route path="/addReservation" element={<ProtectedRoute allowedRoles={['Faculty/Staff', 'School Head', 'SBO PRESIDENT', 'CSG PRESIDENT']}><AddReservation /></ProtectedRoute>} />
+                        <Route path="/notification" element={<ProtectedRoute allowedRoles={['Faculty/Staff', 'School Head', 'SBO PRESIDENT', 'CSG PRESIDENT']}><NotificationUser /></ProtectedRoute>} />
                         {/* Shared Routes (accessible by all authenticated users) */}
                         
                         <Route path="/calendar" element={<ProtectedRoute allowedRoles={['Admin', 'Dean', 'Secretary', 'Faculty/Staff']}><Calendar /></ProtectedRoute>} />

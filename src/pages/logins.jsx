@@ -564,9 +564,10 @@ function Logins() {
                                 setTimeout(() => navigateTo("/adminDashboard"), 100);
                                 break;
                             case "Dean":
-                                notify("Dean Login Successful");
-                                setTimeout(() => navigateTo("/deanDashboard"), 100);
-                                break;
+                            case "Department Head":
+                                    notify("Dean Login Successful");
+                                    setTimeout(() => navigateTo("/deanDashboard"), 100);
+                                    break;
                             default:
                                 notify("User Login Successful");
                                 setTimeout(() => navigateTo("/dashboard"), 100);
@@ -644,9 +645,11 @@ function Logins() {
                             setTimeout(() => navigateTo("/adminDashboard"), 100);
                             break;
                         case "Dean":
+                        case "Department Head":
                             notify("Dean Login Successful");
                             setTimeout(() => navigateTo("/deanDashboard"), 100);
                             break;
+
                         default:
                             notify("User Login Successful");
                             setTimeout(() => navigateTo("/dashboard"), 100);

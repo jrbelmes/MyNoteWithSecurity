@@ -196,6 +196,15 @@ const Sidebar = () => {
               />
 
               <MiniSidebarItem 
+                icon={FaBell} 
+                text="Notifications" 
+                link="/notification" 
+                active={activeItem === '/notification'}
+                isExpanded={isDesktopSidebarOpen}
+                badge={unreadMessages}
+              />
+
+              <MiniSidebarItem 
                 icon={FaComments} 
                 text="Chat" 
                 link="/chat" 

@@ -417,8 +417,8 @@ const Faculty = () => {
                         <FontAwesomeIcon icon={faUser} className="text-2xl text-green-600" />
                     </div>
                     <div>
-                        <h2 className="text-2xl font-bold text-gray-800 m-0">Faculty Management</h2>
-                        <p className="text-gray-500 text-sm mt-1">Manage your faculty members here</p>
+                        <h2 className="text-2xl font-bold text-gray-800 m-0">User Management</h2>
+                        <p className="text-gray-500 text-sm mt-1">Manage your Users here</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-4">

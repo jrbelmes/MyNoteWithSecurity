@@ -60,6 +60,17 @@ const ReservationRequests = () => {
     const user_level_id = localStorage.getItem('user_level_id');
     const encryptedUrl = SecureStorage.getLocalItem("url");
 
+    const [declineReason, setDeclineReason] = useState('');
+    const [isDeclineReasonModalOpen, setIsDeclineReasonModalOpen] = useState(false);
+    const [customReason, setCustomReason] = useState('');
+
+    const declineReasons = [
+        { value: 'schedule_conflict', label: 'Schedule Conflict' },
+        { value: 'resource_unavailable', label: 'Resource Unavailable' },
+        { value: 'invalid_request', label: 'Invalid Request' },
+        { value: 'other', label: 'Other' }
+    ];
+
     useEffect(() => {
         const encryptedUserLevel = SecureStorage.getSessionItem("user_level_id"); 
         console.log("this is encryptedUserLevel", encryptedUserLevel);
@@ -274,8 +285,12 @@ const ReservationRequests = () => {
                 reservation_id: currentRequest.reservation_id,
                 is_accepted: true,
                 user_id: SecureStorage.getSessionItem("user_id"),
-                override_lower_priority: false
+                override_lower_priority: false,
+                notification_message: "Your Reservation Request Has Been Approved By GSD",
+                notification_user_id: reservationDetails.reservation_user_id
             });
+
+            console.log(response.data);
 
             if (response.data?.status === 'success') {
                 toast.success('Reservation accepted successfully!', {
@@ -344,11 +359,16 @@ const ReservationRequests = () => {
     const handleDecline = async () => {
         setIsDeclining(true);
         try {
+            const finalReason = declineReason === 'other' ? customReason : 
+                declineReasons.find(r => r.value === declineReason)?.label || '';
+
             const response = await axios.post(`${encryptedUrl}/process_reservation.php`, {
                 operation: 'handleRequest',
                 reservation_id: currentRequest.reservation_id,
                 is_accepted: false,
-                user_id: SecureStorage.getSessionItem('user_id')
+                user_id: SecureStorage.getSessionItem('user_id'),
+                notification_message: `Your reservation request has been declined. Reason: ${finalReason}`,
+                notification_user_id: reservationDetails.user_id
             }, {
                 headers: {
                     'Content-Type': 'application/json'
@@ -361,8 +381,11 @@ const ReservationRequests = () => {
                     duration: 3000,
                 });
                 await fetchReservations();
-                setIsDeclineModalOpen(false); // Close the decline modal
-                setIsDetailModalOpen(false);  // Also close the detail modal
+                setIsDeclineReasonModalOpen(false);
+                setIsDeclineModalOpen(false);
+                setIsDetailModalOpen(false);
+                setDeclineReason('');
+                setCustomReason('');
             } else {
                 toast.error('Failed to decline reservation.');
             }
@@ -725,17 +748,18 @@ const ReservationRequests = () => {
                     onDecline={() => setIsDeclineModalOpen(true)}
                     isAccepting={isAccepting}
                     isDeclining={isDeclining}
+                    setIsDeclineReasonModalOpen={setIsDeclineReasonModalOpen}
                 />
 
-                {/* Confirmation Modal for Declining */}
+                {/* Decline Reason Modal */}
                 <Modal
-                    title="Confirm Decline"
-                    visible={isDeclineModalOpen}
-                    onCancel={() => setIsDeclineModalOpen(false)}
+                    title="Select Decline Reason"
+                    visible={isDeclineReasonModalOpen}
+                    onCancel={() => setIsDeclineReasonModalOpen(false)}
                     maskClosable={false}
-                    zIndex={1001}
+                    zIndex={1002}
                     footer={[
-                        <Button key="back" onClick={() => setIsDeclineModalOpen(false)}>
+                        <Button key="back" onClick={() => setIsDeclineReasonModalOpen(false)}>
                             Cancel
                         </Button>,
                         <Button 
@@ -743,15 +767,34 @@ const ReservationRequests = () => {
                             type="primary" 
                             danger
                             loading={isDeclining}
-                            onClick={() => {
-                                handleDecline();
-                            }}
+                            onClick={handleDecline}
+                            disabled={!declineReason || (declineReason === 'other' && !customReason)}
                         >
                             Decline
                         </Button>,
                     ]}
                 >
-                    <p>Are you sure you want to decline this reservation? This action cannot be undone.</p>
+                    <Radio.Group 
+                        onChange={(e) => setDeclineReason(e.target.value)} 
+                        value={declineReason}
+                    >
+                        <Space direction="vertical">
+                            {declineReasons.map(reason => (
+                                <Radio key={reason.value} value={reason.value}>
+                                    {reason.label}
+                                </Radio>
+                            ))}
+                        </Space>
+                    </Radio.Group>
+                    {declineReason === 'other' && (
+                        <Input.TextArea 
+                            rows={4} 
+                            value={customReason} 
+                            onChange={(e) => setCustomReason(e.target.value)} 
+                            placeholder="Enter custom reason"
+                            className="mt-4"
+                        />
+                    )}
                 </Modal>
 
                 {/* Priority Conflict Modal */}
@@ -791,7 +834,7 @@ const formatDateRange = (startDate, endDate) => {
     }
 };
 
-const DetailModal = ({ visible, onClose, reservationDetails, setReservationDetails, onAccept, onDecline, isAccepting, isDeclining }) => {
+const DetailModal = ({ visible, onClose, reservationDetails, setReservationDetails, onAccept, onDecline, isAccepting, isDeclining, setIsDeclineReasonModalOpen }) => {
     const [tripTicketApproved, setTripTicketApproved] = useState(false);
     const encryptedUrl = SecureStorage.getLocalItem("url");
     
@@ -893,7 +936,9 @@ const DetailModal = ({ visible, onClose, reservationDetails, setReservationDetai
             'COO': 4,
             'School Head': 3,
             'Dean': 2,
-            'Faculty&Staff': 1
+            'CSG': 2,
+            'Faculty&Staff': 1,
+            'SBO PRESIDENT': 1
         };
 
         // First check if there are any actual resource conflicts
@@ -977,7 +1022,7 @@ const DetailModal = ({ visible, onClose, reservationDetails, setReservationDetai
             return [
                 <Button key="decline" danger loading={isDeclining} onClick={(e) => {
                     e.stopPropagation();
-                    onDecline();
+                    setIsDeclineReasonModalOpen(true);
                 }} size="large" icon={<CloseCircleOutlined />}>
                     Decline
                 </Button>,

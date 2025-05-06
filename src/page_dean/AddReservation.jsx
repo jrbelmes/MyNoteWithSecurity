@@ -383,7 +383,7 @@ useEffect(() => {
         try {
           const encryptedUserLevel = SecureStorage.getSessionItem("user_level_id"); 
           console.log("this is encryptedUserLevel", encryptedUserLevel);
-          if (encryptedUserLevel !== '5' && encryptedUserLevel !== '6') {
+          if (encryptedUserLevel !== '5' && encryptedUserLevel !== '6' && encryptedUserLevel !== '18') {
               localStorage.clear();
               navigate('/gsd');
           }
@@ -2519,11 +2519,19 @@ const renderStepContent = () => {
                 .filter(([_, qty]) => qty > 0)
                 .map(([id, qty]) => ({
                   id: parseInt(id),
-                  quantity: qty // Add the quantity here
+                  quantity: qty
                 }))
-            : formData.resourceType === 'venue' 
-              ? formData.venue 
-              : selectedModels,
+            : formData.resourceType === 'venue'
+              ? Array.isArray(formData.venue) 
+                ? formData.venue.map(id => parseInt(id))
+                : formData.venue 
+                  ? [parseInt(formData.venue)]
+                  : []
+              : Array.isArray(selectedModels)
+                ? selectedModels.map(id => parseInt(id))
+                : selectedModels
+                  ? [parseInt(selectedModels)]
+                  : []
         }}
       />
     ),

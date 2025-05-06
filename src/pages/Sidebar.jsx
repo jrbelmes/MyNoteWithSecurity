@@ -283,7 +283,7 @@ const Sidebar = () => {
 
               <MiniSidebarItem 
                 icon={FaUserCircle} 
-                text="Faculty" 
+                text="Users" 
                 link="/Faculty" 
                 active={activeItem === '/Faculty'}
                 isExpanded={isDesktopSidebarOpen}

@@ -50,7 +50,7 @@ const ViewReserve = () => {
     useEffect(() => {
               const encryptedUserLevel = SecureStorage.getSessionItem("user_level_id"); 
               console.log("this is encryptedUserLevel", encryptedUserLevel);
-              if (encryptedUserLevel !== '5' && encryptedUserLevel !== '6') {
+              if (encryptedUserLevel !== '5' && encryptedUserLevel !== '6' && encryptedUserLevel !== '18') {
                   localStorage.clear();
                   navigate('/gsd');
               }

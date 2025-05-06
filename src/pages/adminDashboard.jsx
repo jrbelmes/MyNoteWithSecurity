@@ -156,6 +156,7 @@ const Dashboard = () => {
     const [recentReservationModalOpen, setRecentReservationModalOpen] = useState(false);
     const [releaseModalOpen, setReleaseModalOpen] = useState(false);
     const [returnConfirmation, setReturnConfirmation] = useState({ show: false, success: false, message: '' });
+    const [inUseFacilities, setInUseFacilities] = useState([]);
 
     const [requestsPage, setRequestsPage] = useState(1);
     const [tasksPage, setTasksPage] = useState(1);
@@ -167,6 +168,32 @@ const Dashboard = () => {
     const [reservationData, setReservationData] = useState([]);
     const [timeFilter, setTimeFilter] = useState('365');
     const encryptedUrl = SecureStorage.getLocalItem("url");
+
+    // Function to check if current time is within reservation period
+    const isTimeInRange = (startDate, endDate) => {
+        const currentDate = new Date();
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        return currentDate >= start && currentDate <= end;
+    };
+
+    const fetchInUseFacilities = useCallback(async () => {
+        try {
+            const response = await axios.post(`${encryptedUrl}/user.php`, {
+                operation: 'getInUse'
+            });
+
+            if (response.data && response.data.status === 'success') {
+                setInUseFacilities(response.data.data);
+            } else {
+                console.error('Failed to fetch in-use facilities');
+            }
+        } catch (error) {
+            console.error('Error fetching in-use facilities:', error);
+        }
+    }, [encryptedUrl]);
+
+
 
     // Utility function for pagination
     const paginateItems = (items, page, perPage) => {
@@ -527,136 +554,25 @@ const Dashboard = () => {
         }
     };
 
-    // Add sample data for reservation chart
-    const getExampleReservationData = (period) => {
-        const data = [];
-        
-        if (period === '7') {
-            // Last 7 days data
-            data.push(
-                { date: '2023-06-15', status: 'Reserved', count: 8 },
-                { date: '2023-06-15', status: 'Declined', count: 3 },
-                { date: '2023-06-16', status: 'Reserved', count: 12 },
-                { date: '2023-06-16', status: 'Declined', count: 4 },
-                { date: '2023-06-17', status: 'Reserved', count: 9 },
-                { date: '2023-06-17', status: 'Declined', count: 2 },
-                { date: '2023-06-18', status: 'Reserved', count: 14 },
-                { date: '2023-06-18', status: 'Declined', count: 5 },
-                { date: '2023-06-19', status: 'Reserved', count: 11 },
-                { date: '2023-06-19', status: 'Declined', count: 3 },
-                { date: '2023-06-20', status: 'Reserved', count: 7 },
-                { date: '2023-06-20', status: 'Declined', count: 2 },
-                { date: '2023-06-21', status: 'Reserved', count: 10 },
-                { date: '2023-06-21', status: 'Declined', count: 4 }
-            );
-        } else if (period === '30') {
-            // Sample data for 30 days - showing just a few points for brevity
-            data.push(
-                { date: '2023-05-23', status: 'Reserved', count: 8 },
-                { date: '2023-05-23', status: 'Declined', count: 3 },
-                { date: '2023-05-30', status: 'Reserved', count: 12 },
-                { date: '2023-05-30', status: 'Declined', count: 4 },
-                { date: '2023-06-06', status: 'Reserved', count: 15 },
-                { date: '2023-06-06', status: 'Declined', count: 6 },
-                { date: '2023-06-13', status: 'Reserved', count: 18 },
-                { date: '2023-06-13', status: 'Declined', count: 5 },
-                { date: '2023-06-20', status: 'Reserved', count: 14 },
-                { date: '2023-06-20', status: 'Declined', count: 7 }
-            );
-        } else if (period === '90') {
-            // Sample weekly data for 90 days
-            data.push(
-                { date: 'Week 1 of Apr', status: 'Reserved', count: 22 },
-                { date: 'Week 1 of Apr', status: 'Declined', count: 8 },
-                { date: 'Week 2 of Apr', status: 'Reserved', count: 28 },
-                { date: 'Week 2 of Apr', status: 'Declined', count: 12 },
-                { date: 'Week 3 of Apr', status: 'Reserved', count: 32 },
-                { date: 'Week 3 of Apr', status: 'Declined', count: 10 },
-                { date: 'Week 4 of Apr', status: 'Reserved', count: 25 },
-                { date: 'Week 4 of Apr', status: 'Declined', count: 9 },
-                { date: 'Week 1 of May', status: 'Reserved', count: 30 },
-                { date: 'Week 1 of May', status: 'Declined', count: 11 },
-                { date: 'Week 2 of May', status: 'Reserved', count: 35 },
-                { date: 'Week 2 of May', status: 'Declined', count: 14 },
-                { date: 'Week 3 of May', status: 'Reserved', count: 42 },
-                { date: 'Week 3 of May', status: 'Declined', count: 15 },
-                { date: 'Week 4 of May', status: 'Reserved', count: 38 },
-                { date: 'Week 4 of May', status: 'Declined', count: 12 },
-                { date: 'Week 1 of Jun', status: 'Reserved', count: 36 },
-                { date: 'Week 1 of Jun', status: 'Declined', count: 10 },
-                { date: 'Week 2 of Jun', status: 'Reserved', count: 40 },
-                { date: 'Week 2 of Jun', status: 'Declined', count: 13 },
-                { date: 'Week 3 of Jun', status: 'Reserved', count: 45 },
-                { date: 'Week 3 of Jun', status: 'Declined', count: 16 }
-            );
-        } else {
-            // Yearly data
-            data.push(
-                { date: 'January', status: 'Reserved', count: 65 },
-                { date: 'January', status: 'Declined', count: 22 },
-                { date: 'February', status: 'Reserved', count: 72 },
-                { date: 'February', status: 'Declined', count: 28 },
-                { date: 'March', status: 'Reserved', count: 80 },
-                { date: 'March', status: 'Declined', count: 32 },
-                { date: 'April', status: 'Reserved', count: 95 },
-                { date: 'April', status: 'Declined', count: 38 },
-                { date: 'May', status: 'Reserved', count: 120 },
-                { date: 'May', status: 'Declined', count: 45 },
-                { date: 'June', status: 'Reserved', count: 110 },
-                { date: 'June', status: 'Declined', count: 40 },
-                { date: 'July', status: 'Reserved', count: 105 },
-                { date: 'July', status: 'Declined', count: 35 },
-                { date: 'August', status: 'Reserved', count: 125 },
-                { date: 'August', status: 'Declined', count: 42 },
-                { date: 'September', status: 'Reserved', count: 135 },
-                { date: 'September', status: 'Declined', count: 48 },
-                { date: 'October', status: 'Reserved', count: 145 },
-                { date: 'October', status: 'Declined', count: 52 },
-                { date: 'November', status: 'Reserved', count: 160 },
-                { date: 'November', status: 'Declined', count: 58 },
-                { date: 'December', status: 'Reserved', count: 180 },
-                { date: 'December', status: 'Declined', count: 65 }
-            );
-        }
-        
-        return data;
-    };
-
-    const fetchReservationChartData = useCallback(async () => { 
-        try {
-            // Show loading state if needed
-            setReservationData([]); // Clear existing data to show loading state
-            
-            // Use example data directly for this demo
-            // In production, this would be replaced with actual API calls
-            setTimeout(() => {
-                const exampleData = getExampleReservationData(timeFilter);
-                setReservationData(exampleData);
-            }, 500); // Simulating API delay
-            
-            /*
-            // This is the original API call that would be used in production
-            const response = await axios.post('http://localhost/coc/gsd/get_totals.php', {
-                operation: 'fetchReservedAndDeclinedReservations'
-            });
-
-            if (response.data.status === 'success') {
-                const data = processChartData(response.data.data, timeFilter);
-                setReservationData(data);
-            } else {
-                setReservationData(generateDefaultData(timeFilter));
-            }
-            */
-        } catch (error) {
-            console.error('Error fetching chart data:', error);
-            // Use example data if API fails
-            setReservationData(getExampleReservationData(timeFilter));
-        }
-    }, [timeFilter]);
-
     useEffect(() => {
-        fetchReservationChartData();
-    }, [timeFilter, fetchReservationChartData]);
+        if (!loading) {
+            fetchVenues();
+            fetchVehicles();
+            fetchEquipment();
+            fetchReservations();
+            fetchReleaseFacilities();
+            fetchPersonnel();
+            fetchReturnFacilities();
+            fetchTotals();
+            fetchRequest();
+            fetchCompletedTask();
+            fetchInUseFacilities(); // Add this line
+        }
+    }, [loading, fetchVenues, fetchVehicles, fetchEquipment, fetchReservations, 
+        fetchReleaseFacilities, fetchReturnFacilities, fetchRequest, fetchCompletedTask, 
+        fetchPersonnel, fetchInUseFacilities]);
+
+    // Add sample data for reservation chart
 
     const transformReservationData = (data) => {
         if (!data || data.length === 0) return { labels: [], datasets: [] };
@@ -736,6 +652,34 @@ const Dashboard = () => {
             animateRotate: true,
             animateScale: true
         }
+    };
+
+    const isReservationActive = (startDate, endDate) => {
+        const now = new Date();
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        return now >= start && now <= end;
+    };
+
+    const getReservationStatusBadge = (startDate, endDate) => {
+        const now = new Date();
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        
+        if (now < start) {
+            return (
+                <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                    Upcoming
+                </span>
+            );
+        } else if (now >= start && now <= end) {
+            return (
+                <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                    Ongoing
+                </span>
+            );
+        }
+        return null;
     };
 
     if (loading) {
@@ -837,56 +781,8 @@ const Dashboard = () => {
                                 color="bg-red-500"
                             />
                         </div>
-                        {/* Top Row with Reservation Activity and Active Reservations */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            {/* Reservation Activity Chart */}
-                            <motion.div
-                                variants={containerVariants}
-                                initial="hidden"
-                                animate="visible" 
-                                className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg dark:bg-gray-900 overflow-hidden border border-green-100 dark:border-green-900"
-                                style={{
-                                    background: `linear-gradient(to bottom, ${darkMode ? '#1f2937' : '#f8fafc'}, ${darkMode ? '#111827' : '#ffffff'})`,
-                                    backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23${darkMode ? '4b5563' : 'e2e8f0'}' fill-opacity='0.15'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-                                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'
-                                }}
-                            >
-                                <div className="p-5">
-                                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-                                        <div className="flex items-center">
-                                            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-teal-100 dark:bg-teal-900 mr-3">
-                                                <FaChartLine className="text-teal-600 dark:text-teal-400" />
-                                            </div>
-                                            <div>
-                                                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Reservation Activity</h2>
-                                                <p className="text-sm text-gray-500 dark:text-gray-400">Monitoring reservation trends</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center mt-4 sm:mt-0 space-x-3">
-                                            <Select
-                                                defaultValue="365"
-                                                style={{ width: 130, borderRadius: '0.375rem' }}
-                                                onChange={setTimeFilter}
-                                                options={[
-                                                    { value: '7', label: 'Last 7 Days' },
-                                                    { value: '30', label: 'Last 30 Days' },
-                                                    { value: '90', label: 'Last 90 Days' },
-                                                    { value: '365', label: 'Yearly' },
-                                                ]}
-                                            />
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-md" style={{ minHeight: '280px' }}>
-                                        <Doughnut 
-                                            data={transformReservationData(reservationData)}
-                                            options={chartOptions}
-                                            height={250}
-                                        />
-                                    </div>
-                                </div>
-                            </motion.div>
-
+                        {/* Top Row with Active Reservations only */}
+                        <div className="grid grid-cols-1 gap-6">
                             {/* Active Reservations Section */}
                             <motion.div
                                 variants={containerVariants}
@@ -908,10 +804,12 @@ const Dashboard = () => {
                                             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                                                 <thead className="bg-gray-50 dark:bg-gray-700">
                                                     <tr>
-                                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Reservation</th>
+                                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Title</th>
+                                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Description</th>
                                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Requestor</th>
+                                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Department</th>
+                                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Schedule</th>
                                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Details</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
@@ -921,25 +819,44 @@ const Dashboard = () => {
                                                             variants={itemVariants}
                                                             className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                                                         >
-                                                            <td className="px-4 py-3 whitespace-nowrap">
-                                                                <div className="text-sm font-medium text-gray-900 dark:text-white">{reservation.reservation_form_name || 'N/A'}</div>
-                                                                <div className="text-xs text-gray-500 dark:text-gray-400">{formatDate(reservation.reservation_start_date)}</div>
+                                                            <td className="px-4 py-3">
+                                                                <div className="text-sm font-medium text-gray-900 dark:text-white">{reservation.reservation_title}</div>
                                                             </td>
-                                                            <td className="px-4 py-3 whitespace-nowrap">
-                                                                <div className="text-sm text-gray-500 dark:text-gray-300">{reservation.requestor_name || 'N/A'}</div>
+                                                            <td className="px-4 py-3">
+                                                                <div className="text-sm text-gray-500 dark:text-gray-300">{reservation.reservation_description}</div>
                                                             </td>
-                                                            <td className="px-4 py-3 whitespace-nowrap">
-                                                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusClass(reservation.status_name)}`}>
-                                                                    {reservation.status_name || 'N/A'}
-                                                                </span>
+                                                            <td className="px-4 py-3">
+                                                                <div className="text-sm text-gray-500 dark:text-gray-300">{reservation.user_full_name}</div>
                                                             </td>
-                                                            <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
-                                                                <button
-                                                                    onClick={() => fetchReservationDetails(reservation.reservation_id)}
-                                                                    className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
-                                                                >
-                                                                    <FaEye />
-                                                                </button>
+                                                            <td className="px-4 py-3">
+                                                                <div className="text-sm text-gray-500 dark:text-gray-300">{reservation.department_name}</div>
+                                                            </td>
+                                                            <td className="px-4 py-3">
+                                                                <div className="text-sm text-gray-500 dark:text-gray-300">
+                                                                    {new Date(reservation.reservation_start_date).toLocaleString('en-US', {
+                                                                        month: 'short',
+                                                                        day: 'numeric',
+                                                                        hour: 'numeric',
+                                                                        minute: '2-digit',
+                                                                        hour12: true
+                                                                    })}
+                                                                    <br />
+                                                                    to
+                                                                    <br />
+                                                                    {new Date(reservation.reservation_end_date).toLocaleString('en-US', {
+                                                                        month: 'short',
+                                                                        day: 'numeric',
+                                                                        hour: 'numeric',
+                                                                        minute: '2-digit',
+                                                                        hour12: true
+                                                                    })}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 py-3">
+                                                                {getReservationStatusBadge(
+                                                                    reservation.reservation_start_date,
+                                                                    reservation.reservation_end_date
+                                                                )}
                                                             </td>
                                                         </motion.tr>
                                                     ))}
@@ -956,73 +873,129 @@ const Dashboard = () => {
                             </motion.div>
                         </div>
 
-                        {/* Facility Usage Lists */}
+                        {/* In Use Facility Lists */}
                         <motion.div
                             variants={containerVariants}
                             initial="hidden"
                             animate="visible" 
                             className="grid grid-cols-1 lg:grid-cols-3 gap-6"
                         >
-                            {/* Venue Usage List */}
+                            {/* Venues In Use */}
                             <motion.div variants={itemVariants} className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg dark:bg-gray-800/90 overflow-hidden border border-green-100 dark:border-green-900">
                                 <div className="bg-gradient-to-r from-green-500 to-green-700 p-4 flex justify-between items-center">
                                     <h2 className="text-white text-lg font-semibold flex items-center">
-                                        <FaBuilding className="mr-2" /> Venue Usage
+                                        <FaBuilding className="mr-2" /> Venues In Use
                                     </h2>
                                     <div className="bg-white/20 px-2 py-1 rounded text-xs font-medium text-white">
-                                        {venues.length} Total
+                                        {inUseFacilities.filter(facility => facility.resource_type === 'venue').length} Active
                                     </div>
                                 </div>
-                                <div className="divide-y divide-gray-100 dark:divide-gray-700 max-h-80 overflow-y-auto">
-                                    <FacilityList 
-                                        items={venues} 
-                                        type="venue" 
-                                        nameKey="venue_name" 
-                                        idKey="venue_id" 
-                                        ongoingReservations={ongoingReservations}
-                                    />
+                                <div className="p-4 divide-y divide-gray-100 dark:divide-gray-700">
+                                    {inUseFacilities.filter(facility => facility.resource_type === 'venue').map((facility, index) => (
+                                        <div key={index} className="py-3">
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <h3 className="text-sm font-medium text-gray-900 dark:text-white">{facility.resource_name}</h3>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400">Currently in use by {facility.user_full_name}</p>
+                                                </div>
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                                                    In Use
+                                                </span>
+                                            </div>
+                                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Until {new Date(facility.reservation_end_date).toLocaleTimeString('en-US', {
+                                                hour: 'numeric',
+                                                minute: '2-digit',
+                                                hour12: true
+                                            })}</p>
+                                        </div>
+                                    ))}
+                                    {inUseFacilities.filter(facility => facility.resource_type === 'venue').length === 0 && (
+                                        <div className="text-center py-6">
+                                            <FaBuilding className="mx-auto text-gray-300 dark:text-gray-600 text-4xl mb-2" />
+                                            <p className="text-gray-500 dark:text-gray-400">No venues currently in use</p>
+                                        </div>
+                                    )}
                                 </div>
                             </motion.div>
 
-                            {/* Vehicle Usage List */}
+                            {/* Vehicles In Use */}
                             <motion.div variants={itemVariants} className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg dark:bg-gray-800/90 overflow-hidden border border-green-100 dark:border-green-900">
                                 <div className="bg-gradient-to-r from-blue-500 to-blue-700 p-4 flex justify-between items-center">
                                     <h2 className="text-white text-lg font-semibold flex items-center">
-                                        <FaCar className="mr-2" /> Vehicle Usage
+                                        <FaCar className="mr-2" /> Vehicles In Use
                                     </h2>
                                     <div className="bg-white/20 px-2 py-1 rounded text-xs font-medium text-white">
-                                        {vehicles.length} Total
+                                        {inUseFacilities.filter(facility => facility.resource_type === 'vehicle').length} Active
                                     </div>
                                 </div>
-                                <div className="divide-y divide-gray-100 dark:divide-gray-700 max-h-80 overflow-y-auto">
-                                    <FacilityList 
-                                        items={vehicles} 
-                                        type="vehicle" 
-                                        nameKey="vehicle_name" 
-                                        idKey="vehicle_id" 
-                                        ongoingReservations={ongoingReservations}
-                                    />
+                                <div className="p-4 divide-y divide-gray-100 dark:divide-gray-700">
+                                    {inUseFacilities.filter(facility => facility.resource_type === 'vehicle').map((facility, index) => (
+                                        <div key={index} className="py-3">
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <h3 className="text-sm font-medium text-gray-900 dark:text-white">{facility.resource_name}</h3>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400">Driven by {facility.user_full_name}</p>
+                                                </div>
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                                    On Trip
+                                                </span>
+                                            </div>
+                                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Expected return: {new Date(facility.reservation_end_date).toLocaleTimeString('en-US', {
+                                                hour: 'numeric',
+                                                minute: '2-digit',
+                                                hour12: true
+                                            })}</p>
+                                        </div>
+                                    ))}
+                                    {inUseFacilities.filter(facility => facility.resource_type === 'vehicle').length === 0 && (
+                                        <div className="text-center py-6">
+                                            <FaCar className="mx-auto text-gray-300 dark:text-gray-600 text-4xl mb-2" />
+                                            <p className="text-gray-500 dark:text-gray-400">No vehicles currently in use</p>
+                                        </div>
+                                    )}
                                 </div>
                             </motion.div>
 
-                            {/* Equipment Usage List */}
+                            {/* Equipment In Use */}
                             <motion.div variants={itemVariants} className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg dark:bg-gray-800/90 overflow-hidden border border-green-100 dark:border-green-900">
                                 <div className="bg-gradient-to-r from-purple-500 to-purple-700 p-4 flex justify-between items-center">
                                     <h2 className="text-white text-lg font-semibold flex items-center">
-                                        <FaTools className="mr-2" /> Equipment Usage
+                                        <FaTools className="mr-2" /> Equipment In Use
                                     </h2>
                                     <div className="bg-white/20 px-2 py-1 rounded text-xs font-medium text-white">
-                                        {equipment.length} Total
+                                        {inUseFacilities.filter(facility => facility.resource_type === 'equipment').length} Active
                                     </div>
                                 </div>
-                                <div className="divide-y divide-gray-100 dark:divide-gray-700 max-h-80 overflow-y-auto">
-                                    <FacilityList 
-                                        items={equipment} 
-                                        type="equipment" 
-                                        nameKey="equipment_name" 
-                                        idKey="equipment_id" 
-                                        ongoingReservations={ongoingReservations}
-                                    />
+                                <div className="p-4 divide-y divide-gray-100 dark:divide-gray-700">
+                                    {inUseFacilities.filter(facility => facility.resource_type === 'equipment').map((facility, index) => (
+                                        <div key={index} className="py-3">
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <div className="flex items-center space-x-2">
+                                                        <h3 className="text-sm font-medium text-gray-900 dark:text-white">{facility.resource_name}</h3>
+                                                        <span className="bg-purple-100 text-purple-800 text-xs px-2 py-0.5 rounded-full dark:bg-purple-900 dark:text-purple-200">
+                                                            Qty: {facility.quantity || 1}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400">Used by {facility.user_full_name}</p>
+                                                </div>
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                                                    In Use
+                                                </span>
+                                            </div>
+                                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Expected return: {new Date(facility.reservation_end_date).toLocaleTimeString('en-US', {
+                                                hour: 'numeric',
+                                                minute: '2-digit',
+                                                hour12: true
+                                            })}</p>
+                                        </div>
+                                    ))}
+                                    {inUseFacilities.filter(facility => facility.resource_type === 'equipment').length === 0 && (
+                                        <div className="text-center py-6">
+                                            <FaTools className="mx-auto text-gray-300 dark:text-gray-600 text-4xl mb-2" />
+                                            <p className="text-gray-500 dark:text-gray-400">No equipment currently in use</p>
+                                        </div>
+                                    )}
                                 </div>
                             </motion.div>
                         </motion.div>
@@ -1203,170 +1176,6 @@ const Dashboard = () => {
 };
 
 // Add new components
-const FacilityList = ({ items, type, nameKey, idKey, ongoingReservations }) => {
-    const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 5;
-    
-    // Determine if an item is in use
-    const isItemInUse = (itemId) => {
-        if (!ongoingReservations) return false;
-        
-        return ongoingReservations.some(res => {
-            if (type === 'venue' && res.venue_id) return res.venue_id === itemId;
-            if (type === 'vehicle' && res.vehicle_id) return res.vehicle_id === itemId;
-            if (type === 'equipment' && res.equipment_id) return res.equipment_id === itemId;
-            return false;
-        });
-    };
-    
-    const totalPages = items ? Math.ceil(items.length / itemsPerPage) : 0;
-    
-    // Get current page items
-    const getCurrentItems = () => {
-        if (!items || items.length === 0) {
-            // Return default items if no real data
-            return getDefaultItems();
-        }
-        const startIndex = (currentPage - 1) * itemsPerPage;
-        return items.slice(startIndex, startIndex + itemsPerPage);
-    };
-    
-    // Get example usage data for display
-    const getExampleUsage = (inUse) => {
-        if (!inUse) return null;
-        
-        const examples = [
-            { user: "Christian Mark S. Valle", dept: "IT Department", until: "4:30 PM" },
-            { user: "Melanie Abalde", dept: "IT Department", until: "Tomorrow" },
-            { user: "Krystyll Ira Andrei Plaza", dept: "IT Department", until: "Next Friday" },
-            { user: "Josh Pagapong", dept: "IT Department", until: "4:00 PM" },
-            { user: "Armie Timbal", dept: "IT Department", until: "5:30 PM" },
-            { user: "Pia Balipagon", dept: "IT Department", until: "5:30 PM" }
-        ];
-        
-        return examples[Math.floor(Math.random() * examples.length)];
-    };
-    
-    // Provide default items when no real data is available
-    const getDefaultItems = () => {
-        if (type === 'venue') {
-            return [
-                { [nameKey]: "Roof Deck", [idKey]: "default-venue-1", status: Math.random() > 0.5 },
-                { [nameKey]: "Auditorium", [idKey]: "default-venue-2", status: Math.random() > 0.5 },
-                { [nameKey]: "MS Lobby", [idKey]: "default-venue-3", status: Math.random() > 0.5 },
-                { [nameKey]: "Mutli Purpose Hall", [idKey]: "default-venue-4", status: Math.random() > 0.5 },
-                { [nameKey]: "Quadrangle", [idKey]: "default-venue-5", status: Math.random() > 0.5 }
-            ];
-        } else if (type === 'vehicle') {
-            return [
-                { [nameKey]: "Toyota Fortuner (ABC-123)", [idKey]: "default-vehicle-1", status: Math.random() > 0.5 },
-                { [nameKey]: "Ford Everest (DEF-456)", [idKey]: "default-vehicle-2", status: Math.random() > 0.5 },
-                { [nameKey]: "Hyundai Starex (GHI-789)", [idKey]: "default-vehicle-3", status: Math.random() > 0.5 },
-                { [nameKey]: "Mitsubishi Montero (JKL-012)", [idKey]: "default-vehicle-4", status: Math.random() > 0.5 },
-                { [nameKey]: "Isuzu mu-X (MNO-345)", [idKey]: "default-vehicle-5", status: Math.random() > 0.5 }
-            ];
-        } else if (type === 'equipment') {
-            return [
-                { [nameKey]: "Projector (Sony)", [idKey]: "default-equip-1", status: Math.random() > 0.5 },
-                { [nameKey]: "PA System", [idKey]: "default-equip-2", status: Math.random() > 0.5 },
-                { [nameKey]: "Laptop (Dell XPS)", [idKey]: "default-equip-3", status: Math.random() > 0.5 },
-                { [nameKey]: "Wireless Microphone", [idKey]: "default-equip-4", status: Math.random() > 0.5 },
-                { [nameKey]: "Digital Camera", [idKey]: "default-equip-5", status: Math.random() > 0.5 }
-            ];
-        }
-        return [];
-    };
-    
-    const displayItems = getCurrentItems();
-    
-    return (
-        <>
-            {displayItems.map((item, index) => {
-                // For default items, use the status property directly
-                const inUse = item.status !== undefined ? item.status : isItemInUse(item[idKey]);
-                const exampleUsage = getExampleUsage(inUse);
-                
-                return (
-                    <div key={index} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                                <div className={`w-3 h-3 rounded-full ${inUse ? 'bg-red-500' : 'bg-green-500'}`}></div>
-                                <div>
-                                    <h3 className="text-gray-800 dark:text-white font-medium">{item[nameKey]}</h3>
-                                    {inUse && exampleUsage && (
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                            In use by {exampleUsage.user} ({exampleUsage.dept}) until {exampleUsage.until}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                            <span className={`text-xs px-2 py-1 rounded-full ${
-                                inUse ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' : 
-                                'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                            }`}>
-                                {inUse ? 'In Use' : 'Available'}
-                            </span>
-                        </div>
-                    </div>
-                );
-            })}
-            
-            {totalPages > 1 && (
-                <div className="flex justify-center p-4 bg-gray-50 dark:bg-gray-700">
-                    <nav className="flex items-center space-x-1">
-                        <button 
-                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                            disabled={currentPage === 1}
-                            className={`p-1 rounded-md ${currentPage === 1 ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-600'}`}
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M12.707 5.293a1 1 010 1.414L9.414 10l3.293 3.293a1 1 01-1.414 1.414l-4-4a1 1 010-1.414l4-4a1 1 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                        </button>
-                        
-                        {[...Array(Math.min(totalPages, 3))].map((_, i) => (
-                            <button
-                                key={i}
-                                onClick={() => setCurrentPage(i + 1)}
-                                className={`px-3 py-1 rounded-md ${currentPage === i + 1 ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500'}`}
-                            >
-                                {i + 1}
-                            </button>
-                        ))}
-                        
-                        {totalPages > 3 && (
-                            <>
-                                <span className="text-gray-500 dark:text-gray-400">...</span>
-                                <button
-                                    onClick={() => setCurrentPage(totalPages)}
-                                    className={`px-3 py-1 rounded-md ${currentPage === totalPages ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500'}`}
-                                >
-                                    {totalPages}
-                                </button>
-                            </>
-                        )}
-                        
-                        <button 
-                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                            disabled={currentPage === totalPages}
-                            className={`p-1 rounded-md ${currentPage === totalPages ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-600'}`}
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M7.293 14.707a1 1 010-1.414L10.586 10 7.293 6.707a1 1 011.414-1.414l4 4a1 1 010 1.414l-4-4a1 1 01-1.414 0z" clipRule="evenodd" />
-                            </svg>
-                        </button>
-                    </nav>
-                </div>
-            )}
-            
-            {items && items.length === 0 && displayItems.length === 0 && (
-                <div className="p-8 text-center">
-                    <p className="text-gray-500 dark:text-gray-400">No {type}s available</p>
-                </div>
-            )}
-        </>
-    );
-};
 
 const StatCard = ({ title, value, icon, color }) => (
     <motion.div
