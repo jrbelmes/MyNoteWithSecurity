@@ -715,7 +715,7 @@ const Dashboard = () => {
 
     return (
         <motion.div 
-            className={`dashboard-container flex h-screen bg-[#d8f3dc] ${fadeIn ? 'fade-in' : ''} ${darkMode ? 'dark' : ''}`}
+            className={`dashboard-container flex h-screen bg-lightcream ${fadeIn ? 'fade-in' : ''} ${darkMode ? 'dark' : ''}`}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5 }}
@@ -724,27 +724,27 @@ const Dashboard = () => {
             <div className="flex-1 overflow-hidden">
                 <div className="h-full flex flex-col">
                     {/* Enhanced Header with Welcome Banner */}
-                    <header className="bg-gradient-to-r from-[#d8f3dc] to-green-800 shadow-lg dark:from-[#d8f3dc] dark:to-green-800">
+                    <header className="bg-gradient-to-r from-lightcream to-primary shadow-lg dark:from-gray-800 dark:to-primary-dark">
                         <div className="px-6 py-8">
                             <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
                                 <div>
-                                    <h1 className="text-3xl font-bold text-gray-800">Welcome Back, Admin!</h1>
-                                    <p className="text-green-800 mt-1">
+                                    <h1 className="text-3xl font-bold text-primary-dark dark:text-white">Welcome Back, Admin!</h1>
+                                    <p className="text-primary mt-1">
                                         {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                                     </p>
                                 </div>
                                 <div className="flex items-center space-x-4">
-                                    <div className="bg-white/20 backdrop-blur-sm px-4 py-2 rounded-lg text-gray-800">
+                                    <div className="bg-white/20 backdrop-blur-sm px-4 py-2 rounded-lg text-primary-dark dark:text-white">
                                         <div className="text-sm font-medium">Active Reservations</div>
                                         <div className="text-2xl font-bold">{ongoingReservations.length}</div>
                                     </div>
                                     <button 
                                         onClick={() => setDarkMode(!darkMode)} 
-                                        className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-gray-800 transition-colors"
+                                        className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-primary-dark dark:text-white transition-colors"
                                     >
                                         {darkMode ? 
-                                            <FaSun className="text-yellow-600 text-xl" /> : 
-                                            <FaMoon className="text-gray-800 text-xl" />
+                                            <FaSun className="text-yellow-400 text-xl" /> : 
+                                            <FaMoon className="text-primary-dark text-xl" />
                                         }
                                     </button>
                                 </div>
@@ -754,31 +754,30 @@ const Dashboard = () => {
 
                     {/* Main Content with scrollable area */}
                     <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                            
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                             <StatCard
                                 title="Venues"
                                 value={totals.venues}
                                 icon={<FaBuilding />}
-                                color="bg-green-500"
+                                color="bg-primary"
                             />
                             <StatCard
                                 title="Equipment"
                                 value={totals.equipments}
                                 icon={<FaTools />}
-                                color="bg-purple-500"
+                                color="bg-accent"
                             />
                             <StatCard
                                 title="Vehicles"
                                 value={totals.vehicles}
                                 icon={<FaCar />}
-                                color="bg-indigo-500"
+                                color="bg-primary-dark"
                             />
                             <StatCard
                                 title="Users"
                                 value={totals.users}
                                 icon={<FaUsers />}
-                                color="bg-red-500"
+                                color="bg-accent-dark"
                             />
                         </div>
                         {/* Top Row with Active Reservations only */}
@@ -788,9 +787,9 @@ const Dashboard = () => {
                                 variants={containerVariants}
                                 initial="hidden"
                                 animate="visible"
-                                className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg dark:bg-gray-800/90 overflow-hidden border border-green-100 dark:border-green-900"
+                                className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg dark:bg-gray-800/90 overflow-hidden border border-primary/20 dark:border-primary-dark/20"
                             >
-                                <div className="bg-gradient-to-r from-amber-500 to-amber-700 p-4 flex justify-between items-center">
+                                <div className="bg-gradient-to-r from-primary to-primary-dark p-4 flex justify-between items-center">
                                     <h2 className="text-white text-lg font-semibold flex items-center">
                                         <FaClock className="mr-2" /> Active Reservations
                                     </h2>
@@ -881,8 +880,8 @@ const Dashboard = () => {
                             className="grid grid-cols-1 lg:grid-cols-3 gap-6"
                         >
                             {/* Venues In Use */}
-                            <motion.div variants={itemVariants} className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg dark:bg-gray-800/90 overflow-hidden border border-green-100 dark:border-green-900">
-                                <div className="bg-gradient-to-r from-green-500 to-green-700 p-4 flex justify-between items-center">
+                            <motion.div variants={itemVariants} className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg dark:bg-gray-800/90 overflow-hidden border border-primary/20 dark:border-primary-dark/20">
+                                <div className="bg-gradient-to-r from-primary to-primary-dark p-4 flex justify-between items-center">
                                     <h2 className="text-white text-lg font-semibold flex items-center">
                                         <FaBuilding className="mr-2" /> Venues In Use
                                     </h2>
@@ -919,8 +918,8 @@ const Dashboard = () => {
                             </motion.div>
 
                             {/* Vehicles In Use */}
-                            <motion.div variants={itemVariants} className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg dark:bg-gray-800/90 overflow-hidden border border-green-100 dark:border-green-900">
-                                <div className="bg-gradient-to-r from-blue-500 to-blue-700 p-4 flex justify-between items-center">
+                            <motion.div variants={itemVariants} className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg dark:bg-gray-800/90 overflow-hidden border border-primary/20 dark:border-primary-dark/20">
+                                <div className="bg-gradient-to-r from-accent to-accent-dark p-4 flex justify-between items-center">
                                     <h2 className="text-white text-lg font-semibold flex items-center">
                                         <FaCar className="mr-2" /> Vehicles In Use
                                     </h2>
@@ -957,8 +956,8 @@ const Dashboard = () => {
                             </motion.div>
 
                             {/* Equipment In Use */}
-                            <motion.div variants={itemVariants} className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg dark:bg-gray-800/90 overflow-hidden border border-green-100 dark:border-green-900">
-                                <div className="bg-gradient-to-r from-purple-500 to-purple-700 p-4 flex justify-between items-center">
+                            <motion.div variants={itemVariants} className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg dark:bg-gray-800/90 overflow-hidden border border-primary/20 dark:border-primary-dark/20">
+                                <div className="bg-gradient-to-r from-primary-dark to-primary p-4 flex justify-between items-center">
                                     <h2 className="text-white text-lg font-semibold flex items-center">
                                         <FaTools className="mr-2" /> Equipment In Use
                                     </h2>
@@ -1013,12 +1012,12 @@ const Dashboard = () => {
                         exit={{ opacity: 0 }}
                     >
                         <motion.div
-                            className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full mx-4 overflow-hidden border border-green-100 dark:border-green-900"
+                            className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full mx-4 overflow-hidden border border-primary/20 dark:border-primary-dark/20"
                             initial={{ scale: 0.9, y: 20 }}
                             animate={{ scale: 1, y: 0 }}
                             exit={{ scale: 0.9, y: 20 }}
                         >
-                            <div className="bg-gradient-to-r from-green-400 to-green-600 p-4">
+                            <div className="bg-gradient-to-r from-primary to-primary-dark p-4">
                                 <h2 className="text-xl font-bold text-white flex items-center">
                                     <FaCalendar className="mr-2" /> Reservation Details
                                 </h2>
@@ -1162,7 +1161,7 @@ const Dashboard = () => {
                             <div className="bg-gray-50 dark:bg-gray-700 p-4 flex justify-end">
                                 <button
                                     onClick={() => setModalOpen(false)}
-                                    className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors"
+                                    className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark transition-colors"
                                 >
                                     Close
                                 </button>
@@ -1175,19 +1174,18 @@ const Dashboard = () => {
     );
 };
 
-// Add new components
-
+// Enhanced StatCard component
 const StatCard = ({ title, value, icon, color }) => (
     <motion.div
-        className={`${color} text-white rounded-lg p-4 shadow-sm`}
+        className={`${color} text-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow`}
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
     >
         <div className="flex items-center justify-between">
-            <div className="text-3xl">{icon}</div>
-            <div className="text-2xl font-bold">{value}</div>
+            <div className="text-4xl">{icon}</div>
+            <div className="text-3xl font-bold">{value}</div>
         </div>
-        <div className="mt-2 text-sm font-medium">{title}</div>
+        <div className="mt-3 text-sm font-medium opacity-90">{title}</div>
     </motion.div>
 );
 

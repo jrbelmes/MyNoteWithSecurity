@@ -26,17 +26,25 @@ const ViewPersonnelTask = () => {
   const [otherEquipmentCondition, setOtherEquipmentCondition] = useState('');
   const [equipmentDefectQty, setEquipmentDefectQty] = useState('');
 
-  // Helper function to determine if equipment condition needs defect quantity
+  const idMapping = {
+    venue: 'reservation_checklist_venue_id',
+    vehicle: 'reservation_checklist_vehicle_id',
+    equipment: 'reservation_checklist_equipment_id'
+  };
+
+  const lookupField = {
+    venue: 'checklist_venue_id',
+    vehicle: 'checklist_vehicle_id',
+    equipment: 'checklist_equipment_id'
+  };
+
   const needsDefectQuantity = (conditionId) => {
-    // Only condition IDs 3 and 4 require defect quantity (needs repair, defective)
     return ['3', '4'].includes(conditionId);
   };
 
-  // Handle equipment condition change
   const handleEquipmentConditionChange = (e) => {
     const value = e.target.value;
     setEquipmentCondition(value);
-    // Reset defect quantity when changing condition
     if (!needsDefectQuantity(value)) {
       setEquipmentDefectQty('');
     }
@@ -45,20 +53,18 @@ const ViewPersonnelTask = () => {
   const handleEquipmentDefectQtyChange = (e) => {
     const value = e.target.value;
     const totalQuantity = selectedTask?.equipment?.quantity || 0;
-    
-    // Ensure value is a positive number
+
     if (value < 0) {
       setEquipmentDefectQty('0');
       return;
     }
-    
-    // Ensure defect quantity doesn't exceed total quantity
+
     if (parseInt(value) > parseInt(totalQuantity)) {
       toast.error(`Defect quantity cannot exceed total quantity (${totalQuantity})`);
       setEquipmentDefectQty(totalQuantity.toString());
       return;
     }
-    
+
     setEquipmentDefectQty(value);
   };
 
@@ -72,7 +78,7 @@ const ViewPersonnelTask = () => {
     const minutes = String(date.getMinutes()).padStart(2, '0');
     const ampm = hours >= 12 ? 'PM' : 'AM';
     const formattedHours = hours % 12 || 12;
-    
+
     return `${month} ${day}, ${year} at ${formattedHours}:${minutes} ${ampm}`;
   };
 
@@ -80,7 +86,7 @@ const ViewPersonnelTask = () => {
     if (!task || !task.reservation_end_date) return false;
     const currentDate = new Date();
     const endDate = new Date(task.reservation_end_date);
-    return currentDate > endDate;  // Changed to only check if current time is past end time
+    return currentDate > endDate;
   };
 
   const isAllChecklistsCompleted = (task) => {
@@ -90,21 +96,21 @@ const ViewPersonnelTask = () => {
     return venueCompleted && vehicleCompleted && equipmentCompleted;
   };
 
-      const fetchConditions = async () => {
-          setLoading(true);
-          try {
-              const response = await axios.post('http://localhost/coc/gsd/fetchMaster.php', new URLSearchParams({ operation: 'fetchConditions' }));
-              if (response.data.status === 'success') {
-                  setConditions(response.data.data);
-              } else {
-                  toast.error(response.data.message);
-              }
-          } catch (error) {
-              toast.error('Error fetching conditions');
-          } finally {
-              setLoading(false);
-          }
-      };
+  const fetchConditions = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.post('http://localhost/coc/gsd/fetchMaster.php', new URLSearchParams({ operation: 'fetchConditions' }));
+      if (response.data.status === 'success') {
+        setConditions(response.data.data);
+      } else {
+        toast.error(response.data.message);
+      }
+    } catch (error) {
+      toast.error('Error fetching conditions');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchPersonnelTasks = async () => {
     try {
@@ -134,51 +140,25 @@ const ViewPersonnelTask = () => {
     }
   };
 
-const handleChecklistUpdate = async (type, checklistId, value) => {
-  try {
-    // Determine the correct ID field for the item
-    const idMapping = {
-      venue: 'reservation_checklist_venue_id',
-      vehicle: 'reservation_checklist_vehicle_id',
-      equipment: 'reservation_checklist_equipment_id'
-    };
+  const handleChecklistUpdate = async (type, checklistId, value) => {
+    try {
+      const checklist = selectedTask[type]?.checklists?.find(
+        item => item[lookupField[type]] === checklistId
+      );
 
-    const lookupField = {
-      venue: 'checklist_venue_id',
-      vehicle: 'checklist_vehicle_id',
-      equipment: 'checklist_equipment_id'
-    };
-
-    // Find the checklist item using the original checklist ID
-    const checklist = selectedTask[type]?.checklists?.find(
-      item => item[lookupField[type]] === checklistId
-    );
-
-    if (!checklist) {
-      console.error('Checklist item not found');
-      return;
-    }
-
-    // Get the reservation checklist ID
-    const reservationChecklistId = checklist[idMapping[type]];
-
-    const response = await axios.post('http://localhost/coc/gsd/personnel.php', {
-      operation: 'updateTask',
-      type: type,
-      id: reservationChecklistId,
-      isActive: value === "1" ? 1 : 0
-    }, {
-      headers: {
-        'Content-Type': 'application/json'
+      if (!checklist) {
+        console.error('Checklist item not found');
+        return;
       }
-    });
 
-    if (response.data.status === 'success') {
-      // Update local state
+      const reservationChecklistId = checklist[idMapping[type]];
+
+      await updateTaskStatus(type, reservationChecklistId, value === "1" ? 1 : 0);
+
       setSelectedTask(prevData => {
         if (!prevData) return prevData;
         const updatedData = { ...prevData };
-        
+
         if (updatedData[type]?.checklists) {
           updatedData[type].checklists = updatedData[type].checklists.map(item =>
             item[lookupField[type]] === checklistId
@@ -186,15 +166,18 @@ const handleChecklistUpdate = async (type, checklistId, value) => {
               : item
           );
         }
-        
+
         return updatedData;
       });
-    } else {
-      // Revert to unchecked state on failure
+
+    } catch (err) {
+      console.error('Error updating task:', err);
+      toast.error('Error updating task');
+
       setSelectedTask(prevData => {
         if (!prevData) return prevData;
         const updatedData = { ...prevData };
-        
+
         if (updatedData[type]?.checklists) {
           updatedData[type].checklists = updatedData[type].checklists.map(item =>
             item[lookupField[type]] === checklistId
@@ -202,17 +185,11 @@ const handleChecklistUpdate = async (type, checklistId, value) => {
               : item
           );
         }
-        
+
         return updatedData;
       });
-
-      toast.error('Failed to update task');
     }
-  } catch (err) {
-    console.error('Error updating task:', err);
-    toast.error('Error updating task');
-  }
-};
+  };
 
   const updateTaskStatus = async (type, id, isActive) => {
     try {
@@ -228,35 +205,19 @@ const handleChecklistUpdate = async (type, checklistId, value) => {
       });
 
       if (response.data.status === 'success') {
-        
-        
-        // Update modalTaskData immediately
-        setSelectedTask(prevData => ({
-          ...prevData,
-          venue_tasks: prevData.venue_tasks?.map(task => 
-            task.release_venue_id === id 
-              ? { ...task, release_isActive: isActive }
-              : task
-          ) || [],
-          vehicle_tasks: prevData.vehicle_tasks?.map(task => 
-            task.release_vehicle_id === id 
-              ? { ...task, release_isActive: isActive }
-              : task
-          ) || []
-        }));
-
-        // Refresh the main tasks list
-        fetchPersonnelTasks();
+        toast.success('Update successful');
       } else {
         toast.error('Failed to update task');
+        throw new Error('Update failed');
       }
     } catch (err) {
       console.error('Error updating task:', err);
-      toast.error('Error updating task');
+      throw err;
     }
   };
 
   const handleModalOpen = (task) => {
+    console.log('Selected Task:', task);
     setSelectedTask(task);
     setIsModalOpen(true);
   };
@@ -265,6 +226,7 @@ const handleChecklistUpdate = async (type, checklistId, value) => {
     fetchPersonnelTasks();
     toast.info('Refreshing tasks...');
   };
+
   const fetchCompletedTasks = async () => {
     try {
       setLoading(true);
@@ -276,7 +238,7 @@ const handleChecklistUpdate = async (type, checklistId, value) => {
           'Content-Type': 'application/json'
         }
       });
-  
+
       if (response.data.status === 'success') {
         setTasks(response.data.data || []);
       } else {
@@ -300,126 +262,115 @@ const handleChecklistUpdate = async (type, checklistId, value) => {
     }
   }, [filter]);
 
-  
-
-const handleSubmitTask = async () => {
-  // Validate other condition inputs when "Other" is selected
-  if (venueCondition === 'Other' && !otherVenueCondition.trim()) {
-    toast.error('Please specify the venue condition');
-    return;
-  }
-  if (vehicleCondition === 'Other' && !otherVehicleCondition.trim()) {
-    toast.error('Please specify the vehicle condition');
-    return;
-  }
-  if (equipmentCondition === 'Other' && !otherEquipmentCondition.trim()) {
-    toast.error('Please specify the equipment condition');
-    return;
-  }
-
-  try {
-    setIsSubmitting(true);
-    const conditionsPayload = {
-      operation: 'submitCondition',
-      conditions: {}
-    };
-
-    // Helper function to create the condition arrays
-    const createConditionPayload = (selectedCondition, otherConditionText, reservationId, qty = '0') => {
-      const conditionIds = [];
-      const otherReasons = [];
-      const qtyBad = [];
-
-      // For equipment conditions
-      if (selectedCondition) {
-        conditionIds.push(selectedCondition);
-        // If it's condition ID 6 (Other), add the other reason text, otherwise null
-        otherReasons.push(selectedCondition === '6' ? otherConditionText : null);
-        // Add quantity - if not provided or good condition (2), use '0'
-        qtyBad.push(selectedCondition === '2' ? '0' : (qty || '0'));
-      }
-
-      return {
-        reservation_ids: [reservationId],
-        condition_ids: conditionIds,
-        other_reasons: otherReasons,
-        qty_bad: qtyBad
-      };
-    };
-
-    // Add venue conditions
-    if (selectedTask.venue && venueCondition) {
-      const venueConditionId = conditions.find(c => c.condition_name === venueCondition)?.id;
-      if (selectedTask.venue.reservation_venue_id && venueConditionId) {
-        conditionsPayload.conditions.venue = createConditionPayload(
-          venueConditionId,
-          otherVenueCondition,
-          selectedTask.venue.reservation_venue_id
-        );
-      }
+  const handleSubmitTask = async () => {
+    if (venueCondition === 'Other' && !otherVenueCondition.trim()) {
+      toast.error('Please specify the venue condition');
+      return;
+    }
+    if (vehicleCondition === 'Other' && !otherVehicleCondition.trim()) {
+      toast.error('Please specify the vehicle condition');
+      return;
+    }
+    if (equipmentCondition === 'Other' && !otherEquipmentCondition.trim()) {
+      toast.error('Please specify the equipment condition');
+      return;
     }
 
-    // Add vehicle conditions
-    if (selectedTask.vehicle && vehicleCondition) {
-      const vehicleConditionId = conditions.find(c => c.condition_name === vehicleCondition)?.id;
-      if (selectedTask.vehicle.reservation_vehicle_id && vehicleConditionId) {
-        conditionsPayload.conditions.vehicle = createConditionPayload(
-          vehicleConditionId,
-          otherVehicleCondition,
-          selectedTask.vehicle.reservation_vehicle_id
-        );
-      }
-    }
-
-    // Add equipment conditions
-    if (selectedTask.equipment && equipmentCondition) {
-      if (selectedTask.equipment.reservation_equipment_id) {
-        conditionsPayload.conditions.equipment = createConditionPayload(
-          equipmentCondition,
-          otherEquipmentCondition,
-          selectedTask.equipment.reservation_equipment_id,
-          equipmentDefectQty
-        );
-      }
-    }
-
-    const conditionResponse = await axios.post('http://localhost/coc/gsd/personnel.php', conditionsPayload, {
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (conditionResponse.data.status === 'success') {
-      // Update reservation status
-      const updateStatusPayload = {
-        operation: 'updateReservationStatus',
-        reservation_id: selectedTask.reservation_id
+    try {
+      setIsSubmitting(true);
+      const conditionsPayload = {
+        operation: 'submitCondition',
+        conditions: {}
       };
 
-      const statusResponse = await axios.post('http://localhost/coc/gsd/personnel.php', updateStatusPayload, {
+      const createConditionPayload = (selectedCondition, otherConditionText, reservationId, qty = '0') => {
+        const conditionIds = [];
+        const otherReasons = [];
+        const qtyBad = [];
+
+        if (selectedCondition) {
+          conditionIds.push(selectedCondition);
+          otherReasons.push(selectedCondition === '6' ? otherConditionText : null);
+          qtyBad.push(selectedCondition === '2' ? '0' : (qty || '0'));
+        }
+
+        return {
+          reservation_ids: [reservationId],
+          condition_ids: conditionIds,
+          other_reasons: otherReasons,
+          qty_bad: qtyBad
+        };
+      };
+
+      if (selectedTask.venue && venueCondition) {
+        const venueConditionId = conditions.find(c => c.condition_name === venueCondition)?.id;
+        if (selectedTask.venue.reservation_venue_id && venueConditionId) {
+          conditionsPayload.conditions.venue = createConditionPayload(
+            venueConditionId,
+            otherVenueCondition,
+            selectedTask.venue.reservation_venue_id
+          );
+        }
+      }
+
+      if (selectedTask.vehicle && vehicleCondition) {
+        const vehicleConditionId = conditions.find(c => c.condition_name === vehicleCondition)?.id;
+        if (selectedTask.vehicle.reservation_vehicle_id && vehicleConditionId) {
+          conditionsPayload.conditions.vehicle = createConditionPayload(
+            vehicleConditionId,
+            otherVehicleCondition,
+            selectedTask.vehicle.reservation_vehicle_id
+          );
+        }
+      }
+
+      if (selectedTask.equipment && equipmentCondition) {
+        if (selectedTask.equipment.reservation_equipment_id) {
+          conditionsPayload.conditions.equipment = createConditionPayload(
+            equipmentCondition,
+            otherEquipmentCondition,
+            selectedTask.equipment.reservation_equipment_id,
+            equipmentDefectQty
+          );
+        }
+      }
+
+      const conditionResponse = await axios.post('http://localhost/coc/gsd/personnel.php', conditionsPayload, {
         headers: {
           'Content-Type': 'application/json'
         }
       });
 
-      if (statusResponse.data.status === 'success') {
-        toast.success('Task completed successfully');
-        setIsModalOpen(false);
-        setSelectedTask(null);
-        fetchPersonnelTasks();
+      if (conditionResponse.data.status === 'success') {
+        const updateStatusPayload = {
+          operation: 'updateReservationStatus',
+          reservation_id: selectedTask.reservation_id
+        };
+
+        const statusResponse = await axios.post('http://localhost/coc/gsd/personnel.php', updateStatusPayload, {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (statusResponse.data.status === 'success') {
+          toast.success('Task completed successfully');
+          setIsModalOpen(false);
+          setSelectedTask(null);
+          fetchPersonnelTasks();
+        } else {
+          toast.error('Failed to update reservation status');
+        }
       } else {
-        toast.error('Failed to update reservation status');
+        toast.error(conditionResponse.data.message || 'Failed to submit task');
       }
-    } else {
-      toast.error(conditionResponse.data.message || 'Failed to submit task');
+    } catch (err) {
+      console.error('Error submitting task:', err);
+      toast.error('Error submitting task');
+    } finally {
+      setIsSubmitting(false);
     }
-  } catch (err) {
-    console.error('Error submitting task:', err);
-    toast.error('Error submitting task');
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+  };
 
   const isAllTasksCompleted = (tasks) => {
     return tasks.every(task => task.release_isActive === '1');
@@ -427,16 +378,90 @@ const handleSubmitTask = async () => {
 
   useEffect(() => {
     fetchPersonnelTasks();
-    fetchConditions(); // Add this line to fetch conditions
+    fetchConditions();
   }, []);
 
-  // Calculate pagination
+  const canBeReleased = (task) => {
+    if (!task || !task.reservation_start_date || task.is_released) return false;
+    const startTime = new Date(task.reservation_start_date);
+    const currentTime = new Date();
+    const timeDiff = startTime.getTime() - currentTime.getTime();
+    const minutesDiff = timeDiff / (1000 * 60);
+    return minutesDiff <= 10 && minutesDiff >= -5;
+  };
+
+  const canBeReturned = (task) => {
+    if (!task || !task.reservation_end_date || !task.is_released || task.is_returned) return false;
+    const endTime = new Date(task.reservation_end_date);
+    const currentTime = new Date();
+    return currentTime >= endTime;
+  };
+
+  const handleRelease = async (type, reservationId) => {
+    try {
+      setIsSubmitting(true);
+      const response = await axios.post('http://localhost/coc/gsd/personnel.php', {
+        operation: 'updateRelease',
+        type: type,
+        reservation_id: reservationId,
+        status: 1
+      }, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.data.status === 'success') {
+        toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} successfully released`);
+        fetchPersonnelTasks();
+        setSelectedTask(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            [type]: {
+              ...prev[type],
+              is_released: '1'
+            }
+          };
+        });
+      } else {
+        toast.error(response.data.message || 'Failed to release');
+      }
+    } catch (error) {
+      toast.error('Error releasing item');
+      console.error('Release error:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleReturn = async (task) => {
+    try {
+      setIsSubmitting(true);
+      const response = await axios.post('http://localhost/coc/gsd/personnel.php', {
+        operation: 'returnReservation',
+        reservation_id: task.reservation_id
+      });
+
+      if (response.data.status === 'success') {
+        toast.success('Successfully returned');
+        fetchPersonnelTasks();
+        setSelectedTask(prev => ({ ...prev, is_returned: '1' }));
+      } else {
+        toast.error(response.data.message || 'Failed to return');
+      }
+    } catch (error) {
+      toast.error('Error returning reservation');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const indexOfLastTask = currentPage * tasksPerPage;
   const indexOfFirstTask = indexOfLastTask - tasksPerPage;
   const currentTasks = tasks.slice(indexOfFirstTask, indexOfLastTask);
   const totalPages = Math.ceil(tasks.length / tasksPerPage);
 
-  // Calculate progress helper function
   const calculateProgress = (task) => {
     const items = task.venue_tasks?.length > 0 ? task.venue_tasks : task.vehicle_tasks;
     if (!items || items.length === 0) return 0;
@@ -444,7 +469,6 @@ const handleSubmitTask = async () => {
     return Math.round((completed / items.length) * 100);
   };
 
-  // Enhanced task card rendering with status
   const renderTaskCard = (task) => (
     <motion.div
       key={task.master_data?.checklist_id || task.reservation_title}
@@ -462,7 +486,7 @@ const handleSubmitTask = async () => {
               {task.venue?.name || task.vehicle?.vehicle_license || 'General Task'}
             </span>
             <span className={`px-3 py-1.5 text-xs font-medium rounded-full whitespace-nowrap ${
-              filter === 'completed' 
+              filter === 'completed'
                 ? 'bg-green-50 text-green-700'
                 : 'bg-amber-50 text-amber-700'
             }`}>
@@ -470,7 +494,7 @@ const handleSubmitTask = async () => {
             </span>
           </div>
         </div>
-        
+
         <div className="flex flex-col gap-2 text-sm text-gray-600">
           <div className="space-y-1">
             <p className="flex items-center gap-2">
@@ -499,7 +523,7 @@ const handleSubmitTask = async () => {
             {task.vehicle.vehicle_license}
           </span>}
         </div>
-        
+
         <button
           onClick={() => handleModalOpen(task)}
           className={`w-full py-2.5 px-4 text-sm font-medium rounded-lg flex items-center justify-center gap-2 transition-all duration-300 ${
@@ -555,7 +579,6 @@ const handleSubmitTask = async () => {
     </motion.div>
   );
 
-  // Enhanced modal content
   const renderSubmitButton = () => {
     const canSubmit = selectedTask && 
       isTaskInProgress(selectedTask) && 
@@ -613,6 +636,17 @@ const handleSubmitTask = async () => {
     <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[85vh] overflow-hidden">
       <div className="sticky top-0 bg-white px-6 py-4 border-b border-gray-200">
         <div className="flex justify-between items-start">
+          <div className="flex items-center gap-4">
+            {canBeReturned(selectedTask) && !selectedTask?.is_returned && (
+              <button
+                onClick={() => handleReturn(selectedTask)}
+                disabled={isSubmitting}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {isSubmitting ? 'Returning...' : 'Return'}
+              </button>
+            )}
+          </div>
           <button
             onClick={() => setIsModalOpen(false)}
             className="p-2 hover:bg-gray-100 rounded-full transition-colors"
@@ -627,7 +661,6 @@ const handleSubmitTask = async () => {
       <div className="p-6 space-y-6 overflow-y-auto max-h-[calc(85vh-180px)]">
         {selectedTask ? (
           <div className="space-y-6">
-            {/* Event Details Section */}
             <div className="bg-gray-50 rounded-xl p-6 border border-gray-200 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -653,7 +686,7 @@ const handleSubmitTask = async () => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wider">Requester Information</h3>
                   <div className="bg-white rounded-lg p-4 border border-gray-200">
@@ -674,7 +707,7 @@ const handleSubmitTask = async () => {
                   </div>
                 </div>
               </div>
-              
+
               {!isTaskInProgress(selectedTask) && (
                 <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4">
                   <div className="flex items-center">
@@ -689,15 +722,32 @@ const handleSubmitTask = async () => {
               )}
             </div>
 
-            {/* Checklists Sections */}
             {selectedTask.venue?.checklists?.length > 0 && (
               <div className="bg-white rounded-xl p-6 border border-gray-200">
                 <div className="flex justify-between items-center mb-4">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">Venue Inspection</h3>
                     <p className="text-sm text-gray-500">Location: {selectedTask.venue.name}</p>
+                    <div className="mt-2">
+                      <span className={`inline-flex items-center px-3 py-1 text-xs font-medium rounded-full ${
+                        selectedTask.venue?.is_released === 1 || selectedTask.venue?.is_released === "1"
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {selectedTask.venue?.is_released === 1 || selectedTask.venue?.is_released === "1" ? 'Released' : 'Not Released'}
+                      </span>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    {canBeReleased(selectedTask) && !selectedTask.venue?.is_released && (
+                      <button
+                        onClick={() => handleRelease('venue', selectedTask.venue.reservation_venue_id)}
+                        disabled={isSubmitting}
+                        className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50"
+                      >
+                        {isSubmitting ? 'Releasing...' : 'Release Venue'}
+                      </button>
+                    )}
                     <select
                       value={venueCondition}
                       onChange={(e) => setVenueCondition(e.target.value)}
@@ -733,7 +783,7 @@ const handleSubmitTask = async () => {
                               type="radio"
                               name={`venue-${item.checklist_venue_id}`}
                               value="1"
-                              checked={item.isChecked === "1"}
+                              checked={item.isChecked === "1" || item.isChecked === 1}
                               onChange={() => handleChecklistUpdate('venue', item.checklist_venue_id, "1")}
                               className="form-radio h-4 w-4 text-green-600 focus:ring-green-500"
                             />
@@ -744,7 +794,7 @@ const handleSubmitTask = async () => {
                               type="radio"
                               name={`venue-${item.checklist_venue_id}`}
                               value="0"
-                              checked={item.isChecked === "0"}
+                              checked={item.isChecked === "0" || item.isChecked === 0}
                               onChange={() => handleChecklistUpdate('venue', item.checklist_venue_id, "0")}
                               className="form-radio h-4 w-4 text-red-600 focus:ring-red-500"
                             />
@@ -758,14 +808,32 @@ const handleSubmitTask = async () => {
               </div>
             )}
 
-            {/* Similar enhanced styling for Vehicle and Equipment sections */}
             {selectedTask.vehicle?.checklists?.length > 0 && (
-              <div className="bg-white rounded-lg p-4 border border-gray-200">
+              <div className="bg-white rounded-xl p-6 border border-gray-200">
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-md font-semibold">
-                    Vehicle Inspection
-                  </h3>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Vehicle Inspection</h3>
+                    <p className="text-sm text-gray-500">Vehicle: {selectedTask.vehicle.vehicle_license}</p>
+                    <div className="mt-2">
+                      <span className={`inline-flex items-center px-3 py-1 text-xs font-medium rounded-full ${
+                        selectedTask.vehicle?.is_released === 1 || selectedTask.vehicle?.is_released === "1"
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {selectedTask.vehicle?.is_released === 1 || selectedTask.vehicle?.is_released === "1" ? 'Released' : 'Not Released'}
+                      </span>
+                    </div>
+                  </div>
                   <div className="flex items-center gap-2">
+                    {canBeReleased(selectedTask) && !selectedTask.vehicle?.is_released && (
+                      <button
+                        onClick={() => handleRelease('vehicle', selectedTask.vehicle.reservation_vehicle_id)}
+                        disabled={isSubmitting}
+                        className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50"
+                      >
+                        {isSubmitting ? 'Releasing...' : 'Release Vehicle'}
+                      </button>
+                    )}
                     <label className="text-sm text-gray-600">Condition:</label>
                     <select
                       value={vehicleCondition}
@@ -804,7 +872,7 @@ const handleSubmitTask = async () => {
                               type="radio"
                               name={`vehicle-${item.checklist_vehicle_id}`}
                               value="1"
-                              checked={item.isChecked === "1"}
+                              checked={item.isChecked === "1" || item.isChecked === 1}
                               onChange={() => handleChecklistUpdate('vehicle', item.checklist_vehicle_id, "1")}
                               className="form-radio h-4 w-4 text-green-600"
                             />
@@ -815,7 +883,7 @@ const handleSubmitTask = async () => {
                               type="radio"
                               name={`vehicle-${item.checklist_vehicle_id}`}
                               value="0"
-                              checked={item.isChecked === "0"}
+                              checked={item.isChecked === "0" || item.isChecked === 0}
                               onChange={() => handleChecklistUpdate('vehicle', item.checklist_vehicle_id, "0")}
                               className="form-radio h-4 w-4 text-red-600"
                             />
@@ -829,9 +897,8 @@ const handleSubmitTask = async () => {
               </div>
             )}
 
-            {/* Equipment Checklist Section */}
             {selectedTask.equipment?.checklists?.length > 0 && (
-              <div className="bg-white rounded-lg p-4 border border-gray-200">
+              <div className="bg-white rounded-xl p-6 border border-gray-200">
                 <div className="flex justify-between items-center mb-4">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">Equipment Inspection</h3>
@@ -840,8 +907,26 @@ const handleSubmitTask = async () => {
                       <span className="text-gray-400">•</span>
                       <p>Quantity: {selectedTask.equipment.quantity || '0'}</p>
                     </div>
+                    <div className="mt-2">
+                      <span className={`inline-flex items-center px-3 py-1 text-xs font-medium rounded-full ${
+                        selectedTask.equipment?.is_released === 1 || selectedTask.equipment?.is_released === "1"
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {selectedTask.equipment?.is_released === 1 || selectedTask.equipment?.is_released === "1" ? 'Released' : 'Not Released'}
+                      </span>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    {canBeReleased(selectedTask) && !selectedTask.equipment?.is_released && (
+                      <button
+                        onClick={() => handleRelease('equipment', selectedTask.equipment.reservation_equipment_id)}
+                        disabled={isSubmitting}
+                        className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50"
+                      >
+                        {isSubmitting ? 'Releasing...' : 'Release Equipment'}
+                      </button>
+                    )}
                     <select
                       value={equipmentCondition}
                       onChange={handleEquipmentConditionChange}
@@ -882,7 +967,7 @@ const handleSubmitTask = async () => {
                               type="radio"
                               name={`equipment-${item.checklist_equipment_id}`}
                               value="1"
-                              checked={item.isChecked === "1"}
+                              checked={item.isChecked === "1" || item.isChecked === 1}
                               onChange={() => handleChecklistUpdate('equipment', item.checklist_equipment_id, "1")}
                               className="form-radio h-4 w-4 text-green-600"
                             />
@@ -893,7 +978,7 @@ const handleSubmitTask = async () => {
                               type="radio"
                               name={`equipment-${item.checklist_equipment_id}`}
                               value="0"
-                              checked={item.isChecked === "0"}
+                              checked={item.isChecked === "0" || item.isChecked === 0}
                               onChange={() => handleChecklistUpdate('equipment', item.checklist_equipment_id, "0")}
                               className="form-radio h-4 w-4 text-red-600"
                             />
@@ -956,7 +1041,7 @@ const handleSubmitTask = async () => {
                   </button>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleRefresh}
@@ -996,7 +1081,6 @@ const handleSubmitTask = async () => {
             </div>
           </div>
 
-          {/* Content grid with better responsive design */}
           {loading ? (
             <div className="flex justify-center items-center h-48">
               <div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-600 border-t-transparent"></div>
@@ -1010,7 +1094,6 @@ const handleSubmitTask = async () => {
             </div>
           )}
 
-          {/* Pagination */}
           <div className="mt-6 flex justify-center">
             <div className="flex gap-2">
               <button

@@ -6,8 +6,7 @@ import { format, isSameDay, isPast, endOfDay, addDays, isBefore, isWithinInterva
 import { toast } from 'react-toastify';
 import { DatePicker, TimePicker, Spin } from 'antd';
 import dayjs from 'dayjs';
-import { isHoliday } from './holiday_utils';
-import { HolidaysAPI } from '../../api/holidaysAPI';
+
 
 const availabilityStatus = {
   past: {
@@ -141,16 +140,34 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
   }, [selectedResource]);
 
   useEffect(() => {
-    const loadHolidays = async () => {
+    const fetchHolidays = async () => {
       try {
-        const currentYear = new Date().getFullYear();
-        const holidaysList = await HolidaysAPI.fetchHolidays(currentYear);
-        setHolidays(holidaysList);
+        const response = await axios.post(
+          'http://localhost/coc/gsd/fetchMaster.php',
+          {
+            operation: 'fetchHoliday'
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        if (response.data.status === 'success') {
+          const formattedHolidays = response.data.data.map(holiday => ({
+            name: holiday.holiday_name,
+            date: holiday.holiday_date
+          }));
+          setHolidays(formattedHolidays);
+        }
       } catch (error) {
-        toast.error('Failed to load holiday information');
+        console.error('Error fetching holidays:', error);
+        toast.error('Failed to fetch holidays');
       }
     };
-    loadHolidays();
+
+    fetchHolidays();
   }, []);
 
   const fetchReservations = async () => {
@@ -269,16 +286,43 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
     return diffInDays >= 0 && diffInDays <= 6;
   };
 
+  const isHoliday = (date) => {
+    const formattedDate = format(date, 'yyyy-MM-dd');
+    return holidays.some(holiday => holiday.date === formattedDate);
+  };
+
   const handleDateClick = (date) => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const compareDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     
+    // Check if it's a holiday first
+    if (isHoliday(date)) {
+      const holiday = holidays.find(h => h.date === format(date, 'yyyy-MM-dd'));
+      toast.error(`Cannot select ${holiday.name} (Holiday)`, {
+        position: 'top-center',
+        icon: '🎉',
+        className: 'font-medium'
+      });
+      return;
+    }
+
     // Check if date is in the past
     if (compareDate < today) {
       toast.error('Cannot select past dates', {
         position: 'top-center',
         icon: '⏰',
+        className: 'font-medium'
+      });
+      return;
+    }
+    
+    // Check if it's a weekend (Saturday = 6, Sunday = 0)
+    const dayOfWeek = date.getDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      toast.error('Reservations can only be made on working days (Monday to Friday)', {
+        position: 'top-center',
+        icon: '📅',
         className: 'font-medium'
       });
       return;
@@ -575,6 +619,8 @@ const renderCalendarGrid = () => {
       >
         {days.map((day, index) => {
           const isCurrentMonth = day.getMonth() === currentDate.getMonth();
+          const isWeekend = day.getDay() === 0 || day.getDay() === 6; // Check for Sunday (0) or Saturday (6)
+          
           // Format the date consistently for comparison
           const formattedDate = new Date(
             day.getFullYear(),
@@ -593,21 +639,20 @@ const renderCalendarGrid = () => {
           const isAfterBusinessHours = isPresentDate && currentTime >= 19;
           const isBeforeBusinessHours = isPresentDate && currentTime < 5;
           
-          // Determine if day is unavailable (either past or after business hours today)
-          const isUnavailable = isPastDate || isAfterBusinessHours;
+          // Determine if day is unavailable (either past, weekend, or after business hours)
+          const isUnavailable = isPastDate || isAfterBusinessHours || isWeekend;
           
           // Add selected date range highlighting
           const isSelected = selectedStartDate && day >= selectedStartDate && 
                            (selectedEndDate ? day <= selectedEndDate : day === selectedStartDate);
 
-          // Get the status based on availability, considering past dates first
-          let status = isPastDate ? 'past' : getAvailabilityStatus(day, reservations);
+          // Get the status based on availability, considering past dates and weekends first
+          let status = isPastDate || isWeekend ? 'past' : getAvailabilityStatus(day, reservations);
           
           // Override the status if it's today but after business hours
           if (isPresentDate && isAfterBusinessHours) {
             status = 'past';
           }
-          
           
           const statusStyle = availabilityStatus[status];
           
@@ -626,6 +671,7 @@ const renderCalendarGrid = () => {
                 ${isCurrentMonth ? statusStyle.className : 'opacity-40 bg-gray-50 dark:bg-gray-800/40'}
                 ${!isUnavailable ? statusStyle.hoverClass : 'cursor-not-allowed select-none'}
                 ${isSelected ? 'ring-2 ring-blue-500 dark:ring-blue-400' : ''}
+                ${isWeekend ? 'bg-gray-100 dark:bg-gray-800 opacity-50' : ''}
                 transition-all duration-200
                 ${isSameDay(day, today) ? 'ring-2 ring-blue-500 dark:ring-blue-400 ring-offset-2 dark:ring-offset-gray-900' : ''}
               `}
@@ -1333,7 +1379,7 @@ const renderCalendarGrid = () => {
 // Update the handleTimeSelection function
 const handleTimeSelection = () => {
   if (!isSelectionValid()) {
-    toast.error('Please select both dates and times');
+    toast.error('Please select both start and end times');
     return;
   }
 
@@ -1342,21 +1388,29 @@ const handleTimeSelection = () => {
     const startDateTime = new Date(selectedStartDate);
     const endDateTime = new Date(selectedEndDate || selectedStartDate);
 
-    // Validate the base dates
-    if (!isValidDate(startDateTime) || !isValidDate(endDateTime)) {
-      toast.error('Invalid date selection');
+    // Validate end time is not equal to start time
+    if (selectedTimes.startTime === selectedTimes.endTime && 
+        selectedTimes.startMinute === selectedTimes.endMinute) {
+      toast.error('End time cannot be the same as start time');
       return;
     }
 
-    // Safely set hours and minutes
+    // Set hours and minutes
     startDateTime.setHours(selectedTimes.startTime || 0);
     startDateTime.setMinutes(selectedTimes.startMinute || 0);
     endDateTime.setHours(selectedTimes.endTime || 0);
     endDateTime.setMinutes(selectedTimes.endMinute || 0);
 
-    // Validate the resulting dates
+    // Check if it's a weekend
+    const dayOfWeek = startDateTime.getDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      toast.error('Reservations can only be made on working days (Monday to Friday)');
+      return;
+    }
+
+    // Validate the base dates
     if (!isValidDate(startDateTime) || !isValidDate(endDateTime)) {
-      toast.error('Invalid time selection');
+      toast.error('Invalid date selection');
       return;
     }
 
@@ -1933,7 +1987,7 @@ const checkConflicts = (attemptedStart, attemptedEnd) => {
               className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M4.293 4.293a1 1 011.414 0L10 8.586l4.293-4.293a1 1 011.414 0L11.414 10l4.293 4.293a1 1 01-1.414 1.414L11.414 10l4.293 4.293a1 1 01-1.414 1.414z" clipRule="evenodd" />
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 011.414 0L10 8.586l4.293-4.293a1 1 011.414 0L11.414 10l4.293 4.293a1 1 01-1.414 1.414z" clipRule="evenodd" />
               </svg>
             </button>
           </div>
@@ -1947,7 +2001,7 @@ const checkConflicts = (attemptedStart, attemptedEnd) => {
               </div>
               <div className="mt-2 text-xs text-blue-600 dark:text-blue-400 flex items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0 1 16 0zm-7-4a1 1 0 11-2 0 1 1 012 0zM9 9a1 1 000 2v3a1 1 001 1h1a1 1 100-2v-3a1 1 00-1-1H9z" clipRule="evenodd" />
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0 1 16 0zm-7-4a1 1 011-2 0 1 1-2 0 1 1 012 0zM9 9a1 1 000 2v3a1 1 001 1h1a1 1 100-2v-3a1 1 00-1-1H9z" clipRule="evenodd" />
                 </svg>
                 Business hours: 5:00 AM - 7:00 PM
               </div>
@@ -1961,6 +2015,11 @@ const checkConflicts = (attemptedStart, attemptedEnd) => {
                 value={selectedEndDate ? dayjs(selectedEndDate) : null}
                 onChange={(date) => setSelectedEndDate(date.toDate())}
                 disabledDate={(current) => {
+                  // Disable weekends
+                  if (current && (current.day() === 0 || current.day() === 6)) {
+                    return true;
+                  }
+                  // Disable dates before start date or past dates
                   return current < dayjs(selectedStartDate).startOf('day') ||
                          current < dayjs().startOf('day') ||
                          !isWithinSevenDays(current.toDate(), selectedStartDate);

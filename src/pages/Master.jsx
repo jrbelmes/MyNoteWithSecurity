@@ -16,6 +16,7 @@ const Master = () => {
   const [isAddUserLevelModalOpen, setIsAddUserLevelModalOpen] = useState(false);
   const [isAddDepartmentModalOpen, setIsAddDepartmentModalOpen] = useState(false);
   const [isAddConditionModalOpen, setIsAddConditionModalOpen] = useState(false);
+  const [isAddHolidayModalOpen, setIsAddHolidayModalOpen] = useState(false);
   
   const [categoryName, setCategoryName] = useState('');
   const [makeName, setMakeName] = useState('');
@@ -25,6 +26,8 @@ const Master = () => {
   const [userLevelDesc, setUserLevelDesc] = useState('');
   const [departmentName, setDepartmentName] = useState('');
   const [conditionName, setConditionName] = useState('');
+  const [holidayName, setHolidayName] = useState('');
+  const [holidayDate, setHolidayDate] = useState('');
   
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedMake, setSelectedMake] = useState('');
@@ -129,6 +132,51 @@ const Master = () => {
     }
   };
 
+  const handleSaveHolidayData = async (e) => {
+    e.preventDefault();
+    if (!holidayName.trim() || !holidayDate) {
+      setMessage('Holiday name and date are required.');
+      setIsSuccess(false);
+      return;
+    }
+
+    const isValid = validateInput(holidayName);
+    if (!isValid) {
+      setMessage('Invalid input detected');
+      setIsSuccess(false);
+      return;
+    }
+
+    const sanitizedHolidayName = sanitizeInput(holidayName);
+
+    try {
+      const response = await axios.post(`${encryptedUrl}insert_master.php`, {
+        operation: 'saveHoliday',
+        data: {
+          holiday_name: sanitizedHolidayName,
+          holiday_date: holidayDate
+        }
+      });
+
+      if (response.data.status === 'success') {
+        setMessage('Holiday added successfully!');
+        setIsSuccess(true);
+        setPopupMessage('Successfully added Holiday!');
+        clearInputs();
+        setTimeout(() => {
+          setPopupMessage('');
+        }, 3000);
+      } else {
+        setMessage(`Error: ${response.data.message}`);
+        setIsSuccess(false);
+      }
+    } catch (error) {
+      console.error('Error adding holiday:', error);
+      setMessage('Error adding holiday.');
+      setIsSuccess(false);
+    }
+  };
+
   const clearInputs = () => {
     setCategoryName('');
     setMakeName('');
@@ -138,6 +186,8 @@ const Master = () => {
     setUserLevelDesc('');
     setDepartmentName('');
     setConditionName('');
+    setHolidayName('');
+    setHolidayDate('');
     setSelectedCategory('');
     setSelectedMake('');
     setMessage('');
@@ -152,6 +202,7 @@ const Master = () => {
     setIsAddUserLevelModalOpen(false);
     setIsAddDepartmentModalOpen(false);
     setIsAddConditionModalOpen(false);
+    setIsAddHolidayModalOpen(false);
   };
 
   const handleSaveCategoryData = (e) => {
@@ -225,6 +276,7 @@ const Master = () => {
             { title: 'Departments', icon: <FaListAlt />, action: () => setIsAddDepartmentModalOpen(true), viewPath: '/departments' },
             { title: 'Equipments', icon: <FaListAlt />, action: () => setIsAddEquipmentModalOpen(true), viewPath: '/equipmentCat' },
             { title: 'Condition', icon: <FaCogs />, action: () => setIsAddConditionModalOpen(true), viewPath: '/condition' },
+            { title: 'Holidays', icon: <FaPlus />, action: () => setIsAddHolidayModalOpen(true) },
           ].map((card, index) => (
             <motion.div 
               key={index}
@@ -437,6 +489,43 @@ const Master = () => {
                 />
                 <div className="flex justify-end">
                   <button type="button" onClick={resetForm} className="mr-2 py-2 px-4 bg-gray-500 text-white rounded">Cancel</button>
+                  <button type="submit" className="py-2 px-4 bg-blue-500 text-white rounded">Save</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Modal for Adding Holiday */}
+        {isAddHolidayModalOpen && (
+          <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
+            <div className="bg-white p-8 rounded-lg shadow-lg">
+              <h2 className="text-xl font-bold mb-4">Add Holiday</h2>
+              <form onSubmit={handleSaveHolidayData}>
+                <input
+                  type="text"
+                  value={holidayName}
+                  onChange={handleInputChange(setHolidayName)}
+                  placeholder="Enter holiday name"
+                  className="border border-gray-300 rounded px-4 py-2 w-full mb-4"
+                />
+                <input
+                  type="date"
+                  value={holidayDate}
+                  onChange={(e) => setHolidayDate(e.target.value)}
+                  className="border border-gray-300 rounded px-4 py-2 w-full mb-4"
+                />
+                <div className="flex justify-end">
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      clearInputs();
+                      setIsAddHolidayModalOpen(false);
+                    }} 
+                    className="mr-2 py-2 px-4 bg-gray-500 text-white rounded"
+                  >
+                    Cancel
+                  </button>
                   <button type="submit" className="py-2 px-4 bg-blue-500 text-white rounded">Save</button>
                 </div>
               </form>

@@ -78,7 +78,7 @@ const AssignPersonnel = () => {
                 reservation_vehicle_id: vehicle.reservation_vehicle_id
               }));
               checklists.push({
-                category: `Vehicle: ${vehicle.name}`,
+                category: `Vehicle: ${vehicle.model || 'N/A'} (License: ${vehicle.license || 'N/A'})`,
                 items: vehicleItems
               });
             }
