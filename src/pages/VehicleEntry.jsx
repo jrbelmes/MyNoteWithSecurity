@@ -24,8 +24,9 @@ import { Divider } from 'primereact/divider';
 import { DataView } from 'primereact/dataview';
 import dayjs from 'dayjs';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faEdit, faTrashAlt, faSearch, faPlus } from '@fortawesome/free-solid-svg-icons';
-import { Modal, Form, Input, TimePicker } from 'antd'; // Add this import
+import { faEdit, faTrashAlt, faSearch, faPlus, faEye } from '@fortawesome/free-solid-svg-icons';
+import { Modal, Form, Input, TimePicker, Table, Button, Space, Tooltip, Image, Select, Upload } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
 import { sanitizeInput, validateInput } from '../utils/sanitize';
 import {SecureStorage} from '../utils/encryption'; // Adjust the import path as necessary
 
@@ -50,8 +51,13 @@ const VehicleEntry = () => {
     const [editingVehicle, setEditingVehicle] = useState(null);
     const [year, setYear] = useState(new Date());
     const [vehicleImage, setVehicleImage] = useState(null);
+    const [fileList, setFileList] = useState([]);
     const [statusAvailability, setStatusAvailability] = useState([]);
     const [selectedStatus, setSelectedStatus] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [pageSize, setPageSize] = useState(10);
+    const [viewImageModal, setViewImageModal] = useState(false);
+    const [currentImage, setCurrentImage] = useState(null);
     const navigate = useNavigate();
     const BASE_URL = "http://localhost/coc/gsd/user.php";
     const user_id = localStorage.getItem('user_id');
@@ -119,7 +125,17 @@ const VehicleEntry = () => {
                 
                 // Handle vehicle image
                 if (vehicle.vehicle_pic) {
-                    setVehicleImage(`${IMAGE_BASE_URL}${vehicle.vehicle_pic}`);
+                    const imageUrl = `${IMAGE_BASE_URL}${vehicle.vehicle_pic}`;
+                    setVehicleImage(imageUrl);
+                    setFileList([{
+                        uid: '-1',
+                        name: 'vehicle-image.png',
+                        status: 'done',
+                        url: imageUrl,
+                    }]);
+                } else {
+                    setVehicleImage(null);
+                    setFileList([]);
                 }
 
                 // Handle status
@@ -179,6 +195,13 @@ const VehicleEntry = () => {
         setCategories([]);
         setModelsByCategory({});
         setSelectedVehicleId(null);
+        setYear(new Date());
+        setVehicleImage(null);
+        setFileList([]);
+        setSelectedStatus('');
+        if (fileUploadRef.current) {
+            fileUploadRef.current.clear();
+        }
     };
 
     const sanitizeAndValidateLicense = (value) => {
@@ -238,8 +261,7 @@ const VehicleEntry = () => {
                         vehicle_license: sanitizedLicense,
                         year: dayjs(year).format('YYYY'),
                         vehicle_pic: vehicleImage,
-                        user_admin_id: user_level_id === '2' ? user_id : null,  // Set user_admin_id if user_level_id is 2
-                        super_admin_id: user_level_id === '4' ? user_id : null, // Set super_admin_id if user_level_id is 1
+                        user_admin_id: user_id,  // Always set user_admin_id to user_id
                         status_availability_id: selectedStatus
                     }
                 });
@@ -295,8 +317,7 @@ const VehicleEntry = () => {
         }
     };
 
-    const handleMakeChange = async (e) => {
-        const selectedMakeId = e.target.value;
+    const handleMakeChange = async (selectedMakeId) => {
         setMakeId(selectedMakeId);
         setCategory(''); // Reset category when make changes
         setVehicleModelId(''); // Reset model when make changes
@@ -308,8 +329,7 @@ const VehicleEntry = () => {
         }
     };
 
-    const handleCategoryChange = (e) => {
-        const selectedCategoryId = e.target.value;
+    const handleCategoryChange = (selectedCategoryId) => {
         setCategory(selectedCategoryId);
         setVehicleModelId(''); // Reset model when category changes
     };
@@ -349,17 +369,167 @@ const VehicleEntry = () => {
 
     const handleSearchChange = (e) => {
         const searchTerm = e.target.value.toLowerCase();
-        const results = vehicles.filter(vehicle =>
-            vehicle.vehicle_model_name && vehicle.vehicle_model_name.toLowerCase().includes(searchTerm)
-        );
-        setFilteredVehicles(results);
+        setSearchTerm(searchTerm);
+        if (searchTerm === '') {
+            setFilteredVehicles(vehicles);
+        } else {
+            const results = vehicles.filter(vehicle =>
+                (vehicle.vehicle_model_name && vehicle.vehicle_model_name.toLowerCase().includes(searchTerm)) ||
+                (vehicle.vehicle_license && vehicle.vehicle_license.toLowerCase().includes(searchTerm)) ||
+                (vehicle.vehicle_make_name && vehicle.vehicle_make_name.toLowerCase().includes(searchTerm)) ||
+                (vehicle.vehicle_category_name && vehicle.vehicle_category_name.toLowerCase().includes(searchTerm)) ||
+                (vehicle.year && vehicle.year.toString().includes(searchTerm))
+            );
+            setFilteredVehicles(results);
+        }
     };
+
     const handleCloseModal = () => {
         resetForm();
         setShowAddModal(false);
         setShowEditModal(false);
         setEditingVehicle(null);
     };
+
+    const getImageUrl = (vehiclePic) => {
+        if (!vehiclePic) return null;
+        return `${IMAGE_BASE_URL}${vehiclePic}`;
+    };
+
+    const handleViewImage = (imageUrl) => {
+        setCurrentImage(imageUrl);
+        setViewImageModal(true);
+    };
+
+    // Table columns configuration
+    const columns = [
+        {
+            title: 'ID',
+            dataIndex: 'vehicle_id',
+            key: 'vehicle_id',
+            width: 80,
+            sorter: (a, b) => a.vehicle_id - b.vehicle_id,
+        },
+        {
+            title: 'Image',
+            dataIndex: 'vehicle_pic',
+            key: 'vehicle_pic',
+            width: 100,
+            render: (text, record) => {
+                const imageUrl = getImageUrl(record.vehicle_pic);
+                return (
+                    <div className="flex justify-center">
+                        {imageUrl ? (
+                            <div className="cursor-pointer" onClick={() => handleViewImage(imageUrl)}>
+                                <img 
+                                    src={imageUrl} 
+                                    alt={record.vehicle_model_name} 
+                                    className="w-16 h-16 object-cover rounded-md shadow-sm hover:opacity-80 transition-opacity"
+                                />
+                            </div>
+                        ) : (
+                            <div className="w-16 h-16 bg-gray-200 rounded-md flex items-center justify-center text-gray-400">
+                                <i className="pi pi-car text-2xl"></i>
+                            </div>
+                        )}
+                    </div>
+                );
+            }
+        },
+        {
+            title: 'License',
+            dataIndex: 'vehicle_license',
+            key: 'vehicle_license',
+            sorter: (a, b) => a.vehicle_license.localeCompare(b.vehicle_license),
+            render: (text) => <span className="font-semibold text-green-800">{text}</span>
+        },
+        {
+            title: 'Make',
+            dataIndex: 'vehicle_make_name',
+            key: 'vehicle_make_name',
+            sorter: (a, b) => a.vehicle_make_name.localeCompare(b.vehicle_make_name),
+        },
+        {
+            title: 'Category',
+            dataIndex: 'vehicle_category_name',
+            key: 'vehicle_category_name',
+            sorter: (a, b) => a.vehicle_category_name.localeCompare(b.vehicle_category_name),
+        },
+        {
+            title: 'Model',
+            dataIndex: 'vehicle_model_name',
+            key: 'vehicle_model_name',
+            sorter: (a, b) => a.vehicle_model_name.localeCompare(b.vehicle_model_name),
+        },
+        {
+            title: 'Year',
+            dataIndex: 'year',
+            key: 'year',
+            width: 100,
+            sorter: (a, b) => a.year - b.year,
+        },
+        {
+            title: 'Status',
+            dataIndex: 'status_availability_name',
+            key: 'status_availability_name',
+            width: 120,
+            render: (text) => (
+                <Tag 
+                    value={text || 'Unknown'} 
+                    severity={text?.toLowerCase() === 'available' ? 'success' : 'danger'}
+                    className="px-2 py-1 text-xs font-semibold"
+                />
+            ),
+            filters: statusAvailability.map(status => ({
+                text: status.status_availability_name,
+                value: status.status_availability_name,
+            })),
+            onFilter: (value, record) => record.status_availability_name === value,
+        },
+        {
+            title: 'Created At',
+            dataIndex: 'created_at',
+            key: 'created_at',
+            width: 170,
+            sorter: (a, b) => new Date(a.created_at) - new Date(b.created_at),
+            render: (text) => text ? dayjs(text).format('MMM D, YYYY HH:mm') : 'N/A'
+        },
+        {
+            title: 'Updated At',
+            dataIndex: 'updated_at',
+            key: 'updated_at',
+            width: 170,
+            sorter: (a, b) => new Date(a.updated_at) - new Date(b.updated_at),
+            render: (text) => text ? dayjs(text).format('MMM D, YYYY HH:mm') : 'N/A'
+        },
+        {
+            title: 'Actions',
+            key: 'actions',
+            fixed: 'right',
+            width: 150,
+            render: (_, record) => (
+                <Space>
+                    <Tooltip title="Edit Vehicle">
+                        <Button 
+                            type="primary" 
+                            icon={<FontAwesomeIcon icon={faEdit} />} 
+                            onClick={() => handleEditVehicle(record)}
+                            size="small"
+                            className="bg-green-500 hover:bg-green-600 border-green-500"
+                        />
+                    </Tooltip>
+                    <Tooltip title="Archive Vehicle">
+                        <Button 
+                            icon={<FontAwesomeIcon icon={faTrashAlt} />} 
+                            onClick={() => handleArchiveVehicle(record)}
+                            size="small"
+                            className="text-yellow-600 hover:text-yellow-700 border-yellow-300 hover:border-yellow-400"
+                        />
+                    </Tooltip>
+                </Space>
+            )
+        }
+    ];
 
     const itemTemplate = (vehicle) => {
         // Helper function to determine tag severity based on status
@@ -468,14 +638,17 @@ const VehicleEntry = () => {
         );
     };
 
-    const handleImageUpload = (event) => {
-        const file = event.files[0];
-        if (file) {
+    const handleImageUpload = ({ fileList: newFileList }) => {
+        setFileList(newFileList);
+        if (newFileList.length > 0) {
+            const file = newFileList[0].originFileObj;
             const reader = new FileReader();
             reader.onloadend = () => {
-                setVehicleImage(reader.result); // This will store the base64 image data
+                setVehicleImage(reader.result);
             };
             reader.readAsDataURL(file);
+        } else {
+            setVehicleImage(null);
         }
     };
 
@@ -485,19 +658,19 @@ const VehicleEntry = () => {
     };
 
     return (
-        <div className="flex h-screen bg-gradient-to-br from-white to-green-500 overflow-hidden">
+        <div className="flex h-screen bg-gradient-to-br from-green-100 to-white overflow-hidden">
             <div className="flex-none">
                 <Sidebar />
             </div>
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto bg-white bg-opacity-60 mt-20">
                 <motion.div 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5 }}
                     className="p-6 lg:p-10"
                 >
-                    <h2 className="text-4xl font-bold mb-6 text-green-800 drop-shadow-lg">Vehicle Management</h2>
-                    <div className="bg-white bg-opacity-90 rounded-lg shadow-xl p-6 mb-6 backdrop-filter backdrop-blur-lg">
+                    <h2 className="text-4xl font-bold mb-6 text-green-800 drop-shadow-sm">Vehicle Management</h2>
+                    <div className="bg-white rounded-lg shadow-md p-6 mb-6 border border-gray-100">
                         <div className="flex flex-col md:flex-row items-center justify-between mb-4">
                             <motion.div 
                                 whileHover={{ scale: 1.05 }}
@@ -506,6 +679,7 @@ const VehicleEntry = () => {
                                 <input
                                     type="text"
                                     onChange={handleSearchChange}
+                                    value={searchTerm}
                                     placeholder="Search vehicles..."
                                     className="w-full pl-10 pr-4 py-2 rounded-full border border-green-300 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-300"
                                 />
@@ -515,7 +689,7 @@ const VehicleEntry = () => {
                                 whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
                                 onClick={handleAddVehicle}
-                                className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out flex items-center justify-center shadow-md"
+                                className="w-full md:w-auto bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out flex items-center justify-center shadow-md"
                             >
                                 <FontAwesomeIcon icon={faPlus} className="mr-2" /> Add Vehicle
                             </motion.button>
@@ -531,19 +705,35 @@ const VehicleEntry = () => {
                                 <div className="loader"></div>
                             </motion.div>
                         ) : (
-                            <DataView
-                                value={filteredVehicles}
-                                itemTemplate={itemTemplate}
-                                paginator
-                                rows={10}
-                                emptyMessage={
-                                    <div className="text-center py-8">
-                                        <i className="pi pi-car text-6xl text-gray-300 mb-4"></i>
-                                        <p className="text-xl text-gray-500">No vehicles found</p>
-                                    </div>
-                                }
-                                className="p-4"
-                            />
+                            <div className="overflow-x-auto">
+                                <Table 
+                                    columns={columns} 
+                                    dataSource={filteredVehicles}
+                                    rowKey="vehicle_id"
+                                    pagination={{
+                                        pageSize: pageSize,
+                                        showSizeChanger: true,
+                                        pageSizeOptions: ['10', '20', '50'],
+                                        showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+                                        onChange: (page, pageSize) => {
+                                            setPageSize(pageSize);
+                                        }
+                                    }}
+                                    scroll={{ x: 1300 }}
+                                    bordered
+                                    size="middle"
+                                    className="vehicle-table"
+                                    style={{ backgroundColor: 'white' }}
+                                    locale={{
+                                        emptyText: (
+                                            <div className="text-center py-8">
+                                                <i className="pi pi-car text-6xl text-gray-300 mb-4"></i>
+                                                <p className="text-xl text-gray-500">No vehicles found</p>
+                                            </div>
+                                        )
+                                    }}
+                                />
+                            </div>
                         )}
                     </div>
                 </motion.div>
@@ -567,7 +757,7 @@ const VehicleEntry = () => {
                                 required
                                 tooltip="Select the vehicle make"
                             >
-                                <Dropdown
+                                <Select
                                     value={makeId}
                                     options={makes.map(make => ({
                                         label: make.vehicle_make_name,
@@ -584,7 +774,7 @@ const VehicleEntry = () => {
                                 required
                                 tooltip="Select the vehicle category"
                             >
-                                <Dropdown
+                                <Select
                                     value={category}
                                     options={categories.map(cat => ({
                                         label: cat.vehicle_category_name,
@@ -602,13 +792,13 @@ const VehicleEntry = () => {
                                 required
                                 tooltip="Select the vehicle model"
                             >
-                                <Dropdown
+                                <Select
                                     value={vehicleModelId}
                                     options={modelsByCategory[category]?.map(model => ({
                                         label: model.vehicle_model_name,
                                         value: model.vehicle_model_id
                                     }))}
-                                    onChange={(e) => setVehicleModelId(e.value)}
+                                    onChange={(value) => setVehicleModelId(value)}
                                     placeholder="Select Model"
                                     className="w-full"
                                     disabled={!category}
@@ -648,13 +838,13 @@ const VehicleEntry = () => {
                                 required
                                 tooltip="Select the vehicle availability status"
                             >
-                                <Dropdown
+                                <Select
                                     value={selectedStatus}
                                     options={statusAvailability.map(status => ({
                                         label: status.status_availability_name,
                                         value: status.status_availability_id
                                     }))}
-                                    onChange={(e) => setSelectedStatus(e.value)}
+                                    onChange={(value) => setSelectedStatus(value)}
                                     placeholder="Select Status"
                                     className="w-full"
                                 />
@@ -666,32 +856,20 @@ const VehicleEntry = () => {
                                 label="Vehicle Image"
                                 tooltip="Upload vehicle image (max 5MB)"
                             >
-                                <FileUpload
-                                    ref={fileUploadRef}
-                                    mode="advanced"
-                                    name="vehicle-pic"
-                                    multiple={false}
-                                    accept="image/*"
-                                    maxFileSize={5000000}
-                                    onSelect={handleImageUpload}
-                                    headerTemplate={options => {
-                                        const { className, chooseButton } = options;
-                                        return (
-                                            <div className={className} style={{backgroundColor: 'transparent', display: 'flex', alignItems: 'center'}}>
-                                                {chooseButton}
-                                            </div>
-                                        );
-                                    }}
-                                    emptyTemplate={
-                                        <div className="flex flex-col items-center p-6 border-2 border-dashed border-gray-300 rounded-lg">
-                                            <i className="pi pi-image mb-2 text-4xl text-gray-400" />
-                                            <p className="m-0 text-gray-500">
-                                                Drag and drop image here or click to browse
-                                            </p>
-                                        </div>
-                                    }
-                                />
-                                {vehicleImage && (
+                                <Upload
+                                    listType="picture-card"
+                                    fileList={fileList}
+                                    onChange={handleImageUpload}
+                                    beforeUpload={() => false}
+                                    maxCount={1}
+                                >
+                                    {fileList.length < 1 && (
+                                        <Button icon={<PlusOutlined />}>
+                                            Upload
+                                        </Button>
+                                    )}
+                                </Upload>
+                                {vehicleImage && typeof vehicleImage === 'string' && vehicleImage.startsWith('http') && (
                                     <div className="mt-4">
                                         <img src={vehicleImage} 
                                             alt="Vehicle Preview" 
@@ -703,6 +881,24 @@ const VehicleEntry = () => {
                         </div>
                     </div>
                 </Form>
+            </Modal>
+
+            {/* Image Preview Modal */}
+            <Modal
+                open={viewImageModal}
+                footer={null}
+                onCancel={() => setViewImageModal(false)}
+                width={700}
+                centered
+            >
+                {currentImage && (
+                    <Image
+                        src={currentImage}
+                        alt="Vehicle"
+                        className="w-full object-contain max-h-[70vh]"
+                        preview={false}
+                    />
+                )}
             </Modal>
         </div>
     );

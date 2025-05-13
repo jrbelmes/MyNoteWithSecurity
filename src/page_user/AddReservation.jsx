@@ -383,7 +383,7 @@ useEffect(() => {
         try {
           const encryptedUserLevel = SecureStorage.getSessionItem("user_level_id"); 
           console.log("this is encryptedUserLevel", encryptedUserLevel);
-          if (encryptedUserLevel !== '3' && encryptedUserLevel !== '15' && encryptedUserLevel !== '16') {
+          if (encryptedUserLevel !== '3' && encryptedUserLevel !== '15' && encryptedUserLevel !== '16' && encryptedUserLevel !== '17') {
               localStorage.clear();
               navigate('/gsd');
           }
@@ -3365,7 +3365,7 @@ return (
         <div className={`bg-white rounded-2xl shadow-sm p-6 border border-gray-100 ${isMobile ? 'mb-3' : 'mb-6'}`}>
           <div className={`flex ${isMobile ? 'flex-col gap-2' : 'justify-between items-center'}`}>
             <Button
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate('/Faculty/Dashboard')}
               className="p-button-text flex items-center gap-2 hover:bg-blue-50 transition-colors"
               icon={<i className="pi pi-arrow-left text-blue-500" />}
             >

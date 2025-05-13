@@ -1,21 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import dayjs from 'dayjs';
 import Sidebar from './Sidebar';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faEdit, faTrashAlt, faSearch, faPlus } from '@fortawesome/free-solid-svg-icons';
+import { faEdit, faTrashAlt, faSearch, faPlus, faEye } from '@fortawesome/free-solid-svg-icons';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import axios from 'axios';
-import {Button } from 'react-bootstrap';
-import 'bootstrap/dist/css/bootstrap.min.css';
-import { motion, AnimatePresence } from 'framer-motion';
-import { DataView } from 'primereact/dataview';
-import { Card } from 'primereact/card';
-import { Tag } from 'primereact/tag';
-import { Divider } from 'primereact/divider';
-import { Modal, Form, Input, Upload } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { motion } from 'framer-motion';
 import { sanitizeInput, validateInput } from '../utils/sanitize';
-import {SecureStorage} from '../utils/encryption';
+import { SecureStorage } from '../utils/encryption';
+import { Modal, Form, Input, Upload, Select, Table, Button, Image, Tooltip, Space } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
+import { Tag } from 'primereact/tag';
 
 const EquipmentEntry = () => {
     const adminId = localStorage.getItem('adminId') || '';
@@ -23,8 +19,7 @@ const EquipmentEntry = () => {
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [currentPage, setCurrentPage] = useState(1);
-    const [entriesPerPage] = useState(10);
+    const [pageSize, setPageSize] = useState(10);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [newEquipmentName, setNewEquipmentName] = useState('');
@@ -33,14 +28,16 @@ const EquipmentEntry = () => {
     const [editingEquipment, setEditingEquipment] = useState(null);
     const navigate = useNavigate();
     
-    const [filteredEquipments, setFilteredEquipments] = useState([]);
     const [form] = Form.useForm();
     const [equipmentImage, setEquipmentImage] = useState(null);
     const [fileList, setFileList] = useState([]);
     const [statusAvailability, setStatusAvailability] = useState([]);
     const [selectedStatus, setSelectedStatus] = useState('');
+    const [viewImageModal, setViewImageModal] = useState(false);
+    const [currentImage, setCurrentImage] = useState(null);
 
     const user_level_id = SecureStorage.getSessionItem('user_level_id');
+    const user_id = SecureStorage.getSessionItem('user_id');
 
     useEffect(() => {
         if (user_level_id !== '1' && user_level_id !== '2' && user_level_id !== '4') {
@@ -54,18 +51,6 @@ const EquipmentEntry = () => {
         fetchCategories();
         fetchStatusAvailability();
     }, []);
-
-    useEffect(() => {
-        const delayDebounceFn = setTimeout(() => {
-            const filtered = equipments.filter(equipment =>
-                equipment.equip_name && equipment.equip_name.toLowerCase().includes(searchTerm.toLowerCase())
-            );
-            setFilteredEquipments(filtered);
-            setCurrentPage(1);
-        }, 300);
-
-        return () => clearTimeout(delayDebounceFn);
-    }, [searchTerm, equipments]);
 
     const fetchEquipments = async () => {
         setLoading(true);
@@ -169,8 +154,7 @@ const EquipmentEntry = () => {
                     categoryId: selectedCategory,
                     statusId: selectedStatus,
                     equip_pic: equipmentImage || null,
-                    user_admin_id: user_level === '1' ? user_admin_id : null,  // Set for user admin (level 1)
-                    super_admin_id: user_level === '4' ? user_admin_id : null  // Set for super admin (level 4)
+                    user_admin_id: user_admin_id
                 }
             };
         } else {
@@ -182,8 +166,7 @@ const EquipmentEntry = () => {
                     categoryId: selectedCategory,
                     equip_pic: equipmentImage,
                     status_availability_id: selectedStatus,
-                    user_admin_id: user_level === '1' ? user_admin_id : null,  // Set for user admin (level 1)
-                    super_admin_id: user_level === '4' ? user_admin_id : null  // Set for super admin (level 4)
+                    user_admin_id: user_admin_id
                 }
             };
         }
@@ -194,7 +177,6 @@ const EquipmentEntry = () => {
 
         setLoading(true);
         try {
-            // Update the request to send data as JSON
             const response = await axios.post(url, JSON.stringify(requestData), {
                 headers: {
                     'Content-Type': 'application/json'
@@ -203,13 +185,9 @@ const EquipmentEntry = () => {
             
             if (response.data.status === 'success') {
                 toast.success(`Equipment successfully ${editingEquipment ? "updated" : "added"}!`);
-                console.log(requestData);
-                console.log(user_level_id);
                 fetchEquipments();
                 resetForm();
             } else {
-                console.log(requestData);
-                console.log(user_level_id);
                 toast.error(`Failed to ${editingEquipment ? "update" : "add"} equipment: ` + (response.data.message || "Unknown error"));
             }
         } catch (error) {
@@ -231,7 +209,6 @@ const EquipmentEntry = () => {
             const file = newFileList[0].originFileObj;
             const reader = new FileReader();
             reader.onloadend = () => {
-                // Store the complete base64 string including data URL
                 setEquipmentImage(reader.result);
             };
             reader.readAsDataURL(file);
@@ -267,7 +244,7 @@ const EquipmentEntry = () => {
                 setNewEquipmentName(equipment.equip_name);
                 setNewEquipmentQuantity(equipment.equip_quantity);
                 setSelectedCategory(equipment.equipment_equipment_category_id);
-                setSelectedStatus(equipment.status_availability_id); // Add this line
+                setSelectedStatus(equipment.status_availability_id);
                 setEditingEquipment(equipment);
                 
                 // Update form values
@@ -275,8 +252,23 @@ const EquipmentEntry = () => {
                     equipmentName: equipment.equip_name,
                     equipmentQuantity: equipment.equip_quantity,
                     category: equipment.equipment_equipment_category_id,
-                    status: equipment.status_availability_id  // Add this line
+                    status: equipment.status_availability_id
                 });
+
+                // If there's an image, prepare it for display
+                if (equipment.equip_pic) {
+                    const imageUrl = `http://localhost/coc/gsd/${equipment.equip_pic}`;
+                    setEquipmentImage(imageUrl);
+                    setFileList([{
+                        uid: '-1',
+                        name: 'equipment-image.png',
+                        status: 'done',
+                        url: imageUrl,
+                    }]);
+                } else {
+                    setFileList([]);
+                    setEquipmentImage(null);
+                }
             } else {
                 toast.error("Error fetching equipment details: " + response.data.message);
             }
@@ -286,7 +278,7 @@ const EquipmentEntry = () => {
         }
     };
 
-    const handleDeleteClick = async (equip_id) => {
+    const handleArchiveEquipment = async (equip_id) => {
         const confirmation = window.confirm("Are you sure you want to archive this equipment?");
         if (!confirmation) return;
 
@@ -318,157 +310,186 @@ const EquipmentEntry = () => {
         }
     };
 
-    const indexOfLastEquipment = currentPage * entriesPerPage;
-    const indexOfFirstEquipment = indexOfLastEquipment - entriesPerPage;
-    const currentEquipments = filteredEquipments.slice(indexOfFirstEquipment, indexOfLastEquipment);
-    const totalPages = Math.ceil(filteredEquipments.length / entriesPerPage);
-
-    const paginate = (pageNumber) => setCurrentPage(pageNumber);
-
-    const itemTemplate = (equipment) => {
-        return (
-            <motion.div
-                whileHover={{ scale: 1.02 }}
-                transition={{ duration: 0.2 }}
-            >
-                <Card className="mb-4 bg-white bg-opacity-95 shadow-lg hover:shadow-2xl transition-all duration-300">
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-                        <div className="md:col-span-3 flex justify-center items-start">
-                            <div className="group relative w-full min-h-[200px] rounded-lg overflow-hidden">
-                                {equipment.equip_pic ? (
-                                    <div className="relative h-48 md:h-64">
-                                        <img 
-                                            src={`http://localhost/coc/gsd/${equipment.equip_pic}`}
-                                            alt={equipment.equip_name}
-                                            className="object-cover w-full h-full rounded-lg transform group-hover:scale-110 transition-transform duration-300"
-                                        />
-                                        <div className="absolute inset-0 bg-black bg-opacity-20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center justify-center h-48 md:h-64 bg-gradient-to-br from-gray-100 to-gray-200">
-                                        <i className="pi pi-box text-6xl text-gray-400"></i>
-                                    </div>
-                                )}
-                                <div className="absolute top-2 right-2">
-                                    <Tag 
-                                        value={equipment.status || 'Available'} 
-                                        severity={equipment.status === 'Available' ? 'success' : 'danger'}
-                                        className="px-3 py-1 text-xs font-semibold rounded-full shadow-md"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="md:col-span-9 flex flex-col">
-                            <div className="flex justify-between items-start mb-4">
-                                <div>
-                                    <h3 className="text-2xl font-bold text-green-800 mb-2 group-hover:text-green-600">
-                                        {equipment.equip_name}
-                                    </h3>
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <span className="bg-green-100 text-green-800 text-sm font-medium px-3 py-1 rounded-full">
-                                            ID: {equipment.equip_id}
-                                        </span>
-                                        <span className="bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1 rounded-full">
-                                            QTY: {equipment.equip_quantity}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
-                                <div className="flex items-center p-3 bg-gray-50 rounded-lg">
-                                    <i className="pi pi-tag text-green-600 mr-2"></i>
-                                    <div>
-                                        <p className="text-xs text-gray-500">Category</p>
-                                        <p className="font-semibold text-sm">{equipment.equipment_category_name || 'N/A'}</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center p-3 bg-gray-50 rounded-lg">
-                                    <i className="pi pi-calendar text-green-600 mr-2"></i>
-                                    <div>
-                                        <p className="text-xs text-gray-500">Created</p>
-                                        <p className="font-semibold text-sm">{new Date(equipment.equip_created_at).toLocaleDateString()}</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center p-3 bg-gray-50 rounded-lg">
-                                    <i className="pi pi-clock text-green-600 mr-2"></i>
-                                    <div>
-                                        <p className="text-xs text-gray-500">Last Updated</p>
-                                        <p className="font-semibold text-sm">{equipment.equip_updated_at ? new Date(equipment.equip_updated_at).toLocaleDateString() : 'N/A'}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="flex justify-end gap-3 mt-auto">
-                                <motion.button 
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    onClick={() => handleEditClick(equipment)}
-                                    className="flex items-center gap-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-2 rounded-full transition-all duration-300 shadow-md hover:shadow-lg"
-                                >
-                                    <FontAwesomeIcon icon={faEdit} className="text-sm" />
-                                    <span>Edit</span>
-                                </motion.button>
-                                <motion.button 
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    onClick={() => handleDeleteClick(equipment.equip_id)}
-                                    className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white px-4 py-2 rounded-full transition-all duration-300 shadow-md hover:shadow-lg"
-                                >
-                                    <i className="pi pi-inbox text-sm"></i>
-                                    <span>Archive</span>
-                                </motion.button>
-                            </div>
-                        </div>
-                    </div>
-                </Card>
-            </motion.div>
-        );
+    const handleViewImage = (imageUrl) => {
+        setCurrentImage(imageUrl);
+        setViewImageModal(true);
     };
 
+    const getImageUrl = (imagePath) => {
+        if (!imagePath) return null;
+        return `http://localhost/coc/gsd/${imagePath}`;
+    };
+
+    const filteredEquipments = equipments.filter(equipment =>
+        equipment.equip_name && equipment.equip_name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    // Table columns configuration
+    const columns = [
+        {
+            title: 'ID',
+            dataIndex: 'equip_id',
+            key: 'equip_id',
+            width: 80,
+            sorter: (a, b) => a.equip_id - b.equip_id,
+        },
+        {
+            title: 'Image',
+            dataIndex: 'equip_pic',
+            key: 'equip_pic',
+            width: 100,
+            render: (text, record) => {
+                const imageUrl = getImageUrl(record.equip_pic);
+                return (
+                    <div className="flex justify-center">
+                        {imageUrl ? (
+                            <div className="cursor-pointer" onClick={() => handleViewImage(imageUrl)}>
+                                <img 
+                                    src={imageUrl} 
+                                    alt={record.equip_name} 
+                                    className="w-16 h-16 object-cover rounded-md shadow-sm hover:opacity-80 transition-opacity"
+                                />
+                            </div>
+                        ) : (
+                            <div className="w-16 h-16 bg-gray-200 rounded-md flex items-center justify-center text-gray-400">
+                                <i className="pi pi-box text-2xl"></i>
+                            </div>
+                        )}
+                    </div>
+                );
+            }
+        },
+        {
+            title: 'Equipment Name',
+            dataIndex: 'equip_name',
+            key: 'equip_name',
+            sorter: (a, b) => a.equip_name.localeCompare(b.equip_name),
+            render: (text) => <span className="font-semibold text-green-800">{text}</span>
+        },
+        {
+            title: 'Quantity',
+            dataIndex: 'equip_quantity',
+            key: 'equip_quantity',
+            width: 120,
+            sorter: (a, b) => a.equip_quantity - b.equip_quantity,
+        },
+        {
+            title: 'Category',
+            dataIndex: 'equipment_category_name',
+            key: 'equipment_category_name',
+            width: 150,
+            render: (text) => text || 'Not specified',
+            filters: categories.map(category => ({
+                text: category.equipments_category_name,
+                value: category.equipments_category_name,
+            })),
+            onFilter: (value, record) => record.equipment_category_name === value,
+        },
+        {
+            title: 'Status',
+            dataIndex: 'status',
+            key: 'status',
+            width: 120,
+            render: (status) => (
+                <Tag 
+                    value={status || 'Available'} 
+                    severity={(status || 'Available') === 'Available' ? 'success' : 'danger'}
+                    className="px-2 py-1 text-xs font-semibold"
+                />
+            ),
+            filters: statusAvailability.map(status => ({
+                text: status.status_availability_name,
+                value: status.status_availability_name === 'Available' ? 'Available' : 'Not Available',
+            })),
+            onFilter: (value, record) => record.status === value,
+        },
+        {
+            title: 'Created At',
+            dataIndex: 'equip_created_at',
+            key: 'equip_created_at',
+            width: 170,
+            sorter: (a, b) => new Date(a.equip_created_at) - new Date(b.equip_created_at),
+            render: (text) => dayjs(text).format('MMM D, YYYY HH:mm')
+        },
+        {
+            title: 'Updated At',
+            dataIndex: 'equip_updated_at',
+            key: 'equip_updated_at',
+            width: 170,
+            sorter: (a, b) => {
+                if (!a.equip_updated_at) return -1;
+                if (!b.equip_updated_at) return 1;
+                return new Date(a.equip_updated_at) - new Date(b.equip_updated_at);
+            },
+            render: (text) => text ? dayjs(text).format('MMM D, YYYY HH:mm') : 'N/A'
+        },
+        {
+            title: 'Actions',
+            key: 'actions',
+            fixed: 'right',
+            width: 150,
+            render: (_, record) => (
+                <Space>
+                    <Tooltip title="Edit Equipment">
+                        <Button 
+                            type="primary" 
+                            icon={<FontAwesomeIcon icon={faEdit} />} 
+                            onClick={() => handleEditClick(record)}
+                            size="small"
+                            className="bg-green-500 hover:bg-green-600 border-green-500"
+                        />
+                    </Tooltip>
+                    <Tooltip title="Archive Equipment">
+                        <Button 
+                            icon={<FontAwesomeIcon icon={faTrashAlt} />} 
+                            onClick={() => handleArchiveEquipment(record.equip_id)}
+                            size="small"
+                            className="text-yellow-600 hover:text-yellow-700 border-yellow-300 hover:border-yellow-400"
+                        />
+                    </Tooltip>
+                </Space>
+            )
+        }
+    ];
+
     return (
-        <div className="flex h-screen bg-gradient-to-br from-white to-green-500 overflow-hidden">
+        <div className="flex h-screen bg-gradient-to-br from-green-100 to-white overflow-hidden">
             <div className="flex-none">
                 <Sidebar />
             </div>
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto bg-white bg-opacity-60 mt-20">
                 <motion.div 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5 }}
                     className="p-6 lg:p-10"
                 >
-                    <h2 className="text-4xl font-bold mb-6 text-green-800 drop-shadow-lg">Equipment Management</h2>
-                    <div className="bg-white bg-opacity-90 rounded-lg shadow-xl p-6 mb-6 backdrop-filter backdrop-blur-lg">
-                        <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0 md:space-x-4 mb-6">
+                    <h2 className="text-4xl font-bold mb-6 text-green-800 drop-shadow-sm">Equipment Management</h2>
+                    <div className="bg-white rounded-lg shadow-md p-6 mb-6 border border-gray-100">
+                        <div className="flex flex-col md:flex-row items-center justify-between mb-4">
                             <motion.div 
-                                whileHover={{ scale: 1.02 }}
-                                className="relative w-full md:w-96"
+                                whileHover={{ scale: 1.05 }}
+                                className="relative w-full md:w-64 mb-4 md:mb-0"
                             >
                                 <input
                                     type="text"
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
-                                    placeholder="Search equipment..."
-                                    className="w-full pl-12 pr-4 py-3 rounded-full border-2 border-green-300 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-300 text-lg"
+                                    placeholder="Search equipments..."
+                                    className="w-full pl-10 pr-4 py-2 rounded-full border border-green-300 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-300"
                                 />
-                                <FontAwesomeIcon 
-                                    icon={faSearch} 
-                                    className="absolute left-4 top-1/2 transform -translate-y-1/2 text-green-400 text-xl"
-                                />
+                                <FontAwesomeIcon icon={faSearch} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-400" />
                             </motion.div>
                             <motion.button 
                                 whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
                                 onClick={() => setIsAddModalOpen(true)}
-                                className="w-full md:w-auto bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-3 px-8 rounded-full transition duration-300 ease-in-out flex items-center justify-center shadow-lg hover:shadow-xl"
+                                className="w-full md:w-auto bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out flex items-center justify-center shadow-md"
                             >
-                                <FontAwesomeIcon icon={faPlus} className="mr-2" />
-                                <span className="text-lg">Add New Equipment</span>
+                                <FontAwesomeIcon icon={faPlus} className="mr-2" /> Add Equipment
                             </motion.button>
                         </div>
-                        
+
                         {loading ? (
                             <motion.div
                                 initial={{ opacity: 0 }}
@@ -479,24 +500,41 @@ const EquipmentEntry = () => {
                                 <div className="loader"></div>
                             </motion.div>
                         ) : (
-                            <DataView
-                                value={filteredEquipments}
-                                itemTemplate={itemTemplate}
-                                paginator
-                                rows={10}
-                                emptyMessage={
-                                    <div className="text-center py-8">
-                                        <i className="pi pi-cog text-6xl text-gray-300 mb-4"></i>
-                                        <p className="text-xl text-gray-500">No equipment found</p>
-                                    </div>
-                                }
-                                className="p-4"
-                            />
+                            <div className="overflow-x-auto">
+                                <Table 
+                                    columns={columns} 
+                                    dataSource={filteredEquipments}
+                                    rowKey="equip_id"
+                                    pagination={{
+                                        pageSize: pageSize,
+                                        showSizeChanger: true,
+                                        pageSizeOptions: ['10', '20', '50'],
+                                        showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+                                        onChange: (page, pageSize) => {
+                                            setPageSize(pageSize);
+                                        }
+                                    }}
+                                    scroll={{ x: 1300 }}
+                                    bordered
+                                    size="middle"
+                                    className="equipment-table"
+                                    style={{ backgroundColor: 'white' }}
+                                    locale={{
+                                        emptyText: (
+                                            <div className="text-center py-8">
+                                                <i className="pi pi-box text-6xl text-gray-300 mb-4"></i>
+                                                <p className="text-xl text-gray-500">No equipment found</p>
+                                            </div>
+                                        )
+                                    }}
+                                />
+                            </div>
                         )}
                     </div>
                 </motion.div>
             </div>
 
+            {/* Add/Edit Equipment Modal */}
             <Modal
                 title={editingEquipment ? "Edit Equipment" : "Add Equipment"}
                 open={isAddModalOpen || isEditModalOpen}
@@ -505,8 +543,10 @@ const EquipmentEntry = () => {
                     setIsEditModalOpen(false);
                     resetForm();
                 }}
+                okText={editingEquipment ? "Update" : "Add"}
                 onOk={handleSubmit}
-                width={800}
+                confirmLoading={loading}
+                width={700}
             >
                 <Form
                     form={form}
@@ -514,7 +554,8 @@ const EquipmentEntry = () => {
                     initialValues={{
                         equipmentName: newEquipmentName,
                         equipmentQuantity: newEquipmentQuantity,
-                        category: selectedCategory
+                        category: selectedCategory,
+                        status: selectedStatus
                     }}
                 >
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -541,6 +582,7 @@ const EquipmentEntry = () => {
                                     value={newEquipmentQuantity}
                                     onChange={handleEquipmentQuantityChange}
                                     placeholder="Enter quantity"
+                                    min="1"
                                 />
                             </Form.Item>
 
@@ -549,18 +591,17 @@ const EquipmentEntry = () => {
                                 name="category"
                                 rules={[{ required: true, message: 'Please select a category!' }]}
                             >
-                                <select
+                                <Select
                                     value={selectedCategory}
-                                    onChange={(e) => setSelectedCategory(e.target.value)}
-                                    className="w-full p-2 border border-gray-300 rounded-lg"
+                                    onChange={(value) => setSelectedCategory(value)}
+                                    placeholder="Select a category"
                                 >
-                                    <option value="">Select a category</option>
                                     {categories.map(category => (
-                                        <option key={category.equipments_category_id} value={category.equipments_category_id}>
+                                        <Select.Option key={category.equipments_category_id} value={category.equipments_category_id}>
                                             {category.equipments_category_name}
-                                        </option>
+                                        </Select.Option>
                                     ))}
-                                </select>
+                                </Select>
                             </Form.Item>
 
                             <Form.Item
@@ -568,18 +609,17 @@ const EquipmentEntry = () => {
                                 name="status"
                                 rules={[{ required: true, message: 'Please select status!' }]}
                             >
-                                <select
+                                <Select
                                     value={selectedStatus}
-                                    onChange={(e) => setSelectedStatus(e.target.value)}
-                                    className="w-full p-2 border border-gray-300 rounded-lg"
+                                    onChange={(value) => setSelectedStatus(value)}
+                                    placeholder="Select status"
                                 >
-                                    <option value="">Select status</option>
                                     {statusAvailability.map(status => (
-                                        <option key={status.status_availability_id} value={status.status_availability_id}>
+                                        <Select.Option key={status.status_availability_id} value={status.status_availability_id}>
                                             {status.status_availability_name}
-                                        </option>
+                                        </Select.Option>
                                     ))}
-                                </select>
+                                </Select>
                             </Form.Item>
                         </div>
 
@@ -596,26 +636,42 @@ const EquipmentEntry = () => {
                                     maxCount={1}
                                 >
                                     {fileList.length < 1 && (
-                                        <div>
-                                            <PlusOutlined />
-                                            <div style={{ marginTop: 8 }}>Upload</div>
-                                        </div>
+                                        <Button icon={<PlusOutlined />}>
+                                            Upload
+                                        </Button>
                                     )}
                                 </Upload>
+                                {equipmentImage && typeof equipmentImage === 'string' && equipmentImage.startsWith('http') && (
+                                    <div className="mt-4">
+                                        <img
+                                            src={equipmentImage}
+                                            alt="Equipment Preview"
+                                            className="max-w-full h-auto max-h-40 rounded-lg shadow-lg"
+                                        />
+                                    </div>
+                                )}
                             </Form.Item>
-
-                            {equipmentImage && (
-                                <div className="mt-4">
-                                    <img
-                                        src={equipmentImage}
-                                        alt="Equipment Preview"
-                                        className="max-w-full h-auto rounded-lg shadow-lg"
-                                    />
-                                </div>
-                            )}
                         </div>
                     </div>
                 </Form>
+            </Modal>
+
+            {/* Image Preview Modal */}
+            <Modal
+                open={viewImageModal}
+                footer={null}
+                onCancel={() => setViewImageModal(false)}
+                width={700}
+                centered
+            >
+                {currentImage && (
+                    <Image
+                        src={currentImage}
+                        alt="Equipment"
+                        className="w-full object-contain max-h-[70vh]"
+                        preview={false}
+                    />
+                )}
             </Modal>
         </div>
     );

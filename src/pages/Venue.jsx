@@ -5,19 +5,17 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faEdit, faSearch, faPlus } from '@fortawesome/free-solid-svg-icons';
+import { faEdit, faSearch, faPlus, faTrashAlt, faEye } from '@fortawesome/free-solid-svg-icons';
 import '../vehicle.css';
-import { Modal, Input, Form, TimePicker, Select } from 'antd';
+import { Modal, Input, Form, TimePicker, Select, Table, Button, Image, Tooltip, Space, Upload } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { motion } from 'framer-motion';
 import { FileUpload } from 'primereact/fileupload';
 import 'primereact/resources/themes/lara-light-indigo/theme.css';
 import 'primereact/resources/primereact.min.css';
 import 'primeicons/primeicons.css';
-import { DataView } from 'primereact/dataview';
 import { Tag } from 'primereact/tag';
-import { Card } from 'primereact/card';
-import { Divider } from 'primereact/divider';
 import { sanitizeInput, validateInput } from '../utils/sanitize';
 import { SecureStorage } from '../utils/encryption';
 
@@ -27,8 +25,7 @@ const VenueEntry = () => {
     const [venues, setVenues] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [currentPage, setCurrentPage] = useState(1);
-    const [entriesPerPage] = useState(10);
+    const [pageSize, setPageSize] = useState(10);
     const [showModal, setShowModal] = useState(false);
     const [venueName, setVenueName] = useState('');
     const [maxOccupancy, setMaxOccupancy] = useState('');
@@ -40,8 +37,11 @@ const VenueEntry = () => {
     const [operatingHoursStart, setOperatingHoursStart] = useState(null);
     const [operatingHoursEnd, setOperatingHoursEnd] = useState(null);
     const [previewUrl, setPreviewUrl] = useState(null);
+    const [fileList, setFileList] = useState([]);
     const [selectedStatus, setSelectedStatus] = useState('1');
     const [statusOptions, setStatusOptions] = useState([]);
+    const [viewImageModal, setViewImageModal] = useState(false);
+    const [currentImage, setCurrentImage] = useState(null);
     const navigate = useNavigate();
     const user_id = SecureStorage.getSessionItem('user_id');
     const fileUploadRef = useRef(null);
@@ -144,8 +144,15 @@ const VenueEntry = () => {
                 if (venue.ven_pic) {
                     const imageUrl = `${encryptedUrl}/${venue.ven_pic}`;
                     setPreviewUrl(imageUrl);
+                    setFileList([{
+                        uid: '-1',
+                        name: 'venue-image.png',
+                        status: 'done',
+                        url: imageUrl,
+                    }]);
                 } else {
                     setPreviewUrl(null);
+                    setFileList([]);
                 }
                 
                 setShowModal(true);
@@ -235,6 +242,7 @@ const VenueEntry = () => {
         setOperatingHours('');
         setVenuePic(null);
         setPreviewUrl(null);
+        setFileList([]);
         setOperatingHoursStart(null);
         setOperatingHoursEnd(null);
     };
@@ -387,12 +395,19 @@ const VenueEntry = () => {
         }
     };
 
-    const onFileUpload = (event) => {
-        if (event.files && event.files[0]) {
-            const file = event.files[0];
+    const handleImageUpload = ({ fileList: newFileList }) => {
+        setFileList(newFileList);
+        if (newFileList.length > 0) {
+            const file = newFileList[0].originFileObj;
             setVenuePic(file);
-            setPreviewUrl(URL.createObjectURL(file));
-            toast.success('File uploaded successfully');
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setPreviewUrl(reader.result);
+            };
+            reader.readAsDataURL(file);
+        } else {
+            setVenuePic(null);
+            setPreviewUrl(null);
         }
     };
 
@@ -408,126 +423,150 @@ const VenueEntry = () => {
         venue.ven_name && venue.ven_name.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const totalPages = Math.ceil(filteredVenues.length / entriesPerPage);
-
-    const paginate = (pageNumber) => setCurrentPage(pageNumber);
-
     const getImageUrl = (venuePic) => {
         if (!venuePic) return null;
         return `${encryptedUrl}/${venuePic}`;
     };
 
-    const itemTemplate = (venue) => {
-        const imageUrl = getImageUrl(venue.ven_pic);
-
-        return (
-            <Card className="mb-4 transform hover:scale-[1.01] transition-transform duration-200">
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-                    <div className="md:col-span-3 flex justify-center items-start">
-                        <div className="relative group w-full min-h-[200px] bg-gray-100 rounded-lg">
-                            {imageUrl ? (
-                                <img 
-                                    src={imageUrl}
-                                    alt={venue.ven_name}
-                                    className="w-full h-48 md:h-64 object-cover rounded-lg"
-                                />
-                            ) : (
-                                <div className="flex items-center justify-center h-48 md:h-64">
-                                    <p className="text-gray-500">No image available</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                    <div className="md:col-span-9">
-                        <div className="flex flex-col h-full">
-                            <div className="flex justify-between items-start mb-4">
-                                <div>
-                                    <h3 className="text-2xl font-bold text-green-800 mb-2">{venue.ven_name}</h3>
-                                    <p className="text-gray-600 text-sm">
-                                        ID: <span className="font-semibold">#{venue.ven_id}</span>
-                                    </p>
-                                </div>
-                                <Tag 
-                                    value={venue.status_availability_id === '1' ? 'Available' : 'Not Available'} 
-                                    severity={venue.status_availability_id === '1' ? 'success' : 'danger'}
-                                    className="px-4 py-2 text-sm font-semibold"
-                                />
-                            </div>
-
-                            <Divider className="my-3" />
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                <div className="flex items-center gap-2">
-                                    <i className="pi pi-users text-green-600"></i>
-                                    <div>
-                                        <p className="text-sm text-gray-500">Max Occupancy</p>
-                                        <p className="font-semibold">{venue.ven_occupancy} people</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <i className="pi pi-clock text-green-600"></i>
-                                    <div>
-                                        <p className="text-sm text-gray-500">Operating Hours</p>
-                                        <p className="font-semibold">{venue.ven_operating_hours || 'Not specified'}</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <i className="pi pi-calendar text-green-600"></i>
-                                    <div>
-                                        <p className="text-sm text-gray-500">Created</p>
-                                        <p className="font-semibold">{dayjs(venue.ven_created_at).format('MMM D, YYYY HH:mm')}</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <i className="pi pi-refresh text-green-600"></i>
-                                    <div>
-                                        <p className="text-sm text-gray-500">Last Updated</p>
-                                        <p className="font-semibold">{dayjs(venue.ven_updated_at).format('MMM D, YYYY HH:mm')}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="flex justify-end gap-3 mt-auto">
-                                <motion.button 
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    onClick={() => handleEditVenue(venue)}
-                                    className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-full transition-colors duration-300"
-                                >
-                                    <FontAwesomeIcon icon={faEdit} />
-                                    <span>Edit</span>
-                                </motion.button>
-                                <motion.button 
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    onClick={() => handleArchiveVenue(venue.ven_id)}
-                                    className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-full transition-colors duration-300"
-                                >
-                                    <i className="pi pi-inbox"></i>
-                                    <span>Archive</span>
-                                </motion.button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </Card>
-        );
+    const handleViewImage = (imageUrl) => {
+        setCurrentImage(imageUrl);
+        setViewImageModal(true);
     };
 
+    // Table columns configuration
+    const columns = [
+        {
+            title: 'ID',
+            dataIndex: 'ven_id',
+            key: 'ven_id',
+            width: 80,
+            sorter: (a, b) => a.ven_id - b.ven_id,
+        },
+        {
+            title: 'Image',
+            dataIndex: 'ven_pic',
+            key: 'ven_pic',
+            width: 100,
+            render: (text, record) => {
+                const imageUrl = getImageUrl(record.ven_pic);
+                return (
+                    <div className="flex justify-center">
+                        {imageUrl ? (
+                            <div className="cursor-pointer" onClick={() => handleViewImage(imageUrl)}>
+                                <img 
+                                    src={imageUrl} 
+                                    alt={record.ven_name} 
+                                    className="w-16 h-16 object-cover rounded-md shadow-sm hover:opacity-80 transition-opacity"
+                                />
+                            </div>
+                        ) : (
+                            <div className="w-16 h-16 bg-gray-200 rounded-md flex items-center justify-center text-gray-400">
+                                <i className="pi pi-image text-2xl"></i>
+                            </div>
+                        )}
+                    </div>
+                );
+            }
+        },
+        {
+            title: 'Venue Name',
+            dataIndex: 'ven_name',
+            key: 'ven_name',
+            sorter: (a, b) => a.ven_name.localeCompare(b.ven_name),
+            render: (text) => <span className="font-semibold text-green-800">{text}</span>
+        },
+        {
+            title: 'Max Occupancy',
+            dataIndex: 'ven_occupancy',
+            key: 'ven_occupancy',
+            width: 150,
+            sorter: (a, b) => a.ven_occupancy - b.ven_occupancy,
+            render: (text) => <span>{text} people</span>
+        },
+        {
+            title: 'Operating Hours',
+            dataIndex: 'ven_operating_hours',
+            key: 'ven_operating_hours',
+            width: 180,
+            render: (text) => text || 'Not specified'
+        },
+        {
+            title: 'Status',
+            dataIndex: 'status_availability_id',
+            key: 'status_availability_id',
+            width: 120,
+            render: (statusId) => (
+                <Tag 
+                    value={statusId === '1' ? 'Available' : 'Not Available'} 
+                    severity={statusId === '1' ? 'success' : 'danger'}
+                    className="px-2 py-1 text-xs font-semibold"
+                />
+            ),
+            filters: statusOptions.map(status => ({
+                text: status.status_availability_name,
+                value: status.status_availability_id,
+            })),
+            onFilter: (value, record) => record.status_availability_id === value,
+        },
+        {
+            title: 'Created At',
+            dataIndex: 'ven_created_at',
+            key: 'ven_created_at',
+            width: 170,
+            sorter: (a, b) => new Date(a.ven_created_at) - new Date(b.ven_created_at),
+            render: (text) => dayjs(text).format('MMM D, YYYY HH:mm')
+        },
+        {
+            title: 'Updated At',
+            dataIndex: 'ven_updated_at',
+            key: 'ven_updated_at',
+            width: 170,
+            sorter: (a, b) => new Date(a.ven_updated_at) - new Date(b.ven_updated_at),
+            render: (text) => dayjs(text).format('MMM D, YYYY HH:mm')
+        },
+        {
+            title: 'Actions',
+            key: 'actions',
+            fixed: 'right',
+            width: 150,
+            render: (_, record) => (
+                <Space>
+                    <Tooltip title="Edit Venue">
+                        <Button 
+                            type="primary" 
+                            icon={<FontAwesomeIcon icon={faEdit} />} 
+                            onClick={() => handleEditVenue(record)}
+                            size="small"
+                            className="bg-green-500 hover:bg-green-600 border-green-500"
+                        />
+                    </Tooltip>
+                    <Tooltip title="Archive Venue">
+                        <Button 
+                            icon={<FontAwesomeIcon icon={faTrashAlt} />} 
+                            onClick={() => handleArchiveVenue(record.ven_id)}
+                            size="small"
+                            className="text-yellow-600 hover:text-yellow-700 border-yellow-300 hover:border-yellow-400"
+                        />
+                    </Tooltip>
+                </Space>
+            )
+        }
+    ];
+
     return (
-        <div className="flex h-screen bg-gradient-to-br from-white to-green-500 overflow-hidden">
+        <div className="flex h-screen bg-gradient-to-br from-green-100 to-white overflow-hidden">
             <div className="flex-none">
                 <Sidebar />
             </div>
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto bg-white bg-opacity-60 mt-20">
                 <motion.div 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5 }}
                     className="p-6 lg:p-10"
                 >
-                    <h2 className="text-4xl font-bold mb-6 text-green-800 drop-shadow-lg">Venue Management</h2>
-                    <div className="bg-white bg-opacity-90 rounded-lg shadow-xl p-6 mb-6 backdrop-filter backdrop-blur-lg">
+                    <h2 className="text-4xl font-bold mb-6 text-green-800 drop-shadow-sm">Venue Management</h2>
+                    <div className="bg-white rounded-lg shadow-md p-6 mb-6 border border-gray-100">
                         <div className="flex flex-col md:flex-row items-center justify-between mb-4">
                             <motion.div 
                                 whileHover={{ scale: 1.05 }}
@@ -546,7 +585,7 @@ const VenueEntry = () => {
                                 whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
                                 onClick={handleAddVenue}
-                                className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out flex items-center justify-center shadow-md"
+                                className="w-full md:w-auto bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out flex items-center justify-center shadow-md"
                             >
                                 <FontAwesomeIcon icon={faPlus} className="mr-2" /> Add Venue
                             </motion.button>
@@ -562,34 +601,34 @@ const VenueEntry = () => {
                                 <div className="loader"></div>
                             </motion.div>
                         ) : (
-                            <DataView
-                                value={filteredVenues}
-                                itemTemplate={itemTemplate}
-                                paginator
-                                rows={entriesPerPage}
-                                currentPageReportTemplate="Showing {first} to {last} of {totalRecords} venues"
-                                rowsPerPageOptions={[5, 10, 20]}
-                                emptyMessage={
-                                    <div className="text-center py-8">
-                                        <i className="pi pi-search text-6xl text-gray-300 mb-4"></i>
-                                        <p className="text-xl text-gray-500">No venues found</p>
-                                    </div>
-                                }
-                                className="p-4"
-                            />
-                        )}
-
-                        {totalPages > 1 && (
-                            <div className="flex justify-center mt-6">
-                                {Array.from({ length: totalPages }, (_, i) => (
-                                    <button
-                                        key={i}
-                                        onClick={() => paginate(i + 1)}
-                                        className={`mx-1 px-4 py-2 rounded-md ${currentPage === i + 1 ? 'bg-green-600 text-white' : 'bg-green-200 text-green-800 hover:bg-green-300'}`}
-                                    >
-                                        {i + 1}
-                                    </button>
-                                ))}
+                            <div className="overflow-x-auto">
+                                <Table 
+                                    columns={columns} 
+                                    dataSource={filteredVenues}
+                                    rowKey="ven_id"
+                                    pagination={{
+                                        pageSize: pageSize,
+                                        showSizeChanger: true,
+                                        pageSizeOptions: ['10', '20', '50'],
+                                        showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+                                        onChange: (page, pageSize) => {
+                                            setPageSize(pageSize);
+                                        }
+                                    }}
+                                    scroll={{ x: 1300 }}
+                                    bordered
+                                    size="middle"
+                                    className="venue-table"
+                                    style={{ backgroundColor: 'white' }}
+                                    locale={{
+                                        emptyText: (
+                                            <div className="text-center py-8">
+                                                <i className="pi pi-search text-6xl text-gray-300 mb-4"></i>
+                                                <p className="text-xl text-gray-500">No venues found</p>
+                                            </div>
+                                        )
+                                    }}
+                                />
                             </div>
                         )}
                     </div>
@@ -643,33 +682,20 @@ const VenueEntry = () => {
                         label="Venue Picture" 
                         tooltip="Upload venue image (max 5MB, formats: jpg, png)"
                     >
-                        <FileUpload
-                            ref={fileUploadRef}
-                            mode="advanced"
-                            name="venue-pic"
-                            multiple={false}
-                            accept="image/*"
-                            maxFileSize={5000000}
-                            onSelect={onFileUpload}
-                            onClear={onFileRemove}
-                            headerTemplate={options => {
-                                const { className, chooseButton, } = options;
-                                return (
-                                    <div className={className} style={{backgroundColor: 'transparent', display: 'flex', alignItems: 'center'}}>
-                                        {chooseButton}
-                                    </div>
-                                );
-                            }}
-                            emptyTemplate={
-                                <div className="flex flex-col items-center p-6 border-2 border-dashed border-gray-300 rounded-lg">
-                                    <i className="pi pi-image mb-2 text-4xl text-gray-400" />
-                                    <p className="m-0 text-gray-500">
-                                        Drag and drop image here or click to browse
-                                    </p>
-                                </div>
-                            }
-                        />
-                        {previewUrl && (
+                        <Upload
+                            listType="picture-card"
+                            fileList={fileList}
+                            onChange={handleImageUpload}
+                            beforeUpload={() => false}
+                            maxCount={1}
+                        >
+                            {fileList.length < 1 && (
+                                <Button icon={<PlusOutlined />}>
+                                    Upload
+                                </Button>
+                            )}
+                        </Upload>
+                        {previewUrl && typeof previewUrl === 'string' && previewUrl.startsWith('http') && (
                             <div className="mt-4">
                                 <img
                                     src={previewUrl}
@@ -701,9 +727,26 @@ const VenueEntry = () => {
                     </Form.Item>
                 </Form>
             </Modal>
+
+            {/* Image Preview Modal */}
+            <Modal
+                open={viewImageModal}
+                footer={null}
+                onCancel={() => setViewImageModal(false)}
+                width={700}
+                centered
+            >
+                {currentImage && (
+                    <Image
+                        src={currentImage}
+                        alt="Venue"
+                        className="w-full object-contain max-h-[70vh]"
+                        preview={false}
+                    />
+                )}
+            </Modal>
         </div>
     );
 };
 
 export default VenueEntry;
-

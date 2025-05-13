@@ -1,6 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Box, Tabs, Tab, Typography, Paper, useTheme, alpha } from '@mui/material';
-import { styled } from '@mui/material/styles';
 import { Table, Button, Space, Popconfirm, message, Tag, Empty, Skeleton } from 'antd';
 import { UndoOutlined, FileSearchOutlined, UserOutlined, CarOutlined, HomeOutlined, ToolOutlined } from '@ant-design/icons';
 import Sidebar from './Sidebar';
@@ -8,143 +6,16 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import { SecureStorage } from '../utils/encryption';
 import { useNavigate } from 'react-router-dom';
-
-// Enhanced styled components
-const StyledTabs = styled(Tabs)(({ theme }) => ({
-  borderBottom: 'none',
-  '& .MuiTabs-indicator': {
-    backgroundColor: theme.palette.primary.main,
-    height: '4px',
-    borderRadius: '4px 4px 0 0',
-  },
-  '& .MuiTab-root': {
-    textTransform: 'none',
-    fontSize: '1.05rem',
-    fontWeight: 600,
-    minWidth: 140,
-    transition: 'all 0.2s ease',
-    '&.Mui-selected': {
-      color: theme.palette.primary.main,
-    },
-    '&:hover': {
-      color: theme.palette.primary.light,
-      backgroundColor: alpha(theme.palette.primary.main, 0.04),
-    },
-  },
-}));
-
-const ContentWrapper = styled(Box)(({ theme }) => ({
-  flexGrow: 1,
-  padding: theme.spacing(3),
-  height: '100vh',
-  overflow: 'auto',
-  backgroundColor: theme.palette.background.default,
-}));
-
-const StyledPaper = styled(Paper)(({ theme }) => ({
-  borderRadius: theme.spacing(1.5),
-  boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
-  overflow: 'hidden',
-  transition: 'transform 0.3s, box-shadow 0.3s',
-  '&:hover': {
-    boxShadow: '0 8px 30px rgba(0,0,0,0.08)',
-  },
-  '& .ant-table-wrapper': {
-    border: 'none',
-    borderRadius: theme.spacing(1),
-    overflow: 'hidden',
-  },
-  '& .ant-table-thead > tr > th': {
-    backgroundColor: theme.palette.grey[50],
-    color: theme.palette.text.primary,
-    fontWeight: 600,
-    padding: '16px',
-    fontSize: '0.9rem',
-  },
-  '& .ant-table-tbody > tr > td': {
-    borderBottom: `1px solid ${theme.palette.grey[200]}`,
-    padding: '12px 16px',
-    fontSize: '0.9rem',
-  },
-  '& .ant-table-tbody > tr:hover > td': {
-    backgroundColor: alpha(theme.palette.primary.main, 0.02),
-  },
-  '& .ant-empty': {
-    margin: '40px 0',
-  },
-}));
-
-const StyledButton = styled(Button)(({ theme }) => ({
-  borderRadius: '8px',
-  boxShadow: 'none',
-  fontWeight: 500,
-  display: 'flex',
-  alignItems: 'center',
-  gap: '6px',
-  '&:hover': {
-    opacity: 0.9,
-    transform: 'translateY(-1px)',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-  },
-}));
-
-const StatusTag = styled(Tag)(({ color }) => ({
-  borderRadius: '6px',
-  padding: '4px 10px',
-  fontWeight: 500,
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: '4px',
-  boxShadow: `0 2px 6px ${alpha(color === 'blue' ? '#1890ff' : color === 'green' ? '#52c41a' : '#722ed1', 0.2)}`,
-}));
-
-const HeaderBox = styled(Box)(({ theme }) => ({
-  display: 'flex',
-  alignItems: 'center',
-  marginBottom: theme.spacing(3),
-  padding: theme.spacing(2, 0),
-  gap: theme.spacing(2),
-  borderBottom: `1px solid ${theme.palette.grey[200]}`,
-}));
-
-const TabIconWrapper = styled(Box)(({ theme }) => ({
-  display: 'flex',
-  alignItems: 'center',
-  gap: '8px',
-}));
-
-const CustomTab = ({ label, icon }) => (
-  <TabIconWrapper>
-    {icon}
-    {label}
-  </TabIconWrapper>
-);
-
-const TabPanel = ({ children, value, index }) => {
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`archive-tabpanel-${index}`}
-      aria-labelledby={`archive-tab-${index}`}
-    >
-      {value === index && (
-        <Box sx={{ p: { xs: 1, md: 2 } }}>
-          {children}
-        </Box>
-      )}
-    </div>
-  );
-};
+import { motion } from 'framer-motion';
 
 const Archive = () => {
-  const theme = useTheme();
   const [value, setValue] = useState(0);
   const [users, setUsers] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [venues, setVenues] = useState([]);
   const [equipment, setEquipment] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [pageSize, setPageSize] = useState(10);
   const navigate = useNavigate();
   const encryptedUrl = SecureStorage.getLocalItem("url");
 
@@ -157,7 +28,7 @@ const Archive = () => {
     }
   }, [navigate]);
 
-  const handleChange = (event, newValue) => {
+  const handleChange = (newValue) => {
     setValue(newValue);
   };
 
@@ -388,9 +259,9 @@ const Archive = () => {
       dataIndex: 'departments_name',
       key: 'department',
       render: (text) => (
-        <StatusTag color="blue">
+        <Tag color="blue">
           {text}
-        </StatusTag>
+        </Tag>
       ),
       filters: [...new Set(users.map(user => user.departments_name))].map(dept => ({
         text: dept,
@@ -403,9 +274,9 @@ const Archive = () => {
       dataIndex: 'user_level_name',
       key: 'userLevel',
       render: (text) => (
-        <StatusTag color="green">
+        <Tag color="green">
           {text}
-        </StatusTag>
+        </Tag>
       ),
       filters: [...new Set(users.map(user => user.user_level_name))].map(level => ({
         text: level,
@@ -432,9 +303,9 @@ const Archive = () => {
             cancelText="No"
             placement="left"
           >
-            <StyledButton type="primary" icon={<UndoOutlined />}>
+            <Button type="primary" icon={<UndoOutlined />} className="bg-green-500 hover:bg-green-600">
               Restore
-            </StyledButton>
+            </Button>
           </Popconfirm>
         </Space>
       ),
@@ -468,9 +339,9 @@ const Archive = () => {
       dataIndex: 'vehicle_category_name', 
       key: 'category',
       render: (text) => (
-        <StatusTag color="purple">
+        <Tag color="purple">
           {text}
-        </StatusTag>
+        </Tag>
       ),
     },
     { 
@@ -492,9 +363,9 @@ const Archive = () => {
             cancelText="No"
             placement="left"
           >
-            <StyledButton type="primary" icon={<UndoOutlined />}>
+            <Button type="primary" icon={<UndoOutlined />} className="bg-green-500 hover:bg-green-600">
               Restore
-            </StyledButton>
+            </Button>
           </Popconfirm>
         </Space>
       ),
@@ -520,9 +391,9 @@ const Archive = () => {
       dataIndex: 'ven_operating_hours', 
       key: 'hours',
       render: (text) => (
-        <StatusTag color="blue">
+        <Tag color="blue">
           {text}
-        </StatusTag>
+        </Tag>
       ),
     },
     {
@@ -538,9 +409,9 @@ const Archive = () => {
             cancelText="No"
             placement="left"
           >
-            <StyledButton type="primary" icon={<UndoOutlined />}>
+            <Button type="primary" icon={<UndoOutlined />} className="bg-green-500 hover:bg-green-600">
               Restore
-            </StyledButton>
+            </Button>
           </Popconfirm>
         </Space>
       ),
@@ -587,9 +458,9 @@ const Archive = () => {
             cancelText="No"
             placement="left"
           >
-            <StyledButton type="primary" icon={<UndoOutlined />}>
+            <Button type="primary" icon={<UndoOutlined />} className="bg-green-500 hover:bg-green-600">
               Restore
-            </StyledButton>
+            </Button>
           </Popconfirm>
         </Space>
       ),
@@ -600,243 +471,160 @@ const Archive = () => {
     <Empty
       image={Empty.PRESENTED_IMAGE_SIMPLE}
       description={
-        <Typography variant="body1" sx={{ color: 'text.secondary' }}>
-          No archived items found
-        </Typography>
+        <p className="text-gray-500">No archived items found</p>
       }
     />
   );
 
   const renderSkeletonLoader = () => (
-    <Box sx={{ padding: 2 }}>
+    <div className="p-4">
       <Skeleton active paragraph={{ rows: 6 }} />
-    </Box>
+    </div>
   );
 
-  const tabIconStyle = { fontSize: '18px' };
+  // Tab components
+  const tabItems = [
+    { key: 0, label: 'Users', icon: <UserOutlined /> },
+    { key: 1, label: 'Vehicles', icon: <CarOutlined /> },
+    { key: 2, label: 'Venues', icon: <HomeOutlined /> },
+    { key: 3, label: 'Equipment', icon: <ToolOutlined /> }
+  ];
 
   return (
-    <Box sx={{ display: 'flex' }}>
-      <Sidebar />
-      <ContentWrapper>
-        <Box sx={{ 
-          p: { xs: 2, md: 3 }, 
-          borderRadius: 2,
-          background: `linear-gradient(145deg, ${alpha(theme.palette.primary.main, 0.05)} 0%, ${alpha(theme.palette.background.paper, 1)} 100%)`,
-          mb: 3,
-        }}>
-          <Typography 
-            variant="h4" 
-            sx={{ 
-              fontWeight: 700, 
-              color: theme.palette.text.primary,
-              mb: 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1.5
-            }}
-          >
-            <FileSearchOutlined style={{ fontSize: '1.7rem', color: theme.palette.primary.main }} />
+    <div className="flex flex-col lg:flex-row bg-gradient-to-br from-white to-green-100 min-h-screen">
+      <div className="flex-none">
+        <Sidebar />
+      </div>
+      <div className="flex-1 overflow-y-auto mt-20 p-8 lg:p-12">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <h2 className="text-4xl font-bold mb-6 text-green-800 drop-shadow-sm flex items-center">
+            <FileSearchOutlined className="mr-4 text-3xl text-green-600" /> 
             Archive Management
-          </Typography>
-          <Typography 
-            variant="body1" 
-            sx={{ 
-              color: theme.palette.text.secondary,
-              maxWidth: '800px',
-            }}
-          >
+          </h2>
+          <p className="mb-6 text-gray-600 max-w-3xl">
             View and restore archived items across the system. All items can be restored back to active status.
-          </Typography>
-        </Box>
+          </p>
 
-        <StyledPaper elevation={0} sx={{ width: '100%', bgcolor: 'background.paper' }}>
-          <StyledTabs
-            value={value}
-            onChange={handleChange}
-            centered
-            aria-label="archive sections"
-            variant="fullWidth"
-            sx={{ 
-              borderBottom: 1, 
-              borderColor: 'divider',
-              backgroundColor: alpha(theme.palette.primary.main, 0.03),
-              borderRadius: '12px 12px 0 0',
-            }}
-          >
-            <Tab 
-              label={<CustomTab label="Users" icon={<UserOutlined style={tabIconStyle} />} />} 
-              id="archive-tab-0" 
-              aria-controls="archive-tabpanel-0" 
-            />
-            <Tab 
-              label={<CustomTab label="Vehicles" icon={<CarOutlined style={tabIconStyle} />} />} 
-              id="archive-tab-1" 
-              aria-controls="archive-tabpanel-1" 
-            />
-            <Tab 
-              label={<CustomTab label="Venues" icon={<HomeOutlined style={tabIconStyle} />} />} 
-              id="archive-tab-2" 
-              aria-controls="archive-tabpanel-2" 
-            />
-            <Tab 
-              label={<CustomTab label="Equipment" icon={<ToolOutlined style={tabIconStyle} />} />} 
-              id="archive-tab-3" 
-              aria-controls="archive-tabpanel-3" 
-            />
-          </StyledTabs>
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6 border border-gray-100">
+            {/* Tabs Navigation */}
+            <div className="border-b border-gray-200 mb-4">
+              <nav className="flex -mb-px space-x-8">
+                {tabItems.map((item) => (
+                  <button
+                    key={item.key}
+                    onClick={() => handleChange(item.key)}
+                    className={`py-4 px-1 flex items-center space-x-2 font-medium text-sm border-b-2 transition-colors duration-200 ${
+                      value === item.key 
+                        ? 'border-green-500 text-green-600' 
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    <span className="text-lg">{item.icon}</span>
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </nav>
+            </div>
 
-          <Box sx={{ px: { xs: 1, sm: 2, md: 3 }, mt: 2 }}>
-            <TabPanel value={value} index={0}>
-              <HeaderBox>
-                <Typography 
-                  variant="h6" 
-                  sx={{ 
-                    fontWeight: 600,
-                    color: theme.palette.text.primary,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1
-                  }}
-                >
-                 
-                </Typography>
-                
-                
-              </HeaderBox>
-
+            {/* Tab Content */}
+            <div className="mt-6">
               {loading ? (
                 renderSkeletonLoader()
               ) : (
-                <Table
-                  columns={userColumns}
-                  dataSource={users}
-                  rowKey="users_id"
-                  pagination={{
-                    pageSize: 10,
-                    showSizeChanger: true,
-                    showTotal: (total) => `Total ${total} items`,
-                    style: { marginTop: '16px' }
-                  }}
-                  scroll={{ x: 'max-content' }}
-                  locale={{ emptyText: renderEmptyState() }}
-                  rowClassName={(record, index) => index % 2 === 0 ? '' : alpha(theme.palette.primary.main, 0.02)}
-                />
+                <div>
+                  {/* Users Tab */}
+                  {value === 0 && (
+                    <Table 
+                      columns={userColumns} 
+                      dataSource={users}
+                      rowKey="users_id"
+                      pagination={{
+                        pageSize: pageSize,
+                        showSizeChanger: true,
+                        pageSizeOptions: ['10', '20', '50'],
+                        showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+                        onChange: (page, pageSize) => {
+                          setPageSize(pageSize);
+                        }
+                      }}
+                      scroll={{ x: 1200 }}
+                      bordered
+                      size="middle"
+                      className="archive-table"
+                      locale={{ emptyText: renderEmptyState() }}
+                    />
+                  )}
+
+                  {/* Vehicles Tab */}
+                  {value === 1 && (
+                    <Table 
+                      columns={vehicleColumns} 
+                      dataSource={vehicles}
+                      rowKey="vehicle_id"
+                      pagination={{
+                        pageSize: pageSize,
+                        showSizeChanger: true,
+                        pageSizeOptions: ['10', '20', '50'],
+                        showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`
+                      }}
+                      scroll={{ x: 1000 }}
+                      bordered
+                      size="middle"
+                      className="archive-table"
+                      locale={{ emptyText: renderEmptyState() }}
+                    />
+                  )}
+
+                  {/* Venues Tab */}
+                  {value === 2 && (
+                    <Table 
+                      columns={venueColumns} 
+                      dataSource={venues}
+                      rowKey="ven_id"
+                      pagination={{
+                        pageSize: pageSize,
+                        showSizeChanger: true,
+                        pageSizeOptions: ['10', '20', '50'],
+                        showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`
+                      }}
+                      scroll={{ x: 800 }}
+                      bordered
+                      size="middle"
+                      className="archive-table"
+                      locale={{ emptyText: renderEmptyState() }}
+                    />
+                  )}
+
+                  {/* Equipment Tab */}
+                  {value === 3 && (
+                    <Table 
+                      columns={equipmentColumns} 
+                      dataSource={equipment}
+                      rowKey="equip_id"
+                      pagination={{
+                        pageSize: pageSize,
+                        showSizeChanger: true,
+                        pageSizeOptions: ['10', '20', '50'],
+                        showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`
+                      }}
+                      scroll={{ x: 800 }}
+                      bordered
+                      size="middle"
+                      className="archive-table"
+                      locale={{ emptyText: renderEmptyState() }}
+                    />
+                  )}
+                </div>
               )}
-            </TabPanel>
-
-            <TabPanel value={value} index={1}>
-              <HeaderBox>
-                <Typography 
-                  variant="h6" 
-                  sx={{ 
-                    fontWeight: 600,
-                    color: theme.palette.text.primary,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1
-                  }}
-                >
-                 
-                </Typography>
-              
-              </HeaderBox>
-
-              {loading ? (
-                renderSkeletonLoader()
-              ) : (
-                <Table
-                  columns={vehicleColumns}
-                  dataSource={vehicles}
-                  loading={loading}
-                  rowKey="vehicle_id"
-                  pagination={{
-                    pageSize: 10,
-                    showSizeChanger: true,
-                    showTotal: (total) => `Total ${total} items`
-                  }}
-                  locale={{ emptyText: renderEmptyState() }}
-                  rowClassName={(record, index) => index % 2 === 0 ? '' : alpha(theme.palette.primary.main, 0.02)}
-                />
-              )}
-            </TabPanel>
-
-            <TabPanel value={value} index={2}>
-              <HeaderBox>
-                <Typography 
-                  variant="h6" 
-                  sx={{ 
-                    fontWeight: 600,
-                    color: theme.palette.text.primary,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1
-                  }}
-                >
-                  
-                </Typography>
-               
-              </HeaderBox>
-
-              {loading ? (
-                renderSkeletonLoader()
-              ) : (
-                <Table
-                  columns={venueColumns}
-                  dataSource={venues}
-                  loading={loading}
-                  rowKey="ven_id"
-                  pagination={{
-                    pageSize: 10,
-                    showSizeChanger: true,
-                    showTotal: (total) => `Total ${total} items`
-                  }}
-                  locale={{ emptyText: renderEmptyState() }}
-                  rowClassName={(record, index) => index % 2 === 0 ? '' : alpha(theme.palette.primary.main, 0.02)}
-                />
-              )}
-            </TabPanel>
-
-            <TabPanel value={value} index={3}>
-              <HeaderBox>
-                <Typography 
-                  variant="h6" 
-                  sx={{ 
-                    fontWeight: 600,
-                    color: theme.palette.text.primary,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1
-                  }}
-                >
-                 
-                </Typography>
-                <Box sx={{ flexGrow: 1 }} />
-               
-              </HeaderBox>
-
-              {loading ? (
-                renderSkeletonLoader()
-              ) : (
-                <Table
-                  columns={equipmentColumns}
-                  dataSource={equipment}
-                  loading={loading}
-                  rowKey="equip_id"
-                  pagination={{
-                    pageSize: 10,
-                    showSizeChanger: true,
-                    showTotal: (total) => `Total ${total} items`
-                  }}
-                  locale={{ emptyText: renderEmptyState() }}
-                  rowClassName={(record, index) => index % 2 === 0 ? '' : alpha(theme.palette.primary.main, 0.02)}
-                />
-              )}
-            </TabPanel>
-          </Box>
-        </StyledPaper>
-      </ContentWrapper>
-    </Box>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    </div>
   );
 };
 

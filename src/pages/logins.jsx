@@ -194,14 +194,14 @@ function Logins() {
                     navigateTo('/adminDashboard');
                     break;
                 case 'Personnel':
-                    navigateTo('/personnelDashboard');
+                    navigateTo('/Personnel/Dashboard');
                     break;
                 case 'Dean':
                 case 'Secretary':
-                    navigateTo('/deanDashboard');
+                    navigateTo('/Department/Dashboard');
                     break;
                 case 'Faculty/Staff':
-                    navigateTo('/dashboard');
+                    navigateTo('/Faculty/Dashboard');
                     break;
                 default:
                     // If no valid user level, clear everything except API URL
@@ -566,11 +566,11 @@ function Logins() {
                             case "Dean":
                             case "Department Head":
                                     notify("Dean Login Successful");
-                                    setTimeout(() => navigateTo("/deanDashboard"), 100);
+                                    setTimeout(() => navigateTo("/Department/Dashboard"), 100);
                                     break;
                             default:
                                 notify("User Login Successful");
-                                setTimeout(() => navigateTo("/dashboard"), 100);
+                                setTimeout(() => navigateTo("/Faculty/Dashboard"), 100);
                         }
                     } else {
                         notify("Invalid OTP. Please try again.", 'error');
@@ -638,7 +638,7 @@ function Logins() {
                             break;
                         case "Personnel":
                             notify("Personnel Login Successful");
-                            setTimeout(() => navigateTo("/personnelDashboard"), 100);
+                            setTimeout(() => navigateTo("/Personnel/Dashboard"), 100);
                             break;
                         case "Admin":
                             notify("Admin Login Successful");
@@ -647,12 +647,12 @@ function Logins() {
                         case "Dean":
                         case "Department Head":
                             notify("Dean Login Successful");
-                            setTimeout(() => navigateTo("/deanDashboard"), 100);
+                            setTimeout(() => navigateTo("/Department/Dashboard"), 100);
                             break;
 
                         default:
                             notify("User Login Successful");
-                            setTimeout(() => navigateTo("/dashboard"), 100);
+                            setTimeout(() => navigateTo("/Faculty/Dashboard"), 100);
                     }
                 }
             } else {
@@ -1001,7 +1001,7 @@ function Logins() {
                             break;
                         case "Personnel":
                             notify("Personnel Login Successful");
-                            setTimeout(() => navigateTo("/personnelDashboard"), 100);
+                            setTimeout(() => navigateTo("/Personnel/Dashboard"), 100);
                             break;
                         case "Admin":
                             notify("Admin Login Successful");

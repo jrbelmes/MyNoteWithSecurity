@@ -210,7 +210,7 @@ const Reports = () => {
   return (
     <div className="flex h-screen bg-gray-100">
       <Sidebar />
-      <div className="flex-1 overflow-auto p-8">
+      <div className="flex-1 overflow-auto p-8 mt-20">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

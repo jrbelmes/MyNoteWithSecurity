@@ -239,12 +239,9 @@ const Dashboard = () => {
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
       
-      <main className="flex-1 p-6 overflow-x-hidden">
+      <main className="flex-1 p-6 overflow-x-hidden mt-20">
         {/* Header Section */}
         <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-gray-600">Welcome back, {userName}</h1>
-          </div>
           <div className="flex gap-4">
            
           </div>

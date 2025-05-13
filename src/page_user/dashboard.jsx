@@ -27,6 +27,22 @@ const Dashboard = () => {
   const [reservationDetails, setReservationDetails] = useState(null);
   const [currentRequest, setCurrentRequest] = useState(null);
   const [completedReservations, setCompletedReservations] = useState([]);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  useEffect(() => {
+    // Add event listener for sidebar toggle
+    const handleSidebarToggle = (e) => {
+      if (e.detail && typeof e.detail.collapsed !== 'undefined') {
+        setIsSidebarCollapsed(e.detail.collapsed);
+      }
+    };
+
+    window.addEventListener('sidebar-toggle', handleSidebarToggle);
+    
+    return () => {
+      window.removeEventListener('sidebar-toggle', handleSidebarToggle);
+    };
+  }, []);
 
   useEffect(() => {
           const encryptedUserLevel = SecureStorage.getSessionItem("user_level_id"); 
@@ -669,9 +685,9 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className={`flex h-screen bg-gradient-to-br from-white to-green-100 overflow-hidden transition-all duration-300`}>
       <Sidebar />
-      <div className="flex-1 overflow-auto">
+      <div className={`flex-1 overflow-auto mt-20 transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'lg:ml-5' : 'lg:ml-16'}`}>
         <div className="p-8">
           {/* Header Section */}
           <div className="flex justify-between items-center mb-8">

@@ -105,23 +105,45 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
     const timeRanges = [];
     const reservedHours = new Set();
     
+    // Get all reservations for this date
     const dayReservations = reservations.filter(res => 
       res.isReserved && isSameDay(new Date(res.startDate), date)
     );
-  
+
+    // Create a Map to track unique time slots by their start and end times
+    const uniqueTimeSlots = new Map();
+    
     dayReservations.forEach(res => {
       const start = new Date(res.startDate);
       const end = new Date(res.endDate);
-      timeRanges.push({
-        start: start,
-        end: end
-      });
       
-      for (let hour = start.getHours(); hour <= end.getHours(); hour++) {
-        reservedHours.add(hour);
+      // Create a unique key for this time slot
+      const timeKey = `${start.getHours()}-${start.getMinutes()}-${end.getHours()}-${end.getMinutes()}`;
+      
+      // Only add this time range if we haven't seen it before
+      if (!uniqueTimeSlots.has(timeKey)) {
+        uniqueTimeSlots.set(timeKey, {
+          start,
+          end,
+          reservation: res
+        });
+        
+        // Add hours to the set of reserved hours
+        for (let hour = start.getHours(); hour <= end.getHours(); hour++) {
+          reservedHours.add(hour);
+        }
       }
     });
-  
+    
+    // Convert the map values to our timeRanges array
+    uniqueTimeSlots.forEach(item => {
+      timeRanges.push({
+        start: item.start,
+        end: item.end,
+        reservation: item.reservation
+      });
+    });
+    
     return {
       hours: Array.from(reservedHours),
       timeRanges: timeRanges
@@ -705,16 +727,16 @@ const renderCalendarGrid = () => {
                 {isCurrentMonth && selectedResource.type !== 'equipment' && (
                   <div className="mt-1 space-y-1">
                     {getReservedTimeSlots(day).timeRanges.map((range, idx) => {
-                      const reservation = reservations.find(res => 
-                        isSameDay(new Date(res.startDate), range.start) && 
-                        new Date(res.startDate).getHours() === range.start.getHours()
-                      );
+                      // We already have the reservation stored in the range object
+                      const reservation = range.reservation;
+                      
+                      if (!reservation) return null;
                       
                       // Determine what to display based on resource type
                       let displayText = '';
-                      if (reservation?.resourceType === 'venue') {
+                      if (reservation.resourceType === 'venue') {
                         displayText = reservation.venueName;
-                      } else if (reservation?.resourceType === 'vehicle') {
+                      } else if (reservation.resourceType === 'vehicle') {
                         displayText = `${reservation.vehicleMake} ${reservation.vehicleModel}`;
                         if (reservation.vehicleLicense) {
                           displayText += ` (${reservation.vehicleLicense})`;
@@ -1063,10 +1085,8 @@ const renderCalendarGrid = () => {
                               {getReservedTimeSlots(day).timeRanges
                                 .filter(range => new Date(range.start).getHours() === hour)
                                 .map((range, idx) => {
-                                  const reservation = reservations.find(res => 
-                                    isSameDay(new Date(res.startDate), range.start) && 
-                                    new Date(res.startDate).getHours() === hour
-                                  );
+                                  // We already have the reservation stored in the range object
+                                  const reservation = range.reservation;
                                   
                                   if (!reservation) return null;
 

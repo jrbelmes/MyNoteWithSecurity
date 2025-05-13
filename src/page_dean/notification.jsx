@@ -10,7 +10,7 @@ import {
   FaFilter,
   FaEye 
 } from 'react-icons/fa';
-import Sidebar from './component/user_sidebar';
+import Sidebar from './component/dean_sidebar';
 import { SecureStorage } from '../utils/encryption';
 
 const NotificationPage = () => {
@@ -36,7 +36,11 @@ const NotificationPage = () => {
     const fetchNotifications = async () => {
       try {
         const userId = SecureStorage.getSessionItem('user_id');
-        const response = await fetch('http://localhost/coc/gsd/faculty&staff.php', {
+        const departmentId = SecureStorage.getSessionItem('department_id');
+        const userLevelId = SecureStorage.getSessionItem('user_level_id');
+
+        // Fetch regular notifications
+        const regularResponse = await fetch('http://localhost/coc/gsd/faculty&staff.php', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -47,20 +51,60 @@ const NotificationPage = () => {
           })
         });
 
-        const data = await response.json();
-        if (data.status === "success") {
-          const formattedNotifications = data.data.map(notification => ({
+        // Fetch approval notifications
+        const approvalResponse = await fetch('http://localhost/coc/gsd/process_reservation.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            operation: "fetchApprovalNotification"
+          })
+        });        const regularData = await regularResponse.json();
+        const approvalData = await approvalResponse.json();
+        
+        let allNotifications = [];
+
+        // Process regular notifications
+        if (regularData.status === "success") {
+          const formattedRegularNotifications = regularData.data.map(notification => ({
             id: notification.notification_reservation_id,
-            type: 'pending', // You might want to add this in your API response
+            type: 'pending',
             title: 'Reservation Status',
             message: notification.notification_message,
             date: notification.notification_created_at,
-            isRead: false, // You might want to add this in your API response
-            priority: 'medium', // You might want to add this in your API response
+            isRead: false,
+            priority: 'medium',
             details: `Reservation ID: ${notification.notification_reservation_reservation_id}\nUser ID: ${notification.notification_user_id}\nCreated At: ${notification.notification_created_at}`
           }));
-          setNotifications(formattedNotifications);
+          allNotifications = [...allNotifications, ...formattedRegularNotifications];
         }
+
+        // Process approval notifications
+        if (approvalData.status === "success") {
+          const filteredApprovalNotifications = approvalData.data
+            .filter(notification => {
+              // Check if the notification matches the user's department and level
+              return notification.notification_department_id === departmentId && 
+                     notification.notification_user_level_id === userLevelId;
+            })
+            .map(notification => ({
+              id: notification.notification_id,
+              type: 'approval',
+              title: 'Approval Request',
+              message: notification.notification_message,
+              date: notification.notification_create,
+              isRead: false,
+              priority: 'high',
+              details: `Department ID: ${notification.notification_department_id}\nUser Level: ${notification.notification_user_level_id}\nCreated At: ${notification.notification_create}`
+            }));
+          allNotifications = [...allNotifications, ...filteredApprovalNotifications];
+        }
+
+        // Sort all notifications by date, newest first
+        allNotifications.sort((a, b) => new Date(b.date) - new Date(a.date));
+        
+        setNotifications(allNotifications);
       } catch (error) {
         console.error('Error fetching notifications:', error);
       }
@@ -68,7 +112,6 @@ const NotificationPage = () => {
 
     fetchNotifications();
   }, []);
-
   const getStatusColor = (type) => {
     switch (type) {
       case 'accepted':
@@ -77,6 +120,8 @@ const NotificationPage = () => {
         return 'bg-yellow-50 border-yellow-500 text-yellow-700';
       case 'declined':
         return 'bg-red-50 border-red-500 text-red-700';
+      case 'approval':
+        return 'bg-blue-50 border-blue-500 text-blue-700';
       default:
         return 'bg-gray-50 border-gray-500 text-gray-700';
     }
@@ -103,6 +148,8 @@ const NotificationPage = () => {
         return <FaClock className="text-yellow-500 w-5 h-5" />;
       case 'declined':
         return <FaTimes className="text-red-500 w-5 h-5" />;
+      case 'approval':
+        return <FaBell className="text-blue-500 w-5 h-5" />;
       default:
         return <FaBell className="text-gray-500 w-5 h-5" />;
     }
@@ -185,7 +232,7 @@ const NotificationPage = () => {
                       >
                         All
                       </button>
-                      {['accepted', 'pending', 'declined'].map((type) => (
+                      {['accepted', 'pending', 'declined', 'approval'].map((type) => (
                         <button
                           key={type}
                           onClick={() => setFilter(type)}

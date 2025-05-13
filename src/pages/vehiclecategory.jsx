@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Button, Form } from 'react-bootstrap';
 import { toast, Toaster } from 'sonner';
 import Sidebar from './Sidebar';
-import { FaArrowLeft, FaPlus, FaTrash, FaSearch, FaCar } from 'react-icons/fa';
+import { FaArrowLeft, FaPlus, FaTrash, FaSearch, FaCar, FaEdit } from 'react-icons/fa';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { sanitizeInput, validateInput } from '../utils/sanitize';
 import { SecureStorage } from '../utils/encryption';
+import { Table, Space, Button, Tooltip, Modal, Form, Input } from 'antd';
+import dayjs from 'dayjs';
 
 const VehicleCategories = () => {
   const navigate = useNavigate();
@@ -21,6 +22,8 @@ const VehicleCategories = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [pageSize, setPageSize] = useState(10);
   const encryptedUrl = SecureStorage.getLocalItem("url");
 
   useEffect(() => {
@@ -71,7 +74,7 @@ const VehicleCategories = () => {
 
   const confirmDelete = async () => {
     try {
-      const response = await axios.post('http://localhost/coc/gsd/delete_master.php', {
+      const response = await axios.post(`${encryptedUrl}delete_master.php`, {
         operation: 'deleteVehicleCategory',
         vehicleCategoryId: selectedCategoryId
       }, {
@@ -92,7 +95,7 @@ const VehicleCategories = () => {
       setShowConfirmDelete(false);
     }
   };
-
+  
   const handleSave = async () => {
     const sanitizedName = sanitizeInput(formData.name);
     
@@ -108,11 +111,19 @@ const VehicleCategories = () => {
 
     setIsSubmitting(true);
     try {
-      const response = await axios.post(`${encryptedUrl}update_master1.php`, {
-        operation: editMode ? 'updateVehicleCategory' : 'saveVehicleCategory',
+      const endpoint = editMode ? 'update_master1.php' : 'vehicle_master.php';
+      const requestData = editMode ? {
+        operation: 'updateVehicleCategory',
         id: formData.id,
         name: sanitizedName
-      }, {
+      } : {
+        operation: 'saveCategoryData',
+        json: JSON.stringify({
+          vehicle_category_name: sanitizedName
+        })
+      };
+
+      const response = await axios.post(`${encryptedUrl}${endpoint}`, requestData, {
         headers: {
           'Content-Type': 'application/json'
         }
@@ -138,9 +149,10 @@ const VehicleCategories = () => {
   };
 
   const handleSearchChange = (e) => {
-    const searchTerm = e.target.value.toLowerCase();
+    const searchTerm = e.target.value;
+    setSearchTerm(searchTerm);
     const results = categories.filter(category =>
-      category.vehicle_category_name.toLowerCase().includes(searchTerm)
+      category.vehicle_category_name.toLowerCase().includes(searchTerm.toLowerCase())
     );
     setFilteredCategories(results);
   };
@@ -151,6 +163,44 @@ const VehicleCategories = () => {
     setShowModal(true);
   };
 
+  // Table columns configuration
+  const columns = [
+    {
+      title: 'Name',
+      dataIndex: 'vehicle_category_name',
+      key: 'vehicle_category_name',
+      sorter: (a, b) => a.vehicle_category_name.localeCompare(b.vehicle_category_name),
+      render: (text) => <span className="font-semibold text-green-800">{text}</span>
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      fixed: 'right',
+      width: 150,
+      render: (_, record) => (
+        <Space>
+          <Tooltip title="Edit Category">
+            <Button 
+              type="primary" 
+              icon={<FaEdit />} 
+              onClick={() => handleEdit(record.vehicle_category_id)}
+              size="small"
+              className="bg-green-500 hover:bg-green-600 border-green-500"
+            />
+          </Tooltip>
+          <Tooltip title="Delete Category">
+            <Button 
+              icon={<FaTrash />} 
+              onClick={() => handleDelete(record.vehicle_category_id)}
+              size="small"
+              className="text-red-600 hover:text-red-700 border-red-300 hover:border-red-400"
+            />
+          </Tooltip>
+        </Space>
+      )
+    }
+  ];
+
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-gradient-to-br from-white to-green-100">
       <Sidebar />
@@ -160,13 +210,13 @@ const VehicleCategories = () => {
         transition={{ duration: 0.5 }}
         className="flex-grow p-6 lg:p-10"
       >
-        <div className="mb-4">
+        <div className="mb-4 mt-20">
           <Button variant="link" onClick={() => navigate('/Master')} className="text-green-800">
             <FaArrowLeft className="mr-2" /> Back to Master
           </Button>
         </div>
         <h2 className="text-4xl font-bold mb-6 text-green-800 drop-shadow-lg">Vehicle Categories</h2>
-        <div className="bg-white bg-opacity-90 rounded-lg shadow-xl p-6 mb-6 backdrop-filter backdrop-blur-lg">
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6 border border-gray-100">
           <div className="flex flex-col md:flex-row items-center justify-between mb-4">
             <motion.div 
               whileHover={{ scale: 1.05 }}
@@ -174,8 +224,9 @@ const VehicleCategories = () => {
             >
               <input
                 type="text"
+                value={searchTerm}
                 onChange={handleSearchChange}
-                placeholder="Search by category name"
+                placeholder="Search categories..."
                 className="w-full pl-10 pr-4 py-2 rounded-full border border-green-300 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-300"
               />
               <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-400" />
@@ -184,11 +235,12 @@ const VehicleCategories = () => {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={handleAddCategory}
-              className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out flex items-center justify-center shadow-md"
+              className="w-full md:w-auto bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out flex items-center justify-center shadow-md"
             >
               <FaPlus className="mr-2" /> Add Category
             </motion.button>
           </div>
+
           {loading ? (
             <motion.div
               initial={{ opacity: 0 }}
@@ -200,96 +252,77 @@ const VehicleCategories = () => {
             </motion.div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full table-auto">
-                <thead>
-                  <tr className="bg-green-600 text-white">
-                    <th className="py-3 px-4 text-left rounded-tl-lg">Name</th>
-                    <th className="py-3 px-4 text-center rounded-tr-lg">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="text-gray-600 text-sm font-light">
-                  <AnimatePresence>
-                    {filteredCategories.map((category) => (
-                      <motion.tr 
-                        key={category.vehicle_category_id}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="border-b border-green-200 hover:bg-green-50 transition-colors duration-200"
-                      >
-                        <td className="py-3 px-4">{category.vehicle_category_name}</td>
-                        <td className="py-3 px-4 text-center">
-                          <motion.button 
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            onClick={() => handleDelete(category.vehicle_category_id)}
-                            className="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded-full transition duration-300 ease-in-out mr-2"
-                          >
-                            <FaTrash />
-                          </motion.button>
-                          <motion.button 
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            onClick={() => handleEdit(category.vehicle_category_id)}
-                            className="bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-3 rounded-full transition duration-300 ease-in-out"
-                          >
-                            Edit
-                          </motion.button>
-                        </td>
-                      </motion.tr>
-                    ))}
-                  </AnimatePresence>
-                </tbody>
-              </table>
+              <Table 
+                columns={columns} 
+                dataSource={filteredCategories}
+                rowKey="vehicle_category_id"
+                pagination={{
+                  pageSize: pageSize,
+                  showSizeChanger: true,
+                  pageSizeOptions: ['10', '20', '50'],
+                  showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+                  onChange: (page, pageSize) => {
+                    setPageSize(pageSize);
+                  }
+                }}
+                bordered
+                size="middle"
+                className="venue-table"
+                style={{ backgroundColor: 'white' }}
+                locale={{
+                  emptyText: (
+                    <div className="text-center py-8">
+                      <FaSearch className="text-6xl text-gray-300 mb-4 mx-auto" />
+                      <p className="text-xl text-gray-500">No categories found</p>
+                    </div>
+                  )
+                }}
+              />
             </div>
           )}
         </div>
       </motion.div>
 
       {/* Add/Edit Category Modal */}
-      <Modal show={showModal} onHide={closeModal} centered>
-        <Modal.Header closeButton className="bg-green-600 text-white">
-          <Modal.Title><FaCar className="inline-block mr-2" /> {editMode ? 'Edit' : 'Add'} Vehicle Category</Modal.Title>
-        </Modal.Header>
-        <Modal.Body className="bg-green-50">
-          <Form>
-            <Form.Group controlId="formCategoryName">
-              <Form.Label>Name:</Form.Label>
-              <Form.Control
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </Form.Group>
-          </Form>
-        </Modal.Body>
-        <Modal.Footer className="bg-green-50">
-          <Button variant="secondary" onClick={closeModal}>
-            Close
-          </Button>
-          <Button variant="primary" onClick={handleSave} disabled={isSubmitting} className="bg-green-600 hover:bg-green-700">
-            {isSubmitting ? 'Saving...' : 'Save'}
-          </Button>
-        </Modal.Footer>
+      <Modal
+        title={
+          <div className="flex items-center">
+            <FaCar className="mr-2" /> 
+            {editMode ? 'Edit Vehicle Category' : 'Add Vehicle Category'}
+          </div>
+        }
+        open={showModal}
+        onCancel={closeModal}
+        okText={editMode ? 'Update' : 'Add'}
+        onOk={handleSave}
+        confirmLoading={isSubmitting}
+      >
+        <Form layout="vertical">
+          <Form.Item
+            label="Category Name"
+            required
+            tooltip="Enter the vehicle category name"
+          >
+            <Input
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="Enter category name"
+            />
+          </Form.Item>
+        </Form>
       </Modal>
 
       {/* Confirm Delete Modal */}
-      <Modal show={showConfirmDelete} onHide={() => setShowConfirmDelete(false)} centered>
-        <Modal.Header closeButton className="bg-red-600 text-white">
-          <Modal.Title>Confirm Deletion</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p>Are you sure you want to delete this vehicle category?</p>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowConfirmDelete(false)}>
-            Cancel
-          </Button>
-          <Button variant="danger" onClick={confirmDelete}>
-            Delete
-          </Button>
-        </Modal.Footer>
+      <Modal
+        title={<div className="text-red-600">Confirm Deletion</div>}
+        open={showConfirmDelete}
+        onCancel={() => setShowConfirmDelete(false)}
+        okText="Delete"
+        okButtonProps={{ danger: true }}
+        onOk={confirmDelete}
+      >
+        <p>Are you sure you want to delete this vehicle category?</p>
+        <p className="text-sm text-gray-500 mt-2">This action cannot be undone.</p>
       </Modal>
 
       <Toaster position="top-right" />

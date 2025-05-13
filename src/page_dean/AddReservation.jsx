@@ -230,14 +230,14 @@ const AddReservation = () => {
     eventTitle: '',
     description: '',
     participants: '',
-    venue: '',
+    venues: [], // Array for multiple venues
     // Vehicle specific fields
     purpose: '',
     destination: '',
-    passengers: [], 
-    driverType: 'default', // Add driver type to form data
+    passengers: [],
+    driverType: 'default',
     driverName: '',
-    tripTicketDriver: null, // Add trip ticket driver field
+    tripTicketDriver: null,
   });
 
 
@@ -588,8 +588,8 @@ const validateCurrentStep = () => {
       return true;
 
     case 1:
-      if (formData.resourceType === 'venue' && !formData.venue) {
-        toast.error('Please select a venue');
+      if (formData.resourceType === 'venue' && (!formData.venues || formData.venues.length === 0)) {
+        toast.error('Please select at least one venue');
         return false;
       }
       if (formData.resourceType === 'vehicle' && selectedModels.length === 0) {
@@ -756,9 +756,9 @@ const renderVenues = () => (
     {/* Compact header */}
     <div className="flex justify-between items-center px-2 mb-2">
       <h3 className="font-medium text-sm sm:text-base truncate flex-1">
-        {formData.venue 
-          ? venues.find(v => v.ven_id === formData.venue)?.ven_name
-          : 'Select Venue'}
+        {formData.venues.length > 0
+          ? `Selected Venues (${formData.venues.length})`
+          : 'Select Venues'}
       </h3>
       <div className="flex space-x-1 bg-gray-100 p-0.5 rounded-md ml-2">
         <button
@@ -797,13 +797,15 @@ const renderVenues = () => (
           className={`
             cursor-pointer
             ${viewMode === 'list' ? 'flex' : ''}
-            ${formData.venue === venue.ven_id ? 'ring-1 ring-green-500' : ''}
+            ${formData.venues.includes(venue.ven_id) ? 'ring-1 ring-green-500' : ''}
             p-1.5 hover:shadow-md transition-shadow
           `}
           onClick={() => {
             setFormData(prev => ({
               ...prev,
-              venue: venue.ven_id
+              venues: prev.venues.includes(venue.ven_id)
+                ? prev.venues.filter(id => id !== venue.ven_id)
+                : [...prev.venues, venue.ven_id]
             }));
           }}
         >
@@ -811,7 +813,7 @@ const renderVenues = () => (
             ${viewMode === 'list' ? 'flex items-center gap-2' : ''}
             ${isMobile ? 'text-xs' : 'text-sm'}
           `}>
-            {/* Optimized image size */}
+            {/* Image container */}
             <div className={viewMode === 'list' ? 'w-16 flex-shrink-0' : ''}>
               <img
                 src={venue.ven_pic ? `http://localhost/coc/gsd/${venue.ven_pic}` : '/default-venue.jpg'}
@@ -827,7 +829,7 @@ const renderVenues = () => (
               />
             </div>
 
-            {/* Compact content */}
+            {/* Content */}
             <div className={`
               ${viewMode === 'list' ? 'flex-1 min-w-0' : 'mt-1.5'}
               ${isMobile ? 'space-y-0.5' : 'space-y-1'}
@@ -836,11 +838,11 @@ const renderVenues = () => (
                 <h3 className="font-medium text-gray-800 truncate flex-1 text-xs sm:text-sm">
                   {venue.ven_name}
                 </h3>
-                <Tag
-                  severity={venue.status_availability_name === 'available' ? 'success' : 'danger'}
-                  value={venue.status_availability_name}
-                  className="text-[10px] px-1 py-0.5"
-                />
+                {formData.venues.includes(venue.ven_id) && (
+                  <Tag color="success" className="text-[10px] px-1 py-0">
+                    Selected
+                  </Tag>
+                )}
               </div>
               
               <div className="flex flex-wrap gap-2 text-[10px] sm:text-xs text-gray-600">
@@ -853,13 +855,6 @@ const renderVenues = () => (
                   <span>8-5</span>
                 </div>
               </div>
-
-              {formData.venue === venue.ven_id && (
-                <div className="flex items-center gap-0.5 text-green-600 text-[10px]">
-                  <i className="pi pi-check" />
-                  <span>Selected</span>
-                </div>
-              )}
             </div>
           </div>
         </Card>
@@ -1413,7 +1408,7 @@ const handleAddReservation = async () => {
 
     // Resource type specific validation and submission
     if (formData.resourceType === 'venue') {
-      if (!formData.eventTitle || !formData.description || !formData.venue) {
+      if (!formData.eventTitle || !formData.description || formData.venues.length === 0) {
         toast.error('Please fill in all required venue reservation fields');
         return false;
       }
@@ -1427,7 +1422,7 @@ const handleAddReservation = async () => {
           end_date: format(new Date(formData.endDate), 'yyyy-MM-dd HH:mm:ss'),
           participants: formData.participants ? formData.participants.toString() : "0",
           user_id: userId,
-          venues: [formData.venue],
+          venues: formData.venues, // Now using the array of venue IDs
           equipment: Object.entries(selectedVenueEquipment).map(([equipId, quantity]) => ({
             equipment_id: equipId,
             quantity: parseInt(quantity)
@@ -1476,7 +1471,7 @@ const handleAddReservation = async () => {
           start_date: format(new Date(formData.startDate), 'yyyy-MM-dd HH:mm:ss'),
           end_date: format(new Date(formData.endDate), 'yyyy-MM-dd HH:mm:ss'),
           user_id: userId,
-          vehicles: selectedModels,
+          vehicles: selectedModels, // Ensure this is passed as an array
           passengers: formData.passengers.map(p => p.name.trim()),
           driver_id: formData.driverName || null,
           equipment: Object.entries(selectedVenueEquipment).map(([equipId, quantity]) => ({
@@ -1566,14 +1561,11 @@ const validatePayload = (payload) => {
   const missing = [];
 
   if (!payload.user_id) missing.push('User ID');
-  if (!payload.dept_id) missing.push('Department ID');
 
-  if (payload.operation === 'venueReservation') {
-    if (!payload.venue_id) missing.push('Venue');
-    if (!payload.form_data.name) missing.push('Reservation Name');
-    if (!payload.form_data.event_title) missing.push('Event Title');
+  if (payload.operation === 'venuereservation') {
+    if (!payload.form_data.venues || payload.form_data.venues.length === 0) missing.push('Venues');
+    if (!payload.form_data.title) missing.push('Event Title');
     if (!payload.form_data.description) missing.push('Description');
-    if (!payload.form_data.participants) missing.push('Participants');
     if (!payload.form_data.start_date) missing.push('Start Date');
     if (!payload.form_data.end_date) missing.push('End Date');
     
@@ -1584,14 +1576,6 @@ const validatePayload = (payload) => {
       );
       if (invalidEquipment.length > 0) missing.push('Valid Equipment Quantities');
     }
-  } else {
-    if (!payload.vehicles || payload.vehicles.length === 0) missing.push('Vehicles');
-    if (!payload.form_data.name) missing.push('Reservation Name');
-    if (!payload.form_data.purpose) missing.push('Purpose');
-    if (!payload.form_data.destination) missing.push('Destination');
-    if (!payload.form_data.start_date) missing.push('Start Date');
-    if (!payload.form_data.end_date) missing.push('End Date');
-    if (!payload.form_data.passengers || payload.form_data.passengers.length === 0) missing.push('Passengers');
   }
 
   return {
@@ -1609,7 +1593,7 @@ const resetForm = () => {
     eventTitle: '',
     description: '',
     participants: '',
-    venue: '',
+    venues: [], // Change from single venue to array of venues
     purpose: '',
     destination: '',
     passengers: [], // Reset passengers to empty array
@@ -1634,10 +1618,10 @@ const resetForm = () => {
 
 
 const renderReviewSection = () => {
-  const selectedVenues = venues.filter(v => formData.venue.includes(v.ven_id));
+  // Use the arrays from formData for multiple selections
+  const selectedVenues = venues.filter(v => formData.venues.includes(v.ven_id));
   const selectedVehicleDetails = vehicles.filter(v => selectedModels.includes(v.vehicle_id));
   const storedName = localStorage.getItem('name');
-  const selectedDriver = drivers.find(d => d.driver_id.toString() === formData.driverName?.toString());
 
   return (
     <motion.div
@@ -1703,9 +1687,13 @@ const renderReviewSection = () => {
                     <div key={venue.ven_id} className="bg-white rounded-lg p-3">
                       <div className="space-y-3">
                         <img
-                          src={venue.image_url || '/default-venue.jpg'}
+                          src={venue.ven_pic ? `http://localhost/coc/gsd/${venue.ven_pic}` : '/default-venue.jpg'}
                           alt={venue.ven_name}
                           className={`w-full ${isMobile ? 'h-32' : 'h-48'} object-cover rounded-lg`}
+                          onError={(e) => {
+                            e.target.src = '/default-venue.jpg';
+                            e.target.onerror = null;
+                          }}
                         />
                         <div className={isMobile ? 'text-sm' : ''}>
                           <h5 className="font-medium">{venue.ven_name}</h5>
@@ -1731,7 +1719,7 @@ const renderReviewSection = () => {
                   )}
                 </div>
 
-                {/* Equipment Section - Collapsed on mobile */}
+                {/* Equipment Section */}
                 {Object.keys(selectedVenueEquipment).length > 0 && (
                   <div className="mt-4">
                     <p className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium mb-2`}>Equipment</p>
@@ -1745,7 +1733,10 @@ const renderReviewSection = () => {
                               src={`http://localhost/coc/gsd/${equip.equipment_pic}`}
                               alt={equip.equipment_name}
                               className={`${isMobile ? 'w-8 h-8' : 'w-12 h-12'} object-cover rounded`}
-                              onError={(e) => { e.target.src = '/default-equipment.jpg'; }}
+                              onError={(e) => {
+                                e.target.src = '/default-equipment.jpg';
+                                e.target.onerror = null;
+                              }}
                             />
                             <div className={isMobile ? 'text-xs' : 'text-sm'}>
                               <p className="font-medium truncate">{equip.equipment_name}</p>
@@ -1763,11 +1754,32 @@ const renderReviewSection = () => {
             // Vehicle Details - Minimized for mobile
             <div className="space-y-4">
               <h4 className={`${isMobile ? 'text-sm' : 'text-lg'} font-medium text-gray-700`}>
-                Vehicle Details
+                Selected Vehicles ({selectedVehicleDetails.length})
               </h4>
               <div className="bg-gray-50 rounded-lg p-3">
-                {/* Trip Info - Minimized */}
-                <div className={`grid ${isMobile ? 'grid-cols-1 gap-2' : 'grid-cols-2 gap-4'}`}>
+                <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
+                  {selectedVehicleDetails.map(vehicle => (
+                    <div key={vehicle.vehicle_id} className="bg-white rounded-lg p-3">
+                      <div className="space-y-3">
+                        <img
+                          src={vehicle.vehicle_pic ? `http://localhost/coc/gsd/${vehicle.vehicle_pic}` : '/default-vehicle.jpg'}
+                          alt={`${vehicle.vehicle_make_name} ${vehicle.vehicle_model_name}`}
+                          className={`w-full ${isMobile ? 'h-32' : 'h-48'} object-cover rounded-lg`}
+                          onError={(e) => {
+                            e.target.src = '/default-vehicle.jpg';
+                            e.target.onerror = null;
+                          }}
+                        />
+                        <div className={isMobile ? 'text-sm' : ''}>
+                          <h5 className="font-medium">{vehicle.vehicle_make_name} {vehicle.vehicle_model_name}</h5>
+                          <p className="text-xs text-gray-600">{vehicle.vehicle_license}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className={`grid ${isMobile ? 'grid-cols-1 gap-2' : 'grid-cols-2 gap-4'} mt-3`}>
                   <div>
                     <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-500`}>Purpose</p>
                     <p className={`${isMobile ? 'text-sm' : 'text-base'} font-medium truncate`}>
@@ -1775,34 +1787,14 @@ const renderReviewSection = () => {
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Driver</p>
+                    <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-500`}>Destination</p>
                     <p className={`${isMobile ? 'text-sm' : 'text-base'} font-medium truncate`}>
-                      {availableDrivers.find(d => d.driver_id === formData.driverName)?.driver_full_name || '-'}
+                      {formData.destination}
                     </p>
                   </div>
                 </div>
 
-                {/* Vehicles - Compact grid */}
-                <div className="mt-4">
-                  <p className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium mb-2`}>Vehicles</p>
-                  <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
-                    {selectedVehicleDetails.map(vehicle => (
-                      <div key={vehicle.vehicle_id} className="bg-white rounded p-2 flex gap-2">
-                        <img
-                          src={vehicle.vehicle_pic ? `http://localhost/coc/gsd/${vehicle.vehicle_pic}` : '/default-vehicle.jpg'}
-                          alt={vehicle.vehicle_model_name}
-                          className={`${isMobile ? 'w-16 h-16' : 'w-20 h-20'} object-cover rounded`}
-                        />
-                        <div className={isMobile ? 'text-xs' : 'text-sm'}>
-                          <p className="font-medium">{vehicle.vehicle_model_name}</p>
-                          <p className="text-gray-500">{vehicle.vehicle_license}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Passengers - Compact list */}
+                {/* Passengers Section */}
                 <div className="mt-4">
                   <p className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium mb-2`}>
                     Passengers ({formData.passengers.length})
@@ -1818,30 +1810,60 @@ const renderReviewSection = () => {
                         ))}
                       </div>
                     ) : (
-                      <p className="text-gray-500">No passengers</p>
+                      <p className="text-gray-500">No passengers added</p>
                     )}
                   </div>
                 </div>
+
+                {/* Equipment Section for Vehicle */}
+                {Object.keys(selectedVenueEquipment).length > 0 && (
+                  <div className="mt-4">
+                    <p className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium mb-2`}>Equipment</p>
+                    <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
+                      {Object.entries(selectedVenueEquipment).map(([equipId, quantity]) => {
+                        const equip = equipment.find(e => e.equipment_id.toString() === equipId.toString());
+                        if (!equip) return null;
+                        return (
+                          <div key={equipId} className="flex items-center gap-2 bg-white p-2 rounded">
+                            <img
+                              src={`http://localhost/coc/gsd/${equip.equipment_pic}`}
+                              alt={equip.equipment_name}
+                              className={`${isMobile ? 'w-8 h-8' : 'w-12 h-12'} object-cover rounded`}
+                              onError={(e) => {
+                                e.target.src = '/default-equipment.jpg';
+                                e.target.onerror = null;
+                              }}
+                            />
+                            <div className={isMobile ? 'text-xs' : 'text-sm'}>
+                              <p className="font-medium truncate">{equip.equipment_name}</p>
+                              <p className="text-gray-500">Qty: {quantity}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
-            // Equipment Details
+            // Equipment Only Section
             <div className="space-y-4">
               <h4 className={`${isMobile ? 'text-sm' : 'text-lg'} font-medium text-gray-700`}>
-                Selected Equipment Details
+                Equipment Details
               </h4>
               <div className="bg-gray-50 rounded-lg p-3">
-                {/* Equipment Info */}
-                <div className={`grid ${isMobile ? 'grid-cols-1 gap-2' : 'grid-cols-2 gap-4'}`}>
+                {/* Equipment purpose and info */}
+                <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-4`}>
                   <div>
-                    <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-500`}>Purpose</p>
-                    <p className={`${isMobile ? 'text-sm' : 'text-base'} font-medium truncate`}>
+                    <p className="text-sm text-gray-500">Purpose</p>
+                    <p className={`${isMobile ? 'text-sm' : 'text-base'} font-medium`}>
                       {formData.eventTitle}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Description</p>
-                    <p className={`${isMobile ? 'text-sm' : 'text-base'} font-medium truncate`}>
+                    <p className={`${isMobile ? 'text-sm' : 'text-base'} font-medium`}>
                       {formData.description}
                     </p>
                   </div>
@@ -1849,34 +1871,32 @@ const renderReviewSection = () => {
 
                 {/* Selected Equipment List */}
                 <div className="mt-4">
-                  <p className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium mb-2`}>Equipment List</p>
-                  {Object.keys(selectedVenueEquipment).length > 0 ? (
-                    <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
-                      {Object.entries(selectedVenueEquipment).map(([equipId, quantity]) => {
-                        const equip = equipment.find(e => e.equipment_id.toString() === equipId);
-                        if (!equip) return null;
-                        return (
-                          <div key={equipId} className="bg-white rounded p-2 flex gap-2">
-                            <img
-                              src={equip.equipment_pic ? `http://localhost/coc/gsd/${equip.equipment_pic}` : '/default-equipment.jpg'}
-                              alt={equip.equipment_name}
-                              className={`${isMobile ? 'w-16 h-16' : 'w-20 h-20'} object-cover rounded`}
-                              onError={(e) => { e.target.src = '/default-equipment.jpg'; }}
-                            />
-                            <div className={isMobile ? 'text-xs' : 'text-sm'}>
-                              <p className="font-medium">{equip.equipment_name}</p>
-                              <p className="text-gray-500">Quantity: {quantity}</p>
-                            </div>
+                  <p className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium mb-2`}>
+                    Selected Equipment
+                  </p>
+                  <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
+                    {Object.entries(selectedVenueEquipment).map(([equipId, quantity]) => {
+                      const equip = equipment.find(e => e.equipment_id.toString() === equipId.toString());
+                      if (!equip) return null;
+                      return (
+                        <div key={equipId} className="flex items-center gap-2 bg-white p-2 rounded">
+                          <img
+                            src={`http://localhost/coc/gsd/${equip.equipment_pic}`}
+                            alt={equip.equipment_name}
+                            className={`${isMobile ? 'w-8 h-8' : 'w-12 h-12'} object-cover rounded`}
+                            onError={(e) => {
+                              e.target.src = '/default-equipment.jpg';
+                              e.target.onerror = null;
+                            }}
+                          />
+                          <div className={isMobile ? 'text-xs' : 'text-sm'}>
+                            <p className="font-medium truncate">{equip.equipment_name}</p>
+                            <p className="text-gray-500">Qty: {quantity}</p>
                           </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-center py-4 bg-white rounded-lg">
-                      <FaTools className="mx-auto text-gray-400 text-2xl mb-2" />
-                      <p className="text-gray-500">No equipment has been selected</p>
-                    </div>
-                  )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1906,6 +1926,7 @@ const renderReviewSection = () => {
     </motion.div>
   );
 };
+
 
 const handleVehicleSelect = (vehicleId) => {
   setSelectedModels(prevSelected => {
@@ -2504,36 +2525,38 @@ const renderStepContent = () => {
       }
     },
     2: () => (
-      <ReservationCalendar
-        onDateSelect={(startDate, endDate) => {
-          setFormData((prev) => ({
-            ...prev,
-            startDate: startDate,
-            endDate: endDate,
-          }));
-        }}
-        selectedResource={{
-          type: formData.resourceType,
-          id: formData.resourceType === 'equipment' 
-            ? Object.entries(equipmentQuantities)
-                .filter(([_, qty]) => qty > 0)
-                .map(([id, qty]) => ({
-                  id: parseInt(id),
-                  quantity: qty
-                }))
-            : formData.resourceType === 'venue'
-              ? Array.isArray(formData.venue) 
-                ? formData.venue.map(id => parseInt(id))
-                : formData.venue 
-                  ? [parseInt(formData.venue)]
-                  : []
-              : Array.isArray(selectedModels)
-                ? selectedModels.map(id => parseInt(id))
-                : selectedModels
-                  ? [parseInt(selectedModels)]
-                  : []
-        }}
-      />
+      <div className="space-y-4">
+        <Alert
+          message="Resource Selection"
+          description={`Select one or more ${formData.resourceType}s for your reservation. You can select multiple items.`}
+          type="info"
+          showIcon
+          className="mb-4"
+        />
+        
+        <ReservationCalendar
+          onDateSelect={(startDate, endDate) => {
+            setFormData((prev) => ({
+              ...prev,
+              startDate: startDate,
+              endDate: endDate,
+            }));
+          }}
+          selectedResource={{
+            type: formData.resourceType,
+            id: formData.resourceType === 'equipment' 
+              ? Object.entries(equipmentQuantities)
+                  .filter(([_, qty]) => qty > 0)
+                  .map(([id, qty]) => ({
+                    id: parseInt(id),
+                    quantity: qty
+                  }))
+              : formData.resourceType === 'venue' 
+                ? formData.venues  // Use the venues array instead of venue
+                : selectedModels   // Use selectedModels array for vehicles
+          }}
+        />
+      </div>
     ),
     3: renderBasicInformation,
     4: renderReviewSection,
@@ -3342,7 +3365,7 @@ return (
         <div className={`bg-white rounded-2xl shadow-sm p-6 border border-gray-100 ${isMobile ? 'mb-3' : 'mb-6'}`}>
           <div className={`flex ${isMobile ? 'flex-col gap-2' : 'justify-between items-center'}`}>
             <Button
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate('/Department/Dashboard')}
               className="p-button-text flex items-center gap-2 hover:bg-blue-50 transition-colors"
               icon={<i className="pi pi-arrow-left text-blue-500" />}
             >

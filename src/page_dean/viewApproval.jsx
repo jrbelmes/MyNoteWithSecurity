@@ -59,7 +59,11 @@ const ViewApproval = () => {
     try {
       const response = await axios.post('http://localhost/coc/gsd/process_reservation.php', {
         operation: 'fetchApprovalByDept',
-        department_id: departmentId,
+        json: {
+          department_id: departmentId,
+          user_level_id: SecureStorage.getSessionItem("user_level_id"),
+          current_user_id: SecureStorage.getSessionItem("user_id")
+        }
       });
       setRequests(response.data.data || []);
     } catch (error) {

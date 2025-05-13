@@ -12,6 +12,7 @@ import { format } from 'date-fns';
 import { Popover, Transition } from '@headlessui/react';
 import { clearAllExceptLoginAttempts } from '../utils/loginAttempts';
 import { SecureStorage } from '../utils/encryption';
+import ProfileAdminModal from '../components/core/profile_admin';
 
 const SidebarContext = createContext();
 
@@ -27,6 +28,8 @@ const Sidebar = () => {
   });
   const [searchQuery, setSearchQuery] = useState('');
   const [unreadMessages, setUnreadMessages] = useState(3);
+  const [notifications, setNotifications] = useState(5);
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   const name = SecureStorage.getSessionItem('name') || 'Admin User';
   const user_level_id = SecureStorage.getSessionItem('user_level_id');
@@ -57,8 +60,28 @@ const Sidebar = () => {
     localStorage.setItem('darkMode', JSON.stringify(isDarkMode));
   }, [isDarkMode]);
 
-  const toggleDesktopSidebar = () => setIsDesktopSidebarOpen(!isDesktopSidebarOpen);
-  const toggleMobileSidebar = () => setIsMobileSidebarOpen(!isMobileSidebarOpen);
+  const toggleDesktopSidebar = () => {
+    const newState = !isDesktopSidebarOpen;
+    setIsDesktopSidebarOpen(newState);
+    
+    // Dispatch custom event to notify other components
+    const event = new CustomEvent('sidebar-toggle', { 
+      detail: { collapsed: !newState }
+    });
+    window.dispatchEvent(event);
+  };
+  
+  const toggleMobileSidebar = () => {
+    const newState = !isMobileSidebarOpen;
+    setIsMobileSidebarOpen(newState);
+    
+    // Dispatch custom event for mobile sidebar
+    const event = new CustomEvent('mobile-sidebar-toggle', { 
+      detail: { open: newState }
+    });
+    window.dispatchEvent(event);
+  };
+
   const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
 
   const handleLogout = () => {
@@ -84,7 +107,118 @@ const Sidebar = () => {
   return (
     <SidebarContext.Provider value={contextValue}>
       <div className={`flex flex-col h-screen ${isDarkMode ? 'dark' : ''}`}>
-        {/* Mobile Header - Simplified */}
+        {/* Desktop Header with Profile Card */}
+        <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-3 hidden lg:flex items-center justify-end shadow-sm fixed top-0 left-0 right-0 z-30 h-24">
+          <div className="flex items-center space-x-6">
+            {/* Welcome Message */}
+            <div className="hidden lg:block">
+              <p className="text-green-600 dark:text-green-400 font-medium">Welcome! <span className="font-bold">{name}</span></p>
+            </div>
+            
+            {/* Notifications */}
+            <Popover className="relative">
+              {({ open }) => (
+                <>
+                  <Popover.Button className="relative flex items-center justify-center h-9 w-9 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-green-100 dark:hover:bg-green-800/50">
+                    <FaBell size={18} className="text-gray-600 dark:text-gray-300" />
+                    {notifications > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
+                        {notifications}
+                      </span>
+                    )}
+                  </Popover.Button>
+                  <Transition
+                    show={open}
+                    as={React.Fragment}
+                    enter="transition ease-out duration-200"
+                    enterFrom="opacity-0 translate-y-1"
+                    enterTo="opacity-100 translate-y-0"
+                    leave="transition ease-in duration-150"
+                    leaveFrom="opacity-100 translate-y-0"
+                    leaveTo="opacity-0 translate-y-1"
+                  >
+                    <Popover.Panel className="absolute right-0 z-10 mt-2 w-80 origin-top-right rounded-lg bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black ring-opacity-5">
+                      <div className="p-3 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+                        <h3 className="font-medium">Notifications</h3>
+                        <button className="text-xs text-green-600 dark:text-green-400 hover:underline">
+                          Mark all as read
+                        </button>
+                      </div>
+                      <div className="max-h-80 overflow-y-auto">
+                        <div className="p-3 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
+                          <p className="text-sm font-medium">New reservation request</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">A new venue request needs your approval</p>
+                          <p className="text-xs text-gray-400 mt-1">3 mins ago</p>
+                        </div>
+                        <div className="p-3 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
+                          <p className="text-sm font-medium">System Update</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">GSD Portal has been updated to version 2.4.0</p>
+                          <p className="text-xs text-gray-400 mt-1">1 hour ago</p>
+                        </div>
+                      </div>
+                      <div className="p-2 text-center">
+                        <Link to="/notifications" className="text-xs text-green-600 dark:text-green-400 hover:underline">
+                          View all notifications
+                        </Link>
+                      </div>
+                    </Popover.Panel>
+                  </Transition>
+                </>
+              )}
+            </Popover>
+            
+            {/* Profile Menu */}
+            <Popover className="relative">
+              {({ open, close }) => (
+                <>
+                  <Popover.Button className="flex items-center justify-center h-9 w-9 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-green-100 dark:hover:bg-green-800/50">
+                    <FaUserCircle size={20} className="text-gray-600 dark:text-gray-300" />
+                  </Popover.Button>
+
+                  <Transition
+                    show={open}
+                    as={React.Fragment}
+                    enter="transition ease-out duration-200"
+                    enterFrom="opacity-0 translate-y-1"
+                    enterTo="opacity-100 translate-y-0"
+                    leave="transition ease-in duration-150"
+                    leaveFrom="opacity-100 translate-y-0"
+                    leaveTo="opacity-0 translate-y-1"
+                  >
+                    <Popover.Panel className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-lg bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black ring-opacity-5">
+                      <div className="p-3 border-b border-gray-100 dark:border-gray-700">
+                        <p className="font-medium text-sm">{name}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Administrator</p>
+                      </div>
+                      <div className="p-2">
+                        <button 
+                          onClick={() => {
+                            close();
+                            setShowProfileModal(true);
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+                        >
+                          My Profile
+                        </button>
+                        <Link to="/settings" className="block px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md">
+                          Settings
+                        </Link>
+                        <button
+                          onClick={handleLogout}
+                          className="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md"
+                        >
+                          Logout
+                        </button>
+                      </div>
+                    </Popover.Panel>
+                  </Transition>
+                </>
+              )}
+            </Popover>
+          </div>
+        </header>
+
+        {/* Mobile Header */}
         <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-3 fixed top-0 left-0 right-0 z-30 lg:hidden flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <button onClick={toggleMobileSidebar} className="text-green-600 dark:text-green-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
@@ -97,9 +231,101 @@ const Sidebar = () => {
           </div>
 
           <div className="flex items-center space-x-3">
-            <HeaderUserMenu name={name} handleLogout={handleLogout} />
+            {/* Notifications */}
+            <Popover className="relative">
+              {({ open }) => (
+                <>
+                  <Popover.Button className="relative flex items-center justify-center h-9 w-9 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-green-100 dark:hover:bg-green-800/50">
+                    <FaBell size={18} className="text-gray-600 dark:text-gray-300" />
+                    {notifications > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
+                        {notifications}
+                      </span>
+                    )}
+                  </Popover.Button>
+                  <Transition
+                    show={open}
+                    as={React.Fragment}
+                    enter="transition ease-out duration-200"
+                    enterFrom="opacity-0 translate-y-1"
+                    enterTo="opacity-100 translate-y-0"
+                    leave="transition ease-in duration-150"
+                    leaveFrom="opacity-100 translate-y-0"
+                    leaveTo="opacity-0 translate-y-1"
+                  >
+                    <Popover.Panel className="absolute right-0 z-10 mt-2 w-72 origin-top-right rounded-lg bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black ring-opacity-5">
+                      <div className="p-3 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+                        <h3 className="font-medium">Notifications</h3>
+                        <button className="text-xs text-green-600 dark:text-green-400 hover:underline">
+                          Mark all as read
+                        </button>
+                      </div>
+                      <div className="max-h-60 overflow-y-auto">
+                        <div className="p-3 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
+                          <p className="text-sm font-medium">New reservation request</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">A new venue request needs your approval</p>
+                          <p className="text-xs text-gray-400 mt-1">3 mins ago</p>
+                        </div>
+                      </div>
+                    </Popover.Panel>
+                  </Transition>
+                </>
+              )}
+            </Popover>
+            
+            {/* User Menu */}
+            <Popover className="relative">
+              {({ open, close }) => (
+                <>
+                  <Popover.Button className="flex items-center justify-center h-9 w-9 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-green-100 dark:hover:bg-green-800/50">
+                    <FaUserCircle size={20} className="text-gray-600 dark:text-gray-300" />
+                  </Popover.Button>
+
+                  <Transition
+                    show={open}
+                    as={React.Fragment}
+                    enter="transition ease-out duration-200"
+                    enterFrom="opacity-0 translate-y-1"
+                    enterTo="opacity-100 translate-y-0"
+                    leave="transition ease-in duration-150"
+                    leaveFrom="opacity-100 translate-y-0"
+                    leaveTo="opacity-0 translate-y-1"
+                  >
+                    <Popover.Panel className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-lg bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black ring-opacity-5">
+                      <div className="p-3 border-b border-gray-100 dark:border-gray-700">
+                        <p className="font-medium text-sm">{name}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Administrator</p>
+                      </div>
+                      <div className="p-2">
+                        <button 
+                          onClick={() => {
+                            close();
+                            setShowProfileModal(true);
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+                        >
+                          My Profile
+                        </button>
+                        <Link to="/settings" className="block px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md">
+                          Settings
+                        </Link>
+                        <button
+                          onClick={handleLogout}
+                          className="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md"
+                        >
+                          Logout
+                        </button>
+                      </div>
+                    </Popover.Panel>
+                  </Transition>
+                </>
+              )}
+            </Popover>
           </div>
         </header>
+
+        {/* Spacer to push content below fixed headers */}
+        <div className="h-24 w-full"></div>
 
         {/* Sidebar Overlay for Mobile */}
         <AnimatePresence>
@@ -115,14 +341,14 @@ const Sidebar = () => {
         </AnimatePresence>
 
         {/* Main Content Area */}
-        <div className="flex flex-1 pt-[60px] lg:pt-0">
+        <div className="flex flex-1 pt-4 lg:pt-4">
           {/* Desktop Sidebar */}
-          <div className={`hidden lg:flex lg:flex-col h-screen bg-white dark:bg-gray-900 shadow-lg z-40 transition-all duration-300 ${
+          <div className={`hidden lg:flex lg:flex-col h-screen fixed top-0 bg-white dark:bg-gray-900 shadow-lg z-50 transition-all duration-300 ${
             isDesktopSidebarOpen ? 'w-64' : 'w-16'
           }`}>
             {/* Sidebar Header */}
-            <div className={`flex items-center justify-between p-4 border-b border-green-100 dark:border-green-800 ${
-              !isDesktopSidebarOpen && 'justify-center'
+            <div className={`flex items-center p-4 border-b border-green-100 dark:border-green-800 ${
+              isDesktopSidebarOpen ? 'justify-between' : 'justify-center'
             }`}>
               {isDesktopSidebarOpen ? (
                 <>
@@ -135,11 +361,9 @@ const Sidebar = () => {
                   </button>
                 </>
               ) : (
-                <>
-                  <button onClick={toggleDesktopSidebar} className="text-green-600 dark:text-green-400 p-1 rounded-full hover:bg-green-50 dark:hover:bg-green-900">
-                    <FaAngleRight size={16} />
-                  </button>
-                </>
+                <button onClick={toggleDesktopSidebar} className="text-green-600 dark:text-green-400 p-1 rounded-full hover:bg-green-50 dark:hover:bg-green-900">
+                  <FaAngleRight size={16} />
+                </button>
               )}
             </div>
 
@@ -170,13 +394,6 @@ const Sidebar = () => {
                 isExpanded={isDesktopSidebarOpen}
               />
               
-              <MiniSidebarItem 
-                icon={FaCalendarAlt} 
-                text="Calendar" 
-                link="/LandCalendar" 
-                active={activeItem === '/LandCalendar'}
-                isExpanded={isDesktopSidebarOpen}
-              />
 
               <MiniSidebarItem 
                 icon={FaComments} 
@@ -225,6 +442,8 @@ const Sidebar = () => {
                   isExpanded={isDesktopSidebarOpen}
                 />
               </MiniSidebarDropdown>
+
+
               <MiniSidebarItem 
                 icon={FaArchive} 
                 text="Archive" 
@@ -235,6 +454,14 @@ const Sidebar = () => {
 
               {isDesktopSidebarOpen && <SectionLabel text="Personnel" />}
 
+                            <MiniSidebarItem 
+                icon={FaFileAlt} 
+                text="Checklist" 
+                link="/Checklist" 
+                active={activeItem === '/Checklist'}
+                isExpanded={isDesktopSidebarOpen}
+              />
+
               <MiniSidebarItem 
                 icon={FaUserCircle} 
                 text="Assign Personnel" 
@@ -243,31 +470,24 @@ const Sidebar = () => {
                 isExpanded={isDesktopSidebarOpen}
               />
 
+              {isDesktopSidebarOpen && <SectionLabel text="User Management" />}
+
+
               <MiniSidebarItem 
-                icon={FaFileAlt} 
-                text="Checklist" 
-                link="/Checklist" 
-                active={activeItem === '/Checklist'}
+                icon={FaUserCircle} 
+                text="Faculty" 
+                link="/Faculty" 
+                active={activeItem === '/Faculty'}
                 isExpanded={isDesktopSidebarOpen}
               />
 
               {isDesktopSidebarOpen && <SectionLabel text="Manage Reservation" />}
-
-
 
               <MiniSidebarItem 
                 icon={FaFolder} 
                 text="View Requests" 
                 link="/ViewRequest" 
                 active={activeItem === '/ViewRequest'}
-                isExpanded={isDesktopSidebarOpen}
-              />
-
-              <MiniSidebarItem 
-                icon={FaFileAlt} 
-                text="Records" 
-                link="/record" 
-                active={activeItem === '/record'}
                 isExpanded={isDesktopSidebarOpen}
               />
 
@@ -279,95 +499,27 @@ const Sidebar = () => {
                 isExpanded={isDesktopSidebarOpen}
               />
 
-              {isDesktopSidebarOpen && <SectionLabel text="User Management" />}
-
               <MiniSidebarItem 
-                icon={FaUserCircle} 
-                text="Users" 
-                link="/Faculty" 
-                active={activeItem === '/Faculty'}
-                isExpanded={isDesktopSidebarOpen}
-              />
-
-              {isDesktopSidebarOpen && <SectionLabel text="Personal Info" />}
-  
-              <MiniSidebarItem 
-                icon={FaCogs} 
-                text="Account Settings" 
-                link="/settings" 
-                active={activeItem === '/settings'}
+                icon={FaFileAlt} 
+                text="Records" 
+                link="/record" 
+                active={activeItem === '/record'}
                 isExpanded={isDesktopSidebarOpen}
               />
             </nav>
-
-            {/* User Profile - Show only icon when collapsed */}
-            <div className="mt-auto border-t border-gray-200 dark:border-gray-800">
-              <Popover className="relative w-full">
-                {({ open }) => (
-                  <>
-                    <Popover.Button className={`w-full p-3 flex items-center ${isDesktopSidebarOpen ? 'justify-between' : 'justify-center'} hover:bg-green-50 dark:hover:bg-green-900/20`}>
-                      {isDesktopSidebarOpen ? (
-                        <>
-                          <div className="flex items-center space-x-3">
-                            <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-800 flex items-center justify-center">
-                              <FaUserCircle className="text-green-600 dark:text-green-300" />
-                            </div>
-                            <div className="text-left">
-                              <p className="font-medium text-sm">{name}</p>
-                              <p className="text-xs text-gray-500 dark:text-gray-400">Administrator</p>
-                            </div>
-                          </div>
-                          <FaChevronDown className={`text-gray-400 transform ${open ? 'rotate-180' : ''}`} size={14} />
-                        </>
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-800 flex items-center justify-center">
-                          <FaUserCircle className="text-green-600 dark:text-green-300" />
-                        </div>
-                      )}
-                    </Popover.Button>
-                    <Transition
-                      show={open}
-                      as={React.Fragment}
-                      enter="transition ease-out duration-200"
-                      enterFrom="opacity-0 translate-y-1"
-                      enterTo="opacity-100 translate-y-0"
-                      leave="transition ease-in duration-150"
-                      leaveFrom="opacity-100 translate-y-0"
-                      leaveTo="opacity-0 translate-y-1"
-                    >
-                      <Popover.Panel className={`absolute ${!isDesktopSidebarOpen ? 'left-full ml-2' : 'right-0'} bottom-full mb-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 z-50`}>
-                        <div className="p-3 border-b border-gray-100 dark:border-gray-700">
-                          <p className="font-medium text-sm">{name}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">Administrator</p>
-                        </div>
-                        <div className="p-2">
-                          <Link to="/settings" className="block w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md flex items-center space-x-2">
-                            <FaCog size={14} />
-                            <span>Settings</span>
-                          </Link>
-                          <button
-                            onClick={handleLogout}
-                            className="w-full mt-1 text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md flex items-center space-x-2"
-                          >
-                            <FaSignOutAlt size={14} />
-                            <span>Logout</span>
-                          </button>
-                        </div>
-                      </Popover.Panel>
-                    </Transition>
-                  </>
-                )}
-              </Popover>
-            </div>
           </div>
 
           {/* Mobile Sidebar */}
-          <div className={`fixed lg:hidden h-[calc(100vh-60px)] bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 shadow-lg z-40 w-72 transition-transform duration-300 flex flex-col ${
+          <div className={`fixed lg:hidden h-screen top-0 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 shadow-lg z-40 w-72 transition-transform duration-300 flex flex-col ${
             isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}>
             {/* Close button */}
-            <div className="flex justify-end p-3">
-              <button onClick={toggleMobileSidebar} className="text-gray-500 hover:text-gray-700 dark:text-gray-400">
+            <div className="flex items-center justify-between p-4 border-b border-green-100 dark:border-green-800">
+              <div className="flex items-center space-x-2">
+                <img src="/images/assets/phinma.png" alt="Logo" className="w-8 h-8" />
+                <span className="font-bold text-green-600 dark:text-green-400">GSD Portal</span>
+              </div>
+              <button onClick={toggleMobileSidebar} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 p-1 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20">
                 <FaTimes size={18} />
               </button>
             </div>
@@ -395,12 +547,6 @@ const Sidebar = () => {
                 active={activeItem === '/adminDashboard'} 
               />
               
-              <SidebarItem 
-                icon={FaCalendarAlt} 
-                text="Calendar" 
-                link="/LandCalendar" 
-                active={activeItem === '/LandCalendar'} 
-              />
 
               <SidebarItem 
                 icon={FaComments} 
@@ -437,12 +583,48 @@ const Sidebar = () => {
                 />
               </SidebarDropdown>
               
-              {/* Continuing with more menu items... */}
+              <SidebarItem 
+                icon={FaFileAlt} 
+                text="Checklist" 
+                link="/Checklist" 
+                active={activeItem === '/Checklist'} 
+              />
+
+              <SidebarItem 
+                icon={FaUserCircle} 
+                text="Assign Personnel" 
+                link="/AssignPersonnel" 
+                active={activeItem === '/AssignPersonnel'} 
+              />
+              
               <SidebarItem 
                 icon={FaUserCircle} 
                 text="Personnel" 
                 link="/AssignPersonnel" 
                 active={activeItem === '/AssignPersonnel'} 
+              />
+              
+              <SectionLabel text="Manage Reservation" />
+
+              <SidebarItem 
+                icon={FaFolder} 
+                text="View Requests" 
+                link="/ViewRequest" 
+                active={activeItem === '/ViewRequest'} 
+              />
+
+              <SidebarItem 
+                icon={FaChartBar} 
+                text="Reports" 
+                link="/Reports" 
+                active={activeItem === '/Reports'} 
+              />
+
+              <SidebarItem 
+                icon={FaFileAlt} 
+                text="Records" 
+                link="/record" 
+                active={activeItem === '/record'} 
               />
               
               <SectionLabel text="Account" />
@@ -456,69 +638,26 @@ const Sidebar = () => {
             </nav>
           </div>
 
-          {/* Toggle Button - Always visible when sidebar is closed */}
-          {!isDesktopSidebarOpen && (
-            <button 
-              onClick={toggleDesktopSidebar}
-              className="hidden lg:flex fixed top-4 left-4 z-50 bg-white dark:bg-gray-800 shadow-md rounded-full p-2 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20"
-            >
-              <FaAngleRight size={20} />
-            </button>
-          )}
-
           {/* Main Content */}
           <main className={`flex-1 bg-gray-50 dark:bg-gray-800 min-h-screen overflow-x-hidden transition-all duration-300 ${
-            !isDesktopSidebarOpen ? 'pl-0' : 'lg:pl-0'
+            !isDesktopSidebarOpen 
+              ? 'lg:ml-64 pl-0 mb-[300px]' 
+              : 'lg:ml-64 pl-0 mb-[300px]'
           }`}>
+
+
+
             {/* Content will be rendered here */}
           </main>
         </div>
+
+        {/* Profile Modal */}
+        <ProfileAdminModal 
+          isOpen={showProfileModal} 
+          onClose={() => setShowProfileModal(false)} 
+        />
       </div>
     </SidebarContext.Provider>
-  );
-};
-
-// Header User Menu Component - Simplified
-const HeaderUserMenu = ({ name, handleLogout }) => {
-  return (
-    <Popover className="relative">
-      {({ open }) => (
-        <>
-          <Popover.Button className="flex items-center justify-center h-9 w-9 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-green-100 dark:hover:bg-green-800/50">
-            <FaUserCircle size={20} className="text-gray-600 dark:text-gray-300" />
-          </Popover.Button>
-
-          <Transition
-            show={open}
-            as={React.Fragment}
-            enter="transition ease-out duration-200"
-            enterFrom="opacity-0 translate-y-1"
-            enterTo="opacity-100 translate-y-0"
-            leave="transition ease-in duration-150"
-            leaveFrom="opacity-100 translate-y-0"
-            leaveTo="opacity-0 translate-y-1"
-          >
-            <Popover.Panel className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-lg bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black ring-opacity-5">
-              <div className="p-3 border-b border-gray-100 dark:border-gray-700">
-                <p className="font-medium text-sm">{name}</p>
-                <p className="text-xs text-gray-500">Administrator</p>
-              </div>
-              <div className="p-2">
-                <Link to="/settings" className="block px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md">
-                  Settings
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md"
-                >
-                  Logout
-                </button>
-              </div>
-            </Popover.Panel>
-          </Transition>
-        </>
-      )}
-    </Popover>
   );
 };
 

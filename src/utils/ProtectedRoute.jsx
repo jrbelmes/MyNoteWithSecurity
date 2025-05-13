@@ -31,8 +31,8 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     const getRedirectPath = () => {
         if (userRole === 'Super Admin' || userRole === 'Admin') return '/adminDashboard';
         if (userRole === 'Personnel') return '/personnelDashboard';
-        if (userRole === 'Dean' || userRole === 'Secretary' || userRole === 'Department Head') return '/deanDashboard';
-        if (userRole === 'Faculty/Staff' || userRole === 'School Head' || userRole === 'SBO PRESIDENT' || userRole === 'CSG PRESIDENT') return '/dashboard';
+        if (userRole === 'Dean' || userRole === 'Secretary' || userRole === 'Department Head') return '7Department/Dashboard';
+        if (userRole === 'Faculty/Staff' || userRole === 'School Head' || userRole === 'SBO PRESIDENT' || userRole === 'CSG PRESIDENT') return '/Faculty/Dashboard';
         return '/gsd';
     };
 

@@ -709,7 +709,7 @@ const ReservationRequests = () => {
     return (
         <div className="flex flex-col lg:flex-row bg-gradient-to-br from-white to-green-100 min-h-screen">
             <Sidebar />
-            <div className="flex-grow p-8 lg:p-12">
+            <div className="flex-grow p-8 lg:p-12 mt-20">
                 <motion.div
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}

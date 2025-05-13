@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Sidebar from './Sidebar';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faEdit, faArchive, faSearch, faPlus, faUser } from '@fortawesome/free-solid-svg-icons';
+import { faEdit, faArchive, faSearch, faPlus, faUser, faTrashAlt, faEye } from '@fortawesome/free-solid-svg-icons';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import axios from 'axios';
@@ -21,8 +21,12 @@ import { Divider } from 'primereact/divider';
 import { Chip } from 'primereact/chip';
 import { IconField } from 'primereact/iconfield';
 import { InputIcon } from 'primereact/inputicon';
+import { Tooltip } from 'primereact/tooltip';
+import { Tag } from 'primereact/tag';
+import { FileUpload } from 'primereact/fileupload';
 import { sanitizeInput, validateInput } from '../utils/sanitize';
 import { SecureStorage } from '../utils/encryption';
+import '../vehicle.css'; // Import vehicle.css which contains loader styles
 
 const generateAvatarColor = (str) => {
     let hash = 0;
@@ -42,7 +46,7 @@ const Faculty = () => {
     const user_level_id = SecureStorage.getSessionItem('user_level_id');
     const [users, setUsers] = useState([]);
     const [departments, setDepartments] = useState([]);
-    const [userLevels, setUserLevels] = useState([]); // Add this new state for user levels
+    const [userLevels, setUserLevels] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [modalState, setModalState] = useState({ isOpen: false, type: '', user: null });
@@ -53,19 +57,12 @@ const Faculty = () => {
         'departments_name': { value: null, matchMode: FilterMatchMode.CONTAINS },
         'users_school_id': { value: null, matchMode: FilterMatchMode.CONTAINS },
     });
-
-    // Add this new state for role filter
     const [selectedRole, setSelectedRole] = useState('');
-
-    // Add this function to filter by role
-    const handleRoleFilter = (role) => {
-        setSelectedRole(role);
-    };
+    const [viewImageModal, setViewImageModal] = useState(false);
+    const [currentImage, setCurrentImage] = useState(null);
 
     const navigate = useNavigate();
     const user_id = localStorage.getItem('user_id');
-
-  
 
     useEffect(() => {
         if (user_level_id !== '1' && user_level_id !== '2' && user_level_id !== '4') {
@@ -290,43 +287,48 @@ const Faculty = () => {
         (user?.users_fname + ' ' + user?.users_lname)?.toLowerCase().includes(searchTerm.toLowerCase())
     ) || [];  // Add null checks and provide empty array fallback
 
+    const handleViewImage = (imageUrl) => {
+        setCurrentImage(imageUrl);
+        setViewImageModal(true);
+    };
+
     const imageBodyTemplate = (rowData) => {
-        if (rowData.users_pic) {
-            return (
-                <div className="relative w-12 h-12">
-                    <img 
-                        src={`http://localhost/coc/gsd/${rowData.users_pic}`}
-                        alt={rowData.users_name}
-                        className="w-full h-full rounded-full object-cover"
-                        onError={() => {
-                            const initials = `${rowData.users_fname?.[0] || ''}${rowData.users_lname?.[0] || ''}`.toUpperCase();
-                            const bgColor = generateAvatarColor(initials);
-                            const imgElement = document.getElementById(`user-img-${rowData.users_id}`);
-                            if (imgElement) {
-                                imgElement.style.display = 'none';
-                                const parent = imgElement.parentElement;
-                                const fallbackDiv = document.createElement('div');
-                                fallbackDiv.className = 'w-full h-full rounded-full flex items-center justify-center text-white font-bold text-lg';
-                                fallbackDiv.style.backgroundColor = bgColor;
-                                fallbackDiv.textContent = initials;
-                                parent.appendChild(fallbackDiv);
-                            }
-                        }}
-                        id={`user-img-${rowData.users_id}`}
-                    />
-                </div>
-            );
-        }
-    
+        const imageUrl = rowData.users_pic ? `http://localhost/coc/gsd/${rowData.users_pic}` : null;
         const initials = `${rowData.users_fname?.[0] || ''}${rowData.users_lname?.[0] || ''}`.toUpperCase();
         const bgColor = generateAvatarColor(initials);
-    
+        
         return (
-            <div
-                className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg"
-                style={{ backgroundColor: bgColor }}
-            >
-                {initials}
+            <div className="flex justify-center">
+                {imageUrl ? (
+                    <div 
+                        className="cursor-pointer w-12 h-12 overflow-hidden rounded-full shadow-sm hover:opacity-80 transition-opacity"
+                        onClick={() => handleViewImage(imageUrl)}
+                    >
+                        <img 
+                            src={imageUrl} 
+                            alt={`${rowData.users_fname} ${rowData.users_lname}`}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.parentElement.innerHTML = `
+                                    <div
+                                        class="w-full h-full rounded-full flex items-center justify-center text-white font-bold text-lg"
+                                        style="background-color: ${bgColor}"
+                                    >
+                                        ${initials}
+                                    </div>
+                                `;
+                            }}
+                        />
+                    </div>
+                ) : (
+                    <div
+                        className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg"
+                        style={{ backgroundColor: bgColor }}
+                    >
+                        {initials}
+                    </div>
+                )}
             </div>
         );
     };
@@ -340,40 +342,37 @@ const Faculty = () => {
         };
 
         const handleArchiveClick = () => {
-            // Log the data we're passing to ensure it's correct
-            console.log('Archive data:', {
-                id: rowData.users_id,
-                type: rowData.user_level_name
-            });
-            
             setModalState({ 
                 isOpen: true, 
                 type: 'archive', 
                 user: {
                     users_id: rowData.users_id,
-                    user_level_name: rowData.user_level_name // Make sure we pass the user level name
+                    user_level_name: rowData.user_level_name
                 }
             });
         };
 
         return (
-            <div className="flex gap-2">
-                <motion.button 
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
+            <div className="flex gap-2 justify-center">
+                <Tooltip target=".edit-btn" />
+                <Tooltip target=".archive-btn" />
+
+                <button 
+                    className="edit-btn bg-green-500 hover:bg-green-600 text-white p-2 rounded-md transition-colors"
+                    data-pr-tooltip="Edit Faculty"
+                    data-pr-position="top"
                     onClick={handleEditClick}
-                    className="bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-3 rounded-full"
                 >
                     <FontAwesomeIcon icon={faEdit} />
-                </motion.button>
-                <motion.button 
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
+                </button>
+                <button 
+                    className="archive-btn text-yellow-600 hover:text-yellow-700 border border-yellow-300 hover:border-yellow-400 p-2 rounded-md transition-colors bg-white"
+                    data-pr-tooltip="Archive Faculty"
+                    data-pr-position="top"
                     onClick={handleArchiveClick}
-                    className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-1 px-3 rounded-full"
                 >
                     <FontAwesomeIcon icon={faArchive} />
-                </motion.button>
+                </button>
             </div>
         );
     };
@@ -408,145 +407,169 @@ const Faculty = () => {
         );
     };
 
-    const header = (
-        <div className="flex flex-col gap-6">
-            {/* Header Title Section */}
-            <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
-                <div className="flex items-center gap-3">
-                    <div className="p-3 bg-green-50 rounded-full">
-                        <FontAwesomeIcon icon={faUser} className="text-2xl text-green-600" />
-                    </div>
-                    <div>
-                        <h2 className="text-2xl font-bold text-gray-800 m-0">User Management</h2>
-                        <p className="text-gray-500 text-sm mt-1">Manage your Users here</p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-4">
-                    {/* Role Filter Dropdown */}
-                    <select
-                        className="p-2 border rounded-lg"
-                        value={selectedRole}
-                        onChange={(e) => handleRoleFilter(e.target.value)}
-                    >
-                        <option value="">All Roles</option>
-                        <option value="Admin">Admin</option>
-                        <option value="Faculty">Faculty</option>
-                        <option value="Staff">Staff</option>
-                    </select>
-                    <motion.button 
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => setModalState({ isOpen: true, type: 'add', user: null })}
-                        className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 px-4 rounded-lg flex items-center gap-2 shadow-sm transition-all"
-                    >
-                        <FontAwesomeIcon icon={faPlus} className="text-sm" />
-                        <span>Add Faculty</span>
-                    </motion.button>
-                </div>
-            </div>
-
-            <Divider className="my-0" />
-
-            
-        </div>
-    );
-
     // Modify the DataTable value prop to include role filtering
     const filteredData = selectedRole 
         ? users.filter(user => user.user_level_name === selectedRole)
         : users;
+        
+    // Add custom styling to match Venue.jsx table
+    const tableStyle = {
+        minWidth: '50rem',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)',
+        borderRadius: '0.5rem',
+        overflow: 'hidden',
+        border: '1px solid #e5e7eb'
+    };
 
     return (
-        <div className="flex flex-col lg:flex-row min-h-screen bg-gray-50">
-            <Sidebar />
-            <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="flex-grow p-6 lg:p-8 overflow-hidden"
-            >
-                <Card className="shadow-md border-0">
-                    <DataTable
-                        value={filteredData}
-                        paginator
-                        rows={10}
-                        dataKey="users_id"
-                        filters={filters}
-                        filterDisplay="row"
-                        loading={loading}
-                        header={header}
-                        emptyMessage={
-                            <div className="text-center py-8">
-                                <i className="pi pi-search text-gray-300 text-4xl mb-4"></i>
-                                <p className="text-gray-500">No faculty members found</p>
+        <div className="flex flex-col lg:flex-row bg-gradient-to-br from-white to-green-100 min-h-screen">
+            <div className="flex-none">
+                <Sidebar />
+            </div>
+            <div className="flex-grow p-8 lg:p-12 mt-20">
+                <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5 }}
+                    className="p-6 lg:p-10"
+                >
+                    <h2 className="text-4xl font-bold mb-6 text-green-800 drop-shadow-sm">Faculty Management</h2>
+                    <div className="bg-white rounded-lg shadow-md p-6 mb-6 border border-gray-100">
+                        <div className="flex flex-col md:flex-row items-center justify-between mb-4">
+                            <motion.div 
+                                whileHover={{ scale: 1.05 }}
+                                className="relative w-full md:w-64 mb-4 md:mb-0"
+                            >
+                                <InputText
+                                    value={filters.global.value || ''}
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        let _filters = { ...filters };
+                                        _filters['global'].value = value;
+                                        setFilters(_filters);
+                                    }}
+                                    placeholder="Search faculty..."
+                                    className="w-full pl-10 pr-4 py-2 rounded-full border border-green-300 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-300"
+                                />
+                                <FontAwesomeIcon icon={faSearch} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-400" />
+                            </motion.div>
+                            <div className="flex items-center gap-4">
+                                <select
+                                    className="p-2 border rounded-lg"
+                                    value={selectedRole}
+                                    onChange={(e) => setSelectedRole(e.target.value)}
+                                >
+                                    <option value="">All Roles</option>
+                                    <option value="Admin">Admin</option>
+                                    <option value="Faculty">Faculty</option>
+                                    <option value="Staff">Staff</option>
+                                </select>
+                                <motion.button 
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={() => setModalState({ isOpen: true, type: 'add', user: null })}
+                                    className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out flex items-center justify-center shadow-md"
+                                >
+                                    <FontAwesomeIcon icon={faPlus} className="mr-2" /> Add Faculty
+                                </motion.button>
                             </div>
-                        }
-                        className="p-datatable-users"
-                        responsiveLayout="scroll"
-                        showGridlines
-                        stripedRows
-                        size="small"
-                        tableStyle={{ minWidth: '50rem' }}
-                        rowClassName="hover:bg-gray-50 transition-colors duration-200"
-                    >
-                        <Column 
-                            header="Photo" 
-                            body={imageBodyTemplate} 
-                            style={{ width: '100px' }}
-                            className="text-center"
-                        />
-                        <Column 
-                            field="users_school_id" 
-                            header="School ID" 
-                            filter 
-                            filterPlaceholder="Search ID"
-                            sortable 
-                            className="font-semibold"
-                        />
-                        <Column 
-                            field="users_name" 
-                            header="Full Name" 
-                            body={(rowData) => `${rowData.users_fname} ${rowData.users_mname ? rowData.users_mname + ' ' : ''}${rowData.users_lname}`}
-                            filter
-                            filterField="global"
-                            filterPlaceholder="Search name"
-                            sortable
-                        />
-                        <Column 
-                            field="departments_name" 
-                            header="Department" 
-                            body={departmentTemplate}
-                            filter 
-                            filterPlaceholder="Search department"
-                            sortable 
-                        />
-                        <Column 
-                            field="user_level_name" 
-                            header="Role" 
-                            body={userLevelTemplate}
-                            sortable 
-                            style={{ width: '150px' }}
-                        />
-                        <Column 
-                            field="users_contact_number" 
-                            header="Contact" 
-                            sortable 
-                            body={(rowData) => (
-                                <div className="flex items-center gap-2">
-                                    <i className="pi pi-phone text-green-500" />
-                                    {rowData.users_contact_number}
-                                </div>
-                            )}
-                        />
-                        <Column 
-                            header="Actions" 
-                            body={actionsBodyTemplate} 
-                            style={{ width: '150px' }}
-                            className="text-center"
-                        />
-                    </DataTable>
-                </Card>
-            </motion.div>
+                        </div>
+
+                        {loading ? (
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="flex justify-center items-center h-64"
+                            >
+                                <div className="loader"></div>
+                            </motion.div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <DataTable
+                                    value={filteredData}
+                                    paginator
+                                    rows={10}
+                                    rowsPerPageOptions={[10, 20, 50]}
+                                    dataKey="users_id"
+                                    filters={filters}
+                                    filterDisplay="row"
+                                    loading={loading}
+                                    emptyMessage={
+                                        <div className="text-center py-8">
+                                            <i className="pi pi-search text-6xl text-gray-300 mb-4"></i>
+                                            <p className="text-xl text-gray-500">No faculty members found</p>
+                                        </div>
+                                    }
+                                    className="p-datatable-users"
+                                    responsiveLayout="scroll"
+                                    showGridlines
+                                    stripedRows
+                                    size="small"
+                                    tableStyle={tableStyle}
+                                    rowClassName="hover:bg-gray-50 transition-colors duration-200"
+                                >
+                                    <Column 
+                                        header="Photo" 
+                                        body={imageBodyTemplate} 
+                                        style={{ width: '100px' }}
+                                        className="text-center"
+                                    />
+                                    <Column 
+                                        field="users_school_id" 
+                                        header="School ID" 
+                                        filter 
+                                        filterPlaceholder="Search ID"
+                                        sortable 
+                                        className="font-semibold"
+                                    />
+                                    <Column 
+                                        field="users_name" 
+                                        header="Full Name" 
+                                        body={(rowData) => `${rowData.users_fname} ${rowData.users_mname ? rowData.users_mname + ' ' : ''}${rowData.users_lname}`}
+                                        filter
+                                        filterField="global"
+                                        filterPlaceholder="Search name"
+                                        sortable
+                                    />
+                                    <Column 
+                                        field="departments_name" 
+                                        header="Department" 
+                                        body={departmentTemplate}
+                                        filter 
+                                        filterPlaceholder="Search department"
+                                        sortable 
+                                    />
+                                    <Column 
+                                        field="user_level_name" 
+                                        header="Role" 
+                                        body={userLevelTemplate}
+                                        sortable 
+                                        style={{ width: '150px' }}
+                                    />
+                                    <Column 
+                                        field="users_contact_number" 
+                                        header="Contact" 
+                                        sortable 
+                                        body={(rowData) => (
+                                            <div className="flex items-center gap-2">
+                                                <i className="pi pi-phone text-green-500" />
+                                                {rowData.users_contact_number}
+                                            </div>
+                                        )}
+                                    />
+                                    <Column 
+                                        header="Actions" 
+                                        body={actionsBodyTemplate} 
+                                        style={{ width: '150px' }}
+                                        className="text-center"
+                                    />
+                                </DataTable>
+                            </div>
+                        )}
+                    </div>
+                </motion.div>
+            </div>
 
             <FacultyModal 
                 show={modalState.isOpen} 
@@ -556,18 +579,40 @@ const Faculty = () => {
                 departments={departments}
                 onSubmit={handleSubmit}
                 onDelete={archiveUser}
-                userLevels={userLevels} // Pass userLevels to FacultyModal
-                getUserDetails={getUserDetails} // Add this line
-                generateAvatarColor={generateAvatarColor} // Add this prop
-                fetchUsers={fetchUsers} // Add this prop
+                userLevels={userLevels}
+                getUserDetails={getUserDetails}
+                generateAvatarColor={generateAvatarColor}
+                fetchUsers={fetchUsers}
             />
+
+            {/* Image Preview Modal */}
+            <Modal
+                show={viewImageModal}
+                onHide={() => setViewImageModal(false)}
+                centered
+                size="lg"
+            >
+                <Modal.Header closeButton>
+                    <Modal.Title>Profile Image</Modal.Title>
+                </Modal.Header>
+                <Modal.Body className="text-center">
+                    {currentImage && (
+                        <img
+                            src={currentImage}
+                            alt="Faculty"
+                            className="max-w-full max-h-[70vh] object-contain"
+                        />
+                    )}
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setViewImageModal(false)}>
+                        Close
+                    </Button>
+                </Modal.Footer>
+            </Modal>
         </div>
     );
 };
-
-
-
-
 
 const FacultyModal = ({ 
     show, 
@@ -576,14 +621,14 @@ const FacultyModal = ({
     user, 
     departments, 
     onSubmit, 
-    onDelete: onArchive, // Rename this prop
+    onDelete: onArchive,
     userLevels,
     getUserDetails,
     generateAvatarColor,
-    fetchUsers // Add this to props
+    fetchUsers
 }) => {
-    const timeoutRef = useRef(null); // Add this line at the top with other state declarations
-    const [currentUserData, setCurrentUserData] = useState(null); // Add currentUserData state
+    const timeoutRef = useRef(null);
+    const [currentUserData, setCurrentUserData] = useState(null);
     const [formData, setFormData] = useState({
         users_id: '',
         users_firstname: '',
@@ -597,13 +642,10 @@ const FacultyModal = ({
         users_role: '',
     });
 
-    // Add imageUrl state
     const [imageUrl, setImageUrl] = useState('');
-
-    // Add validation state
     const [errors, setErrors] = useState({});
     const [touchedFields, setTouchedFields] = useState({});
-
+    
     // Password validation regex
     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]*$/;
     const passwordSingleSpecialCharRegex = /[!@#$%^&*]/g;
@@ -1058,25 +1100,39 @@ const FacultyModal = ({
     }, []);
 
     return (
-        <Modal show={show} onHide={onHide} centered size="lg" className="rounded-xl">
+        <Modal show={show} onHide={onHide} centered size="lg" className="rounded-xl faculty-modal">
             <Modal.Header closeButton className="bg-gradient-to-r from-green-600 to-green-700 text-white">
                 <Modal.Title className="flex items-center gap-2">
                     <FontAwesomeIcon icon={faUser} className="text-xl" />
                     <span className="font-bold">
-                        {type === 'add' ? 'Add New Faculty' : type === 'edit' ? 'Edit Faculty Details' : 'Confirm Deletion'}
+                        {type === 'add' ? 'Add New Faculty' : type === 'edit' ? 'Edit Faculty Details' : 'Archive Faculty'}
                     </span>
                 </Modal.Title>
             </Modal.Header>
-            <Modal.Body className="bg-green-50 px-4 py-4">
+            <Modal.Body className="bg-green-50 p-4">
                 {type === 'archive' ? (
-                    <div className="text-center">
-                        <FontAwesomeIcon icon={faArchive} className="text-4xl text-yellow-500 mb-4" />
-                        <p className="text-lg">Are you sure you want to archive this user?</p>
-                        <p className="text-gray-600">This action will move the user to the archive.</p>
+                    <div className="text-center p-6">
+                        <div className="bg-yellow-100 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4">
+                            <FontAwesomeIcon icon={faArchive} className="text-4xl text-yellow-500" />
+                        </div>
+                        <h4 className="text-xl font-bold mb-2">Archive Confirmation</h4>
+                        <p className="text-gray-700 mb-4">Are you sure you want to archive this faculty member? This action will remove them from active lists.</p>
+                        <div className="flex justify-center gap-4 mt-6">
+                            <Button variant="outline-secondary" onClick={onHide} className="px-4 py-2">
+                                Cancel
+                            </Button>
+                            <Button 
+                                variant="warning" 
+                                onClick={() => onArchive(user.users_id, user.user_level_name)}
+                                className="bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-500 px-4 py-2"
+                            >
+                                Confirm Archive
+                            </Button>
+                        </div>
                     </div>
                 ) : (
-                    <Form onSubmit={handleSubmit} noValidate>
-                        {/* Add image preview at the top of the form */}
+                    <Form onSubmit={handleSubmit} noValidate className="p-2">
+                        {/* Image Preview */}
                         {type === 'edit' && (
                             <div className="flex justify-center mb-6">
                                 <div className="relative w-32 h-32">
@@ -1119,10 +1175,10 @@ const FacultyModal = ({
                             </div>
                         )}
                         
-                        {/* Rest of your form groups remain unchanged */}
+                        {/* Form Groups */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                             <Form.Group>
-                                <Form.Label>First Name <span className="text-red-500">*</span></Form.Label>
+                                <Form.Label className="font-semibold">First Name <span className="text-red-500">*</span></Form.Label>
                                 <Form.Control
                                     type="text"
                                     name="users_firstname"
@@ -1130,6 +1186,7 @@ const FacultyModal = ({
                                     onChange={handleChange}
                                     onBlur={handleBlur}
                                     isInvalid={touchedFields.users_firstname && errors.users_firstname}
+                                    className="border-green-200 focus:border-green-400 focus:ring focus:ring-green-200"
                                     required
                                 />
                                 <Form.Control.Feedback type="invalid">
@@ -1137,11 +1194,17 @@ const FacultyModal = ({
                                 </Form.Control.Feedback>
                             </Form.Group>
                             <Form.Group>
-                                <Form.Label>Middle Name</Form.Label>
-                                <Form.Control type="text" name="users_middlename" value={formData.users_middlename} onChange={handleChange} />
+                                <Form.Label className="font-semibold">Middle Name</Form.Label>
+                                <Form.Control 
+                                    type="text" 
+                                    name="users_middlename" 
+                                    value={formData.users_middlename} 
+                                    onChange={handleChange}
+                                    className="border-green-200 focus:border-green-400 focus:ring focus:ring-green-200" 
+                                />
                             </Form.Group>
                             <Form.Group>
-                                <Form.Label>Last Name <span className="text-red-500">*</span></Form.Label>
+                                <Form.Label className="font-semibold">Last Name <span className="text-red-500">*</span></Form.Label>
                                 <Form.Control
                                     type="text"
                                     name="users_lastname"
@@ -1149,6 +1212,7 @@ const FacultyModal = ({
                                     onChange={handleChange}
                                     onBlur={handleBlur}
                                     isInvalid={touchedFields.users_lastname && errors.users_lastname}
+                                    className="border-green-200 focus:border-green-400 focus:ring focus:ring-green-200"
                                     required
                                 />
                                 <Form.Control.Feedback type="invalid">
@@ -1274,29 +1338,21 @@ const FacultyModal = ({
                     </Form>
                 )}
             </Modal.Body>
-            <Modal.Footer className="bg-green-50">
-                <Button variant="secondary" onClick={onHide}>
-                    Close
-                </Button>
-                {type === 'archive' ? (
-                    <Button 
-                        variant="warning" 
-                        onClick={() => onArchive(user.users_id, user.user_level_name)}
-                        className="bg-yellow-500 hover:bg-yellow-600 text-white"
-                    >
-                        Archive
+            {!type.includes('archive') && (
+                <Modal.Footer className="bg-green-50 border-t border-green-100">
+                    <Button variant="outline-secondary" onClick={onHide} className="px-4">
+                        Cancel
                     </Button>
-                ) : (
                     <Button 
-                        variant="primary" 
+                        variant="success" 
                         onClick={handleSubmit} 
-                        className="bg-green-600 hover:bg-green-700"
-                        disabled={duplicateFields.email || duplicateFields.schoolId}
+                        className="bg-green-600 hover:bg-green-700 border-green-600 px-4"
+                        disabled={duplicateFields && (duplicateFields.email || duplicateFields.schoolId)}
                     >
                         {type === 'add' ? 'Add Faculty' : 'Save Changes'}
                     </Button>
-                )}
-            </Modal.Footer>
+                </Modal.Footer>
+            )}
         </Modal>
     );
 };

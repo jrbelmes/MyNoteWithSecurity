@@ -7,7 +7,7 @@ import {
   FaEye, FaCheckCircle, FaSun, FaMoon, FaClock, FaTimesCircle,
   FaClipboardCheck, FaCalendar, FaChartLine, FaChartBar,
   FaCalendarDay, FaFileAlt, FaBell, FaEllipsisH, FaArrowUp,
-  FaArrowDown, FaPercent
+  FaArrowDown, FaPercent, FaArrowLeft, FaArrowRight
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
@@ -160,6 +160,9 @@ const Dashboard = () => {
 
     const [requestsPage, setRequestsPage] = useState(1);
     const [tasksPage, setTasksPage] = useState(1);
+    const [venuesPage, setVenuesPage] = useState(1);
+    const [vehiclesPage, setVehiclesPage] = useState(1);
+    const [equipmentPage, setEquipmentPage] = useState(1);
     const itemsPerPage = 5;
 
     const [setReturnFacilities] = useState([]);
@@ -715,69 +718,43 @@ const Dashboard = () => {
 
     return (
         <motion.div 
-            className={`dashboard-container flex h-screen bg-lightcream ${fadeIn ? 'fade-in' : ''} ${darkMode ? 'dark' : ''}`}
+            className={`dashboard-container flex min-h-screen bg-gradient-to-br from-white to-green-100 ${fadeIn ? 'fade-in' : ''} ${darkMode ? 'dark' : ''}`}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5 }}
         >
             <Sidebar />
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 mt-20">
                 <div className="h-full flex flex-col">
                     {/* Enhanced Header with Welcome Banner */}
-                    <header className="bg-gradient-to-r from-lightcream to-primary shadow-lg dark:from-gray-800 dark:to-primary-dark">
-                        <div className="px-6 py-8">
-                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
-                                <div>
-                                    <h1 className="text-3xl font-bold text-primary-dark dark:text-white">Welcome Back, Admin!</h1>
-                                    <p className="text-primary mt-1">
-                                        {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                                    </p>
-                                </div>
-                                <div className="flex items-center space-x-4">
-                                    <div className="bg-white/20 backdrop-blur-sm px-4 py-2 rounded-lg text-primary-dark dark:text-white">
-                                        <div className="text-sm font-medium">Active Reservations</div>
-                                        <div className="text-2xl font-bold">{ongoingReservations.length}</div>
-                                    </div>
-                                    <button 
-                                        onClick={() => setDarkMode(!darkMode)} 
-                                        className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-primary-dark dark:text-white transition-colors"
-                                    >
-                                        {darkMode ? 
-                                            <FaSun className="text-yellow-400 text-xl" /> : 
-                                            <FaMoon className="text-primary-dark text-xl" />
-                                        }
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </header>
+                   
 
                     {/* Main Content with scrollable area */}
-                    <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                    <div className="flex-1 p-6 space-y-6 bg-gradient-to-br from-white via-gray-50/50 to-lightcream/20">
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                             <StatCard
                                 title="Venues"
                                 value={totals.venues}
                                 icon={<FaBuilding />}
-                                color="bg-primary"
+                                color="bg-gradient-to-r from-primary to-primary-dark"
                             />
                             <StatCard
                                 title="Equipment"
                                 value={totals.equipments}
                                 icon={<FaTools />}
-                                color="bg-accent"
+                                color="bg-gradient-to-r from-primary to-primary-dark"
                             />
                             <StatCard
                                 title="Vehicles"
                                 value={totals.vehicles}
                                 icon={<FaCar />}
-                                color="bg-primary-dark"
+                                color="bg-gradient-to-r from-primary to-primary-dark"
                             />
                             <StatCard
                                 title="Users"
                                 value={totals.users}
                                 icon={<FaUsers />}
-                                color="bg-accent-dark"
+                                color="bg-gradient-to-r from-primary to-primary-dark"
                             />
                         </div>
                         {/* Top Row with Active Reservations only */}
@@ -787,21 +764,21 @@ const Dashboard = () => {
                                 variants={containerVariants}
                                 initial="hidden"
                                 animate="visible"
-                                className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg dark:bg-gray-800/90 overflow-hidden border border-primary/20 dark:border-primary-dark/20"
+                                className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm overflow-hidden border border-gray-100 dark:bg-gray-800/90 dark:border-gray-700"
                             >
-                                <div className="bg-gradient-to-r from-primary to-primary-dark p-4 flex justify-between items-center">
+                                <div className="bg-gradient-to-r from-primary/90 to-primary-dark/90 p-4 flex justify-between items-center">
                                     <h2 className="text-white text-lg font-semibold flex items-center">
                                         <FaClock className="mr-2" /> Active Reservations
                                     </h2>
-                                    <div className="bg-white/20 px-2 py-1 rounded text-xs font-medium text-white">
+                                    <div className="bg-white/30 px-2 py-1 rounded-md text-xs font-medium text-white">
                                         {ongoingReservations.length} Active
                                     </div>
                                 </div>
-                                <div className="p-4 overflow-y-auto" style={{ maxHeight: 'calc(100% - 64px)' }}>
+                                <div className="p-4" style={{ maxHeight: 'none' }}>
                                     {ongoingReservations.length > 0 ? (
                                         <div className="overflow-x-auto">
                                             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                                                <thead className="bg-gray-50 dark:bg-gray-700">
+                                                <thead className="bg-gray-50 dark:bg-gray-800">
                                                     <tr>
                                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Title</th>
                                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Description</th>
@@ -811,7 +788,7 @@ const Dashboard = () => {
                                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
                                                     </tr>
                                                 </thead>
-                                                <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
+                                                <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-700 dark:divide-gray-600">
                                                     {ongoingReservations.slice(0, 5).map((reservation, index) => (
                                                         <motion.tr 
                                                             key={index}
@@ -880,24 +857,27 @@ const Dashboard = () => {
                             className="grid grid-cols-1 lg:grid-cols-3 gap-6"
                         >
                             {/* Venues In Use */}
-                            <motion.div variants={itemVariants} className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg dark:bg-gray-800/90 overflow-hidden border border-primary/20 dark:border-primary-dark/20">
-                                <div className="bg-gradient-to-r from-primary to-primary-dark p-4 flex justify-between items-center">
+                            <motion.div variants={itemVariants} className="bg-white/95 backdrop-blur-sm rounded-xl shadow-sm overflow-hidden border border-gray-100 dark:bg-gray-800/90 dark:border-gray-700">
+                                <div className="bg-gradient-to-r from-primary/90 to-primary-dark/90 p-4 flex justify-between items-center">
                                     <h2 className="text-white text-lg font-semibold flex items-center">
                                         <FaBuilding className="mr-2" /> Venues In Use
                                     </h2>
-                                    <div className="bg-white/20 px-2 py-1 rounded text-xs font-medium text-white">
+                                    <div className="bg-white/30 px-2 py-1 rounded-md text-xs font-medium text-white">
                                         {inUseFacilities.filter(facility => facility.resource_type === 'venue').length} Active
                                     </div>
                                 </div>
                                 <div className="p-4 divide-y divide-gray-100 dark:divide-gray-700">
-                                    {inUseFacilities.filter(facility => facility.resource_type === 'venue').map((facility, index) => (
+                                    {inUseFacilities
+                                        .filter(facility => facility.resource_type === 'venue')
+                                        .slice((venuesPage - 1) * itemsPerPage, venuesPage * itemsPerPage)
+                                        .map((facility, index) => (
                                         <div key={index} className="py-3">
                                             <div className="flex items-center justify-between">
                                                 <div>
                                                     <h3 className="text-sm font-medium text-gray-900 dark:text-white">{facility.resource_name}</h3>
                                                     <p className="text-xs text-gray-500 dark:text-gray-400">Currently in use by {facility.user_full_name}</p>
                                                 </div>
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                                                     In Use
                                                 </span>
                                             </div>
@@ -914,28 +894,56 @@ const Dashboard = () => {
                                             <p className="text-gray-500 dark:text-gray-400">No venues currently in use</p>
                                         </div>
                                     )}
+                                    
+                                    {/* Pagination for Venues */}
+                                    {inUseFacilities.filter(facility => facility.resource_type === 'venue').length > itemsPerPage && (
+                                        <div className="flex justify-center pt-4 mt-4 border-t border-gray-100 dark:border-gray-700">
+                                            <nav className="flex items-center space-x-1">
+                                                <button 
+                                                    onClick={() => setVenuesPage(p => Math.max(1, p - 1))}
+                                                    disabled={venuesPage === 1}
+                                                    className={`px-3 py-1 rounded-md ${venuesPage === 1 ? 'text-gray-400 cursor-not-allowed' : 'text-primary hover:bg-primary/10'}`}
+                                                >
+                                                    <FaArrowLeft className="w-4 h-4" />
+                                                </button>
+                                                <span className="text-sm text-gray-600 dark:text-gray-300">
+                                                    Page {venuesPage} of {Math.ceil(inUseFacilities.filter(facility => facility.resource_type === 'venue').length / itemsPerPage)}
+                                                </span>
+                                                <button 
+                                                    onClick={() => setVenuesPage(p => p + 1)}
+                                                    disabled={venuesPage >= Math.ceil(inUseFacilities.filter(facility => facility.resource_type === 'venue').length / itemsPerPage)}
+                                                    className={`px-3 py-1 rounded-md ${venuesPage >= Math.ceil(inUseFacilities.filter(facility => facility.resource_type === 'venue').length / itemsPerPage) ? 'text-gray-400 cursor-not-allowed' : 'text-primary hover:bg-primary/10'}`}
+                                                >
+                                                    <FaArrowRight className="w-4 h-4" />
+                                                </button>
+                                            </nav>
+                                        </div>
+                                    )}
                                 </div>
                             </motion.div>
 
                             {/* Vehicles In Use */}
-                            <motion.div variants={itemVariants} className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg dark:bg-gray-800/90 overflow-hidden border border-primary/20 dark:border-primary-dark/20">
-                                <div className="bg-gradient-to-r from-accent to-accent-dark p-4 flex justify-between items-center">
+                            <motion.div variants={itemVariants} className="bg-white/95 backdrop-blur-sm rounded-xl shadow-sm overflow-hidden border border-gray-100 dark:bg-gray-800/90 dark:border-gray-700">
+                                <div className="bg-gradient-to-r from-primary/90 to-primary-dark/90 p-4 flex justify-between items-center">
                                     <h2 className="text-white text-lg font-semibold flex items-center">
                                         <FaCar className="mr-2" /> Vehicles In Use
                                     </h2>
-                                    <div className="bg-white/20 px-2 py-1 rounded text-xs font-medium text-white">
+                                    <div className="bg-white/30 px-2 py-1 rounded-md text-xs font-medium text-white">
                                         {inUseFacilities.filter(facility => facility.resource_type === 'vehicle').length} Active
                                     </div>
                                 </div>
                                 <div className="p-4 divide-y divide-gray-100 dark:divide-gray-700">
-                                    {inUseFacilities.filter(facility => facility.resource_type === 'vehicle').map((facility, index) => (
+                                    {inUseFacilities
+                                        .filter(facility => facility.resource_type === 'vehicle')
+                                        .slice((vehiclesPage - 1) * itemsPerPage, vehiclesPage * itemsPerPage)
+                                        .map((facility, index) => (
                                         <div key={index} className="py-3">
                                             <div className="flex items-center justify-between">
                                                 <div>
                                                     <h3 className="text-sm font-medium text-gray-900 dark:text-white">{facility.resource_name}</h3>
                                                     <p className="text-xs text-gray-500 dark:text-gray-400">Driven by {facility.user_full_name}</p>
                                                 </div>
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                                                     On Trip
                                                 </span>
                                             </div>
@@ -952,33 +960,61 @@ const Dashboard = () => {
                                             <p className="text-gray-500 dark:text-gray-400">No vehicles currently in use</p>
                                         </div>
                                     )}
+                                    
+                                    {/* Pagination for Vehicles */}
+                                    {inUseFacilities.filter(facility => facility.resource_type === 'vehicle').length > itemsPerPage && (
+                                        <div className="flex justify-center pt-4 mt-4 border-t border-gray-100 dark:border-gray-700">
+                                            <nav className="flex items-center space-x-1">
+                                                <button 
+                                                    onClick={() => setVehiclesPage(p => Math.max(1, p - 1))}
+                                                    disabled={vehiclesPage === 1}
+                                                    className={`px-3 py-1 rounded-md ${vehiclesPage === 1 ? 'text-gray-400 cursor-not-allowed' : 'text-primary hover:bg-primary/10'}`}
+                                                >
+                                                    <FaArrowLeft className="w-4 h-4" />
+                                                </button>
+                                                <span className="text-sm text-gray-600 dark:text-gray-300">
+                                                    Page {vehiclesPage} of {Math.ceil(inUseFacilities.filter(facility => facility.resource_type === 'vehicle').length / itemsPerPage)}
+                                                </span>
+                                                <button 
+                                                    onClick={() => setVehiclesPage(p => p + 1)}
+                                                    disabled={vehiclesPage >= Math.ceil(inUseFacilities.filter(facility => facility.resource_type === 'vehicle').length / itemsPerPage)}
+                                                    className={`px-3 py-1 rounded-md ${vehiclesPage >= Math.ceil(inUseFacilities.filter(facility => facility.resource_type === 'vehicle').length / itemsPerPage) ? 'text-gray-400 cursor-not-allowed' : 'text-primary hover:bg-primary/10'}`}
+                                                >
+                                                    <FaArrowRight className="w-4 h-4" />
+                                                </button>
+                                            </nav>
+                                        </div>
+                                    )}
                                 </div>
                             </motion.div>
 
                             {/* Equipment In Use */}
-                            <motion.div variants={itemVariants} className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg dark:bg-gray-800/90 overflow-hidden border border-primary/20 dark:border-primary-dark/20">
-                                <div className="bg-gradient-to-r from-primary-dark to-primary p-4 flex justify-between items-center">
+                            <motion.div variants={itemVariants} className="bg-white/95 backdrop-blur-sm rounded-xl shadow-sm overflow-hidden border border-gray-100 dark:bg-gray-800/90 dark:border-gray-700">
+                                <div className="bg-gradient-to-r from-primary/90 to-primary-dark/90 p-4 flex justify-between items-center">
                                     <h2 className="text-white text-lg font-semibold flex items-center">
                                         <FaTools className="mr-2" /> Equipment In Use
                                     </h2>
-                                    <div className="bg-white/20 px-2 py-1 rounded text-xs font-medium text-white">
+                                    <div className="bg-white/30 px-2 py-1 rounded-md text-xs font-medium text-white">
                                         {inUseFacilities.filter(facility => facility.resource_type === 'equipment').length} Active
                                     </div>
                                 </div>
                                 <div className="p-4 divide-y divide-gray-100 dark:divide-gray-700">
-                                    {inUseFacilities.filter(facility => facility.resource_type === 'equipment').map((facility, index) => (
+                                    {inUseFacilities
+                                        .filter(facility => facility.resource_type === 'equipment')
+                                        .slice((equipmentPage - 1) * itemsPerPage, equipmentPage * itemsPerPage)
+                                        .map((facility, index) => (
                                         <div key={index} className="py-3">
                                             <div className="flex items-center justify-between">
                                                 <div>
                                                     <div className="flex items-center space-x-2">
                                                         <h3 className="text-sm font-medium text-gray-900 dark:text-white">{facility.resource_name}</h3>
-                                                        <span className="bg-purple-100 text-purple-800 text-xs px-2 py-0.5 rounded-full dark:bg-purple-900 dark:text-purple-200">
+                                                        <span className="bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded-full dark:bg-green-900 dark:text-green-200">
                                                             Qty: {facility.quantity || 1}
                                                         </span>
                                                     </div>
                                                     <p className="text-xs text-gray-500 dark:text-gray-400">Used by {facility.user_full_name}</p>
                                                 </div>
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                                                     In Use
                                                 </span>
                                             </div>
@@ -995,6 +1031,31 @@ const Dashboard = () => {
                                             <p className="text-gray-500 dark:text-gray-400">No equipment currently in use</p>
                                         </div>
                                     )}
+                                    
+                                    {/* Pagination for Equipment */}
+                                    {inUseFacilities.filter(facility => facility.resource_type === 'equipment').length > itemsPerPage && (
+                                        <div className="flex justify-center pt-4 mt-4 border-t border-gray-100 dark:border-gray-700">
+                                            <nav className="flex items-center space-x-1">
+                                                <button 
+                                                    onClick={() => setEquipmentPage(p => Math.max(1, p - 1))}
+                                                    disabled={equipmentPage === 1}
+                                                    className={`px-3 py-1 rounded-md ${equipmentPage === 1 ? 'text-gray-400 cursor-not-allowed' : 'text-primary hover:bg-primary/10'}`}
+                                                >
+                                                    <FaArrowLeft className="w-4 h-4" />
+                                                </button>
+                                                <span className="text-sm text-gray-600 dark:text-gray-300">
+                                                    Page {equipmentPage} of {Math.ceil(inUseFacilities.filter(facility => facility.resource_type === 'equipment').length / itemsPerPage)}
+                                                </span>
+                                                <button 
+                                                    onClick={() => setEquipmentPage(p => p + 1)}
+                                                    disabled={equipmentPage >= Math.ceil(inUseFacilities.filter(facility => facility.resource_type === 'equipment').length / itemsPerPage)}
+                                                    className={`px-3 py-1 rounded-md ${equipmentPage >= Math.ceil(inUseFacilities.filter(facility => facility.resource_type === 'equipment').length / itemsPerPage) ? 'text-gray-400 cursor-not-allowed' : 'text-primary hover:bg-primary/10'}`}
+                                                >
+                                                    <FaArrowRight className="w-4 h-4" />
+                                                </button>
+                                            </nav>
+                                        </div>
+                                    )}
                                 </div>
                             </motion.div>
                         </motion.div>
@@ -1002,7 +1063,7 @@ const Dashboard = () => {
                 </div>
             </div>
 
-            {/* Reservation Details Modal - Keeping this from previous design */}
+            {/* Reservation Details Modal */}
             <AnimatePresence>
                 {modalOpen && selectedReservation && (
                     <motion.div
@@ -1012,12 +1073,12 @@ const Dashboard = () => {
                         exit={{ opacity: 0 }}
                     >
                         <motion.div
-                            className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full mx-4 overflow-hidden border border-primary/20 dark:border-primary-dark/20"
+                            className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full mx-4 overflow-hidden border border-gray-100 dark:border-gray-700"
                             initial={{ scale: 0.9, y: 20 }}
                             animate={{ scale: 1, y: 0 }}
                             exit={{ scale: 0.9, y: 20 }}
                         >
-                            <div className="bg-gradient-to-r from-primary to-primary-dark p-4">
+                            <div className="bg-gradient-to-r from-primary/90 to-primary-dark/90 p-4">
                                 <h2 className="text-xl font-bold text-white flex items-center">
                                     <FaCalendar className="mr-2" /> Reservation Details
                                 </h2>
@@ -1177,7 +1238,7 @@ const Dashboard = () => {
 // Enhanced StatCard component
 const StatCard = ({ title, value, icon, color }) => (
     <motion.div
-        className={`${color} text-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow`}
+        className={`${color} text-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow`}
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
     >

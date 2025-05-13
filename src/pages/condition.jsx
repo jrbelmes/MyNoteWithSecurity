@@ -59,16 +59,25 @@ const Conditions = () => {
             setEditMode(true);
             setShowModal(true);
         }
-    };
-
-    const handleDelete = (id) => {
-        setSelectedConditionId(id);
-        setShowConfirmDelete(true);
+    };    const handleDelete = (id) => {
+        console.log('Deleting condition with id:', id);  // For debugging
+        if (id) {
+            setSelectedConditionId(id);
+            setShowConfirmDelete(true);
+        } else {
+            toast.error('Invalid condition ID');
+        }
     };
 
     const confirmDelete = async () => {
-        try {
-            const response = await axios.post('http://localhost/coc/gsd/delete_master.php', new URLSearchParams({ operation: 'deleteCondition', condition_id: selectedConditionId }));
+        try {            const response = await axios.post('http://localhost/coc/gsd/delete_master.php', {
+                operation: 'deleteCondition',
+                conditionId: selectedConditionId
+            }, {
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
             if (response.data.status === 'success') {
                 setConditions(conditions.filter(condition => condition.condition_id !== selectedConditionId));
                 toast.success('Condition deleted successfully!');
@@ -76,6 +85,7 @@ const Conditions = () => {
                 toast.error(response.data.message || 'Failed to delete condition.');
             }
         } catch (error) {
+            console.error('Error:', error);
             toast.error('Error deleting condition.');
         } finally {
             setShowConfirmDelete(false);
@@ -142,12 +152,12 @@ const Conditions = () => {
                 transition={{ duration: 0.5 }}
                 className="flex-grow p-6 lg:p-10"
             >
-                <div className="mb-4">
+                <div className="mb-4 mt-20">
                     <Button variant="link" onClick={() => navigate('/Master')} className="text-green-800">
                         <FaArrowLeft className="mr-2" /> Back to Master
                     </Button>
                 </div>
-                <h2 className="text-4xl font-bold mb-6 text-green-800 drop-shadow-lg">Vehicle Conditions</h2>
+                <h2 className="text-4xl font-bold mb-6 text-green-800 drop-shadow-lg">Conditions</h2>
                 <div className="bg-white bg-opacity-90 rounded-lg shadow-xl p-6 mb-6 backdrop-filter backdrop-blur-lg">
                     {loading ? (
                         <motion.div
@@ -171,7 +181,7 @@ const Conditions = () => {
                                     <AnimatePresence>
                                         {conditions.map((condition) => (
                                             <motion.tr 
-                                                key={condition.condition_id}
+                                                key={condition.id}
                                                 initial={{ opacity: 0 }}
                                                 animate={{ opacity: 1 }}
                                                 exit={{ opacity: 0 }}
@@ -181,8 +191,7 @@ const Conditions = () => {
                                                 <td className="py-3 px-4 text-center">
                                                     <motion.button 
                                                         whileHover={{ scale: 1.1 }}
-                                                        whileTap={{ scale: 0.9 }}
-                                                        onClick={() => handleDelete(condition.condition_id)}
+                                                        whileTap={{ scale: 0.9 }}                                                        onClick={() => handleDelete(condition.id.toString())}
                                                         className="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded-full transition duration-300 ease-in-out mr-2"
                                                     >
                                                         <FaTrash />

@@ -258,7 +258,7 @@ const Master = () => {
   return (
     <div className="flex h-screen bg-gradient-to-br from-green-100 to-white">
       <Sidebar />
-      <div className="flex-grow p-8 overflow-y-auto">
+      <div className="flex-grow p-8 overflow-y-auto mt-20">
         <motion.h1 
           initial={{ opacity: 0, y: -50 }}
           animate={{ opacity: 1, y: 0 }}
@@ -275,8 +275,8 @@ const Master = () => {
             { title: 'Vehicle Model', icon: <FaCogs />, action: () => setIsAddModelModalOpen(true), viewPath: '/vehiclemodel' },
             { title: 'Departments', icon: <FaListAlt />, action: () => setIsAddDepartmentModalOpen(true), viewPath: '/departments' },
             { title: 'Equipments', icon: <FaListAlt />, action: () => setIsAddEquipmentModalOpen(true), viewPath: '/equipmentCat' },
-            { title: 'Condition', icon: <FaCogs />, action: () => setIsAddConditionModalOpen(true), viewPath: '/condition' },
-            { title: 'Holidays', icon: <FaPlus />, action: () => setIsAddHolidayModalOpen(true) },
+            // { title: 'Condition', icon: <FaCogs />, action: () => setIsAddConditionModalOpen(true), viewPath: '/condition' },
+            // { title: 'Holidays', icon: <FaPlus />, action: () => setIsAddHolidayModalOpen(true) },
           ].map((card, index) => (
             <motion.div 
               key={index}
