@@ -1,16 +1,21 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Button, Form, Table, Tooltip, Space, Input, Tag } from 'antd';
+import { Modal, Button, Form, Table, Tooltip, Space, Input, Tag, Pagination, Empty, Alert } from 'antd';
 import { toast, Toaster } from 'sonner';
 import Sidebar from './Sidebar';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEdit, faTrashAlt, faSearch, faPlus } from '@fortawesome/free-solid-svg-icons';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { FaArrowLeft } from 'react-icons/fa';
+import { FaArrowLeft, FaEdit, FaTrashAlt, FaEye, FaSearch, FaPlus } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { sanitizeInput, validateInput } from '../utils/sanitize';
 import { SecureStorage } from '../utils/encryption';
+import { PlusOutlined, ExclamationCircleOutlined, DeleteOutlined, EditOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Tag as PrimeTag } from 'primereact/tag';
+import 'primereact/resources/themes/lara-light-indigo/theme.css';
+import 'primereact/resources/primereact.min.css';
+import 'primeicons/primeicons.css';
 
 const VehicleModels = () => {
   const navigate = useNavigate();
@@ -28,7 +33,11 @@ const VehicleModels = () => {
   const [setEditingModel] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortField, setSortField] = useState('vehicle_model_id');
+  const [sortOrder, setSortOrder] = useState('desc');
   const encryptedUrl = SecureStorage.getLocalItem("url");
+  const [form] = Form.useForm();
 
   useEffect(() => {
     const encryptedUserLevel = SecureStorage.getSessionItem("user_level_id"); 
@@ -119,11 +128,8 @@ const VehicleModels = () => {
         }
       );
 
-      console.log('API Response:', response.data); // Log the entire response
-
       if (response.data.status === 'success' && response.data.data.length > 0) {
         const modelData = response.data.data[0];
-        console.log('Fetched Model Data:', modelData); // Log the fetched model data
         
         setFormData({
           id: modelData.vehicle_model_id,
@@ -131,9 +137,7 @@ const VehicleModels = () => {
           makeId: makes.find(make => make.vehicle_make_name === modelData.vehicle_make_name)?.vehicle_make_id || '',
           categoryId: categories.find(category => category.vehicle_category_name === modelData.vehicle_category_name)?.vehicle_category_id || ''
         });
-        
-        console.log('Form Data after setting:', formData); // Log the form data
-        
+                
         setEditMode(true);
         setShowModal(true);
       } else {
@@ -272,208 +276,276 @@ const VehicleModels = () => {
     setShowModal(true);
   };
 
-  // Table columns configuration
-  const columns = [
-    {
-      title: 'Model Name',
-      dataIndex: 'vehicle_model_name',
-      key: 'vehicle_model_name',
-      sorter: (a, b) => a.vehicle_model_name.localeCompare(b.vehicle_model_name),
-      render: (text) => <span className="font-semibold text-green-800">{text}</span>
-    },
-    {
-      title: 'Make Name',
-      dataIndex: 'vehicle_make_name',
-      key: 'vehicle_make_name',
-      sorter: (a, b) => a.vehicle_make_name.localeCompare(b.vehicle_make_name),
-    },
-    {
-      title: 'Category',
-      dataIndex: 'vehicle_category_name',
-      key: 'vehicle_category_name',
-      sorter: (a, b) => a.vehicle_category_name.localeCompare(b.vehicle_category_name),
-      render: (text) => (
-        <Tag
-          className="px-2 py-1 text-xs font-semibold"
-          color="blue"
-        >
-          {text}
-        </Tag>
-      )
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      fixed: 'right',
-      width: 150,
-      render: (_, record) => (
-        <Space>
-          <Tooltip title="Edit Model">
-            <Button 
-              type="primary" 
-              icon={<FontAwesomeIcon icon={faEdit} />} 
-              onClick={() => handleEdit(record.vehicle_model_id)}
-              size="small"
-              className="bg-green-500 hover:bg-green-600 border-green-500"
-            />
-          </Tooltip>
-          <Tooltip title="Delete Model">
-            <Button 
-              icon={<FontAwesomeIcon icon={faTrashAlt} />} 
-              onClick={() => handleDelete(record.vehicle_model_id)}
-              size="small"
-              className="text-yellow-600 hover:text-yellow-700 border-yellow-300 hover:border-yellow-400"
-            />
-          </Tooltip>
-        </Space>
-      )
+  const handleRefresh = () => {
+    fetchModels();
+    setSearchTerm('');
+  };
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortOrder("asc");
     }
-  ];
+  };
 
   return (
-    <div className="flex flex-col lg:flex-row min-h-screen bg-gradient-to-br from-white to-green-100">
-      <div className="flex-none">
+    <div className="flex h-screen overflow-hidden bg-gradient-to-br from-green-100 to-white">
+      {/* Fixed Sidebar */}
+      <div className="flex-shrink-0">
         <Sidebar />
       </div>
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="flex-grow p-6 lg:p-10"
-      >
-                <div className="mb-4 mt-20">
-                    <Button variant="link" onClick={() => navigate('/Master')} className="text-green-800">
-                        <FaArrowLeft className="mr-2" /> Back to Master
-                    </Button>
+      
+      {/* Scrollable Content Area */}
+      <div className="flex-grow p-6 sm:p-8 overflow-y-auto">
+        <div className="p-[2.5rem] lg:p-12 min-h-screen">
+          <motion.div 
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="mb-8"
+          >
+            <div className="mb-4 mt-20">
+              <Button variant="link" onClick={() => navigate('/Master')} className="text-green-800">
+                <FaArrowLeft className="mr-2" /> Back to Master
+              </Button>
+              <h2 className="text-2xl font-bold text-green-900 mt-5">
+                Vehicle Models 
+              </h2>
+            </div>
+          </motion.div>
+
+          {/* Search and Filters */}
+          <div className="bg-[#fafff4] p-4 rounded-lg shadow-sm mb-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="flex flex-col md:flex-row gap-4 flex-1">
+                <div className="flex-1">
+                  <Input
+                    placeholder="Search models by name"
+                    allowClear
+                    prefix={<SearchOutlined />}
+                    size="large"
+                    value={searchTerm}
+                    onChange={handleSearchChange}
+                    className="w-full"
+                  />
                 </div>
-        <h2 className="text-4xl font-bold mb-6 text-green-800 drop-shadow-sm">Vehicle Models</h2>
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6 border border-gray-100">
-          <div className="flex flex-col md:flex-row items-center justify-between mb-4">
-            <motion.div 
-              whileHover={{ scale: 1.05 }}
-              className="relative w-full md:w-64 mb-4 md:mb-0"
-            >
-              <Input
-                type="text"
-                value={searchTerm}
-                onChange={handleSearchChange}
-                placeholder="Search models..."
-                className="w-full pl-10 pr-4 py-2 rounded-full border border-green-300 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-300"
-                prefix={<FontAwesomeIcon icon={faSearch} className="text-green-400" />}
-              />
-            </motion.div>
-            <motion.button 
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={handleAddModel}
-              className="w-full md:w-auto bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out flex items-center justify-center shadow-md"
-            >
-              <FontAwesomeIcon icon={faPlus} className="mr-2" /> Add Model
-            </motion.button>
+              </div>
+              <div className="flex gap-2">
+                <Tooltip title="Refresh data">
+                  <Button
+                    icon={<ReloadOutlined />}
+                    onClick={handleRefresh}
+                    size="large"
+                  />
+                </Tooltip>
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  size="large"
+                  onClick={handleAddModel}
+                  className="bg-lime-900 hover:bg-green-600"
+                >
+                  Add Model
+                </Button>
+              </div>
+            </div>
           </div>
 
-          {loading ? (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex justify-center items-center h-64"
-            >
-              <div className="loader"></div>
-            </motion.div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table 
-                columns={columns} 
-                dataSource={filteredModels}
-                rowKey="vehicle_model_id"
-                pagination={{
-                  pageSize: pageSize,
-                  showSizeChanger: true,
-                  pageSizeOptions: ['10', '20', '50'],
-                  showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
-                  onChange: (page, pageSize) => {
-                    setPageSize(pageSize);
-                  }
-                }}
-                scroll={{ x: 1000 }}
-                bordered
-                size="middle"
-                className="model-table"
-                style={{ backgroundColor: 'white' }}
-                locale={{
-                  emptyText: (
-                    <div className="text-center py-8">
-                      <i className="pi pi-search text-6xl text-gray-300 mb-4"></i>
-                      <p className="text-xl text-gray-500">No models found</p>
-                    </div>
-                  )
-                }}
-              />
-            </div>
-          )}
+          {/* Table */}
+          <div className="relative overflow-x-auto shadow-md sm:rounded-lg bg-[#fafff4] dark:bg-green-100">
+            {loading ? (
+              <div className="flex justify-center items-center h-64">
+                <div className="loader"></div>
+              </div>
+            ) : (
+              <>
+                <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
+                  <thead className="text-xs text-gray-700 uppercase bg-green-400/20 dark:bg-green-900/20 dark:text-green-900">
+                                        <tr>                      <th scope="col" className="px-6 py-3" onClick={() => handleSort('vehicle_model_name')}>                        <div className="flex items-center cursor-pointer hover:text-gray-900">                          Model Name                          {sortField === 'vehicle_model_name' && (                            <span className="ml-1">                              {sortOrder === "asc" ? "↑" : "↓"}                            </span>                          )}                        </div>                      </th>
+                      <th scope="col" className="px-6 py-3" onClick={() => handleSort('vehicle_make_name')}>
+                        <div className="flex items-center cursor-pointer hover:text-gray-900">
+                          Make Name
+                          {sortField === 'vehicle_make_name' && (
+                            <span className="ml-1">
+                              {sortOrder === "asc" ? "↑" : "↓"}
+                            </span>
+                          )}
+                        </div>
+                      </th>
+                      <th scope="col" className="px-6 py-3" onClick={() => handleSort('vehicle_category_name')}>
+                        <div className="flex items-center cursor-pointer hover:text-gray-900">
+                          Category
+                          {sortField === 'vehicle_category_name' && (
+                            <span className="ml-1">
+                              {sortOrder === "asc" ? "↑" : "↓"}
+                            </span>
+                          )}
+                        </div>
+                      </th>
+                      <th scope="col" className="px-6 py-3">
+                        <div className="flex items-center">
+                          Actions
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredModels && filteredModels.length > 0 ? (
+                      filteredModels
+                        .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                        .map((model) => (
+                                                    <tr                            key={model.vehicle_model_id}                            className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 border-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600"                          >                            <td className="px-6 py-4">                              <div className="flex items-center">                                <FaEye className="mr-2 text-green-900" />                                <span className="font-medium">{model.vehicle_model_name}</span>                              </div>                            </td>
+                            <td className="px-6 py-4">{model.vehicle_make_name}</td>
+                            <td className="px-6 py-4">
+                              <PrimeTag
+                                value={model.vehicle_category_name}
+                                severity="info"
+                                className="px-2 py-1 text-xs font-semibold"
+                              />
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex space-x-2">
+                                <Button
+                                  type="primary"
+                                  icon={<EditOutlined />}
+                                  onClick={() => handleEdit(model.vehicle_model_id)}
+                                  size="middle"
+                                  className="bg-green-900 hover:bg-lime-900"
+                                />
+                                <Button
+                                  danger
+                                  icon={<DeleteOutlined />}
+                                  onClick={() => handleDelete(model.vehicle_model_id)}
+                                  size="middle"
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                    ) : (
+                                            <tr>                        <td colSpan={4} className="px-6 py-24 text-center">                          <Empty                            image={Empty.PRESENTED_IMAGE_SIMPLE}                            description={                              <span className="text-gray-500 dark:text-gray-400">                                No models found                              </span>                            }                          />                        </td>                      </tr>
+                    )}
+                  </tbody>
+                </table>
+
+                {/* Pagination */}
+                <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+                  <Pagination
+                    current={currentPage}
+                    pageSize={pageSize}
+                    total={filteredModels ? filteredModels.length : 0}
+                    onChange={(page, size) => {
+                      setCurrentPage(page);
+                      setPageSize(size);
+                    }}
+                    showSizeChanger={true}
+                    showTotal={(total, range) =>
+                      `${range[0]}-${range[1]} of ${total} items`
+                    }
+                    className="flex justify-end"
+                  />
+                </div>
+              </>
+            )}
+          </div>
         </div>
+      </div>
 
-        <Modal
-          title={editMode ? 'Edit Vehicle Model' : 'Add New Vehicle Model'}
-          open={showModal}
-          onCancel={closeModal}
-          okText={editMode ? 'Update' : 'Add'}
-          onOk={handleSave}
-          confirmLoading={isSubmitting}
-        >
-          <Form layout="vertical">
-            <Form.Item label="Model Name">
-              <Input
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Enter model name"
-              />
-            </Form.Item>
-            <Form.Item label="Select Make">
-              <select 
-                className="w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-2 focus:ring-green-500" 
-                value={formData.makeId} 
-                onChange={(e) => setFormData({ ...formData, makeId: e.target.value })}
-              >
-                <option value="">Select a make...</option>
-                {makes.map((make) => (
-                  <option key={make.vehicle_make_id} value={make.vehicle_make_id}>
-                    {make.vehicle_make_name}
-                  </option>
-                ))}
-              </select>
-            </Form.Item>
-            <Form.Item label="Select Category">
-              <select 
-                className="w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-2 focus:ring-green-500" 
-                value={formData.categoryId} 
-                onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-              >
-                <option value="">Select a category...</option>
-                {categories.map((category) => (
-                  <option key={category.vehicle_category_id} value={category.vehicle_category_id}>
-                    {category.vehicle_category_name}
-                  </option>
-                ))}
-              </select>
-            </Form.Item>
-          </Form>
-        </Modal>
+      {/* Add/Edit Vehicle Model Modal */}
+      <Modal
+        title={
+          <div className="flex items-center">
+            <FaEye className="mr-2 text-green-900" /> 
+            {editMode ? 'Edit Vehicle Model' : 'Add Vehicle Model'}
+          </div>
+        }
+        open={showModal}
+        onCancel={closeModal}
+        okText={editMode ? 'Update' : 'Add'}
+        onOk={handleSave}
+        confirmLoading={isSubmitting}
+      >
+        <Form form={form} layout="vertical">
+          <Form.Item 
+            label="Model Name" 
+            required
+          >
+            <Input
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="Enter model name"
+            />
+          </Form.Item>
+          <Form.Item 
+            label="Select Make" 
+            required
+          >
+            <select 
+              className="w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-2 focus:ring-green-500" 
+              value={formData.makeId} 
+              onChange={(e) => setFormData({ ...formData, makeId: e.target.value })}
+            >
+              <option value="">Select a make...</option>
+              {makes.map((make) => (
+                <option key={make.vehicle_make_id} value={make.vehicle_make_id}>
+                  {make.vehicle_make_name}
+                </option>
+              ))}
+            </select>
+          </Form.Item>
+          <Form.Item 
+            label="Select Category" 
+            required
+          >
+            <select 
+              className="w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-2 focus:ring-green-500" 
+              value={formData.categoryId} 
+              onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+            >
+              <option value="">Select a category...</option>
+              {categories.map((category) => (
+                <option key={category.vehicle_category_id} value={category.vehicle_category_id}>
+                  {category.vehicle_category_name}
+                </option>
+              ))}
+            </select>
+          </Form.Item>
+        </Form>
+      </Modal>
 
-        <Modal
-          title="Confirm Deletion"
-          open={showConfirmDelete}
-          onCancel={() => setShowConfirmDelete(false)}
-          onOk={confirmDelete}
-          okText="Delete"
-          okButtonProps={{ danger: true }}
-        >
-          <p>Are you sure you want to delete this vehicle model?</p>
-        </Modal>
+      {/* Confirm Delete Modal */}
+      <Modal
+        title={<div className="text-red-600 flex items-center"><ExclamationCircleOutlined className="mr-2" /> Confirm Deletion</div>}
+        open={showConfirmDelete}
+        onCancel={() => setShowConfirmDelete(false)}
+        footer={[
+          <Button key="back" onClick={() => setShowConfirmDelete(false)}>
+            Cancel
+          </Button>,
+          <Button
+            key="submit"
+            type="primary"
+            danger
+            loading={loading}
+            onClick={() => confirmDelete()}
+            icon={<DeleteOutlined />}
+          >
+            Delete
+          </Button>,
+        ]}
+      >
+        <Alert
+          message="Warning"
+          description={`Are you sure you want to delete this vehicle model? This action cannot be undone.`}
+          type="warning"
+          showIcon
+          icon={<ExclamationCircleOutlined />}
+        />
+      </Modal>
 
-        <Toaster />
-      </motion.div>
+      <Toaster />
     </div>
   );
 };

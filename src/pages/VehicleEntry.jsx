@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'; // Add useRef to imports
 import Sidebar from './Sidebar';
-import { FaPlus, FaTrash, FaSearch, FaCar } from 'react-icons/fa';
+import { FaPlus, FaTrash, FaSearch, FaCar, FaEye, FaEdit, FaTrashAlt, FaArrowLeft } from 'react-icons/fa';
 import { toast } from 'sonner';
 import axios from 'axios';
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -25,8 +25,8 @@ import { DataView } from 'primereact/dataview';
 import dayjs from 'dayjs';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEdit, faTrashAlt, faSearch, faPlus, faEye } from '@fortawesome/free-solid-svg-icons';
-import { Modal, Form, Input, TimePicker, Table, Button, Space, Tooltip, Image, Select, Upload } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { Modal, Form, Input, TimePicker, Table, Button, Space, Tooltip, Image, Select, Upload, Empty, Pagination, Alert } from 'antd';
+import { PlusOutlined, ExclamationCircleOutlined, DeleteOutlined, EditOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons';
 import { sanitizeInput, validateInput } from '../utils/sanitize';
 import {SecureStorage} from '../utils/encryption'; // Adjust the import path as necessary
 
@@ -62,6 +62,10 @@ const VehicleEntry = () => {
     const BASE_URL = "http://localhost/coc/gsd/user.php";
     const user_id = localStorage.getItem('user_id');
     const IMAGE_BASE_URL = "http://localhost/coc/gsd/";
+    const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [sortField, setSortField] = useState('vehicle_id');
+    const [sortOrder, setSortOrder] = useState('desc');
 
     useEffect(() => {
         if (user_level_id !== '1' && user_level_id !== '2' && user_level_id !== '4') {
@@ -213,6 +217,32 @@ const VehicleEntry = () => {
         return sanitized;
     };
 
+    const handleLicenseChange = (e) => {
+        const value = e.target.value;
+        setVehicleLicensed(sanitizeAndValidateLicense(value));
+    };
+
+    const handleImageUpload = ({ fileList: newFileList }) => {
+        setFileList(newFileList);
+        
+        if (newFileList.length > 0) {
+            const file = newFileList[0].originFileObj;
+            if (file) {
+                // Create a reader to convert the file to base64
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => {
+                    setVehicleImage(reader.result);
+                };
+            } else if (newFileList[0].url) {
+                // If it's already uploaded and has a URL
+                setVehicleImage(newFileList[0].url);
+            }
+        } else {
+            setVehicleImage(null);
+        }
+    };
+
     const handleSubmit = async () => {
         // Sanitize and validate inputs
         const sanitizedLicense = sanitizeAndValidateLicense(vehicleLicensed);
@@ -236,7 +266,7 @@ const VehicleEntry = () => {
                     vehicleData: {
                         vehicle_id: selectedVehicleId,
                         vehicle_model_id: vehicleModelId,
-                        vehicle_license: sanitizedLicense, // Use sanitized value
+                        vehicle_license: sanitizedLicense,
                         year: dayjs(year).format('YYYY'),
                         status_availability_id: selectedStatus,
                         vehicle_pic: vehicleImage || editingVehicle?.vehicle_pic || ''
@@ -252,6 +282,20 @@ const VehicleEntry = () => {
                         }
                     }
                 );
+
+                // If update is successful
+                if (response.data.status === 'success') {
+                    console.log('Update Success Response:', response.data);
+                    toast.success(response.data.message || 'Vehicle updated successfully');
+                    resetForm();
+                    setShowEditModal(false);
+                    fetchVehicles();
+                    return;
+                } else {
+                    console.log('Update Error Response:', response.data);
+                    toast.error(response.data.message || 'Failed to update vehicle');
+                    return;
+                }
             } else {
                 // Add operation
                 const requestData = JSON.stringify({
@@ -261,7 +305,7 @@ const VehicleEntry = () => {
                         vehicle_license: sanitizedLicense,
                         year: dayjs(year).format('YYYY'),
                         vehicle_pic: vehicleImage,
-                        user_admin_id: user_id,  // Always set user_admin_id to user_id
+                        user_admin_id: user_id,
                         status_availability_id: selectedStatus
                     }
                 });
@@ -271,16 +315,21 @@ const VehicleEntry = () => {
                         'Content-Type': 'application/json'
                     }
                 });
+
+                // If add is successful, close modal and refresh data
+                if (response.data.status === 'success') {
+                    console.log('Add Success Response:', response.data);
+                    toast.success(response.data.message);
+                    resetForm();
+                    setShowAddModal(false);
+                    fetchVehicles();
+                    return;
+                }
             }
     
-            if (response.data.status === 'success') {
-                toast.success(response.data.message);
-                resetForm();
-                setShowAddModal(false);
-                setShowEditModal(false);
-                fetchVehicles();
-            } else {
-                toast.error(response.data.message);
+            // Only show error toast if the response indicates an error
+            if (response.data.status !== 'success') {
+               
             }
         } catch (error) {
             console.error('Error details:', error);
@@ -290,14 +339,19 @@ const VehicleEntry = () => {
         }
     };
 
-    const handleArchiveVehicle = async (vehicle) => {
-        if (window.confirm("Are you sure you want to archive this vehicle?")) {
+    const handleArchiveVehicle = (vehicle) => {
+        setSelectedVehicleId(vehicle.vehicle_id);
+        setShowConfirmDelete(true);
+    };
+
+    const confirmDelete = async () => {
+        if (selectedVehicleId) {
             try {
                 const response = await axios.post("http://localhost/coc/gsd/delete_master.php", 
                     JSON.stringify({
                         operation: "archiveResource",
                         resourceType: "vehicle",
-                        resourceId: vehicle.vehicle_id
+                        resourceId: selectedVehicleId
                     }), {
                         headers: {
                             'Content-Type': 'application/json'
@@ -308,6 +362,7 @@ const VehicleEntry = () => {
                 if (response.data.status === 'success') {
                     toast.success("Vehicle successfully archived!");
                     fetchVehicles();
+                    setShowConfirmDelete(false);
                 } else {
                     toast.error(response.data.message);
                 }
@@ -401,346 +456,277 @@ const VehicleEntry = () => {
         setViewImageModal(true);
     };
 
-    // Table columns configuration
-    const columns = [
-        {
-            title: 'ID',
-            dataIndex: 'vehicle_id',
-            key: 'vehicle_id',
-            width: 80,
-            sorter: (a, b) => a.vehicle_id - b.vehicle_id,
-        },
-        {
-            title: 'Image',
-            dataIndex: 'vehicle_pic',
-            key: 'vehicle_pic',
-            width: 100,
-            render: (text, record) => {
-                const imageUrl = getImageUrl(record.vehicle_pic);
-                return (
-                    <div className="flex justify-center">
-                        {imageUrl ? (
-                            <div className="cursor-pointer" onClick={() => handleViewImage(imageUrl)}>
-                                <img 
-                                    src={imageUrl} 
-                                    alt={record.vehicle_model_name} 
-                                    className="w-16 h-16 object-cover rounded-md shadow-sm hover:opacity-80 transition-opacity"
-                                />
-                            </div>
-                        ) : (
-                            <div className="w-16 h-16 bg-gray-200 rounded-md flex items-center justify-center text-gray-400">
-                                <i className="pi pi-car text-2xl"></i>
-                            </div>
-                        )}
-                    </div>
-                );
-            }
-        },
-        {
-            title: 'License',
-            dataIndex: 'vehicle_license',
-            key: 'vehicle_license',
-            sorter: (a, b) => a.vehicle_license.localeCompare(b.vehicle_license),
-            render: (text) => <span className="font-semibold text-green-800">{text}</span>
-        },
-        {
-            title: 'Make',
-            dataIndex: 'vehicle_make_name',
-            key: 'vehicle_make_name',
-            sorter: (a, b) => a.vehicle_make_name.localeCompare(b.vehicle_make_name),
-        },
-        {
-            title: 'Category',
-            dataIndex: 'vehicle_category_name',
-            key: 'vehicle_category_name',
-            sorter: (a, b) => a.vehicle_category_name.localeCompare(b.vehicle_category_name),
-        },
-        {
-            title: 'Model',
-            dataIndex: 'vehicle_model_name',
-            key: 'vehicle_model_name',
-            sorter: (a, b) => a.vehicle_model_name.localeCompare(b.vehicle_model_name),
-        },
-        {
-            title: 'Year',
-            dataIndex: 'year',
-            key: 'year',
-            width: 100,
-            sorter: (a, b) => a.year - b.year,
-        },
-        {
-            title: 'Status',
-            dataIndex: 'status_availability_name',
-            key: 'status_availability_name',
-            width: 120,
-            render: (text) => (
-                <Tag 
-                    value={text || 'Unknown'} 
-                    severity={text?.toLowerCase() === 'available' ? 'success' : 'danger'}
-                    className="px-2 py-1 text-xs font-semibold"
-                />
-            ),
-            filters: statusAvailability.map(status => ({
-                text: status.status_availability_name,
-                value: status.status_availability_name,
-            })),
-            onFilter: (value, record) => record.status_availability_name === value,
-        },
-        {
-            title: 'Created At',
-            dataIndex: 'created_at',
-            key: 'created_at',
-            width: 170,
-            sorter: (a, b) => new Date(a.created_at) - new Date(b.created_at),
-            render: (text) => text ? dayjs(text).format('MMM D, YYYY HH:mm') : 'N/A'
-        },
-        {
-            title: 'Updated At',
-            dataIndex: 'updated_at',
-            key: 'updated_at',
-            width: 170,
-            sorter: (a, b) => new Date(a.updated_at) - new Date(b.updated_at),
-            render: (text) => text ? dayjs(text).format('MMM D, YYYY HH:mm') : 'N/A'
-        },
-        {
-            title: 'Actions',
-            key: 'actions',
-            fixed: 'right',
-            width: 150,
-            render: (_, record) => (
-                <Space>
-                    <Tooltip title="Edit Vehicle">
-                        <Button 
-                            type="primary" 
-                            icon={<FontAwesomeIcon icon={faEdit} />} 
-                            onClick={() => handleEditVehicle(record)}
-                            size="small"
-                            className="bg-green-500 hover:bg-green-600 border-green-500"
-                        />
-                    </Tooltip>
-                    <Tooltip title="Archive Vehicle">
-                        <Button 
-                            icon={<FontAwesomeIcon icon={faTrashAlt} />} 
-                            onClick={() => handleArchiveVehicle(record)}
-                            size="small"
-                            className="text-yellow-600 hover:text-yellow-700 border-yellow-300 hover:border-yellow-400"
-                        />
-                    </Tooltip>
-                </Space>
-            )
-        }
-    ];
-
-    const itemTemplate = (vehicle) => {
-        // Helper function to determine tag severity based on status
-        const getStatusSeverity = (status) => {
-            return status?.toLowerCase() === 'available' ? 'success' : 'danger';
-        };
+    const handleRefresh = () => {
+        fetchVehicles();
+        setSearchTerm('');
+    };
     
-        return (
-            <Card className="mb-4 transform hover:scale-[1.01] transition-transform duration-200">
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-                    <div className="md:col-span-3 flex justify-center items-start">
-                        <div className="relative group w-full min-h-[200px] bg-gray-100 rounded-lg">
-                            {vehicle.vehicle_pic ? (
-                                <img 
-                                    src={`${IMAGE_BASE_URL}${vehicle.vehicle_pic}`}
-                                    alt={vehicle.vehicle_model_name}
-                                    className="w-full h-48 md:h-64 object-cover rounded-lg"
-                                    onError={(e) => {
-                                        e.target.onerror = null;
-                                        e.target.src = 'placeholder-image-url'; // Optional: provide a fallback image
-                                    }}
-                                />
-                            ) : (
-                                <div className="flex items-center justify-center h-48 md:h-64">
-                                    <FaCar className="text-4xl text-gray-400" />
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                    <div className="md:col-span-9">
-                        <div className="flex flex-col h-full">
-                            <div className="flex justify-between items-start mb-4">
-                                <div>
-                                    <h3 className="text-2xl font-bold text-green-800 mb-2">{vehicle.vehicle_model_name}</h3>
-                                    <p className="text-gray-600 text-sm">
-                                        License: <span className="font-semibold">{vehicle.vehicle_license}</span>
-                                    </p>
-                                    <p className="text-gray-600 text-sm mt-1">
-                                        Year: <span className="font-semibold">{vehicle.year}</span>
-                                    </p>
-                                </div>
-                                <Tag 
-                                    value={vehicle.status_availability_name || 'Unknown'} 
-                                    severity={getStatusSeverity(vehicle.status_availability_name)}
-                                    className="px-4 py-2 text-sm font-semibold capitalize"
-                                />
-                            </div>
-
-                            <Divider className="my-3" />
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                <div className="flex items-center gap-2">
-                                    <i className="pi pi-car text-green-600"></i>
-                                    <div>
-                                        <p className="text-sm text-gray-500">Make</p>
-                                        <p className="font-semibold">{vehicle.vehicle_make_name}</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <i className="pi pi-tag text-green-600"></i>
-                                    <div>
-                                        <p className="text-sm text-gray-500">Category</p>
-                                        <p className="font-semibold">{vehicle.vehicle_category_name}</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <i className="pi pi-calendar text-green-600"></i>
-                                    <div>
-                                        <p className="text-sm text-gray-500">Year</p>
-                                        <p className="font-semibold">{vehicle.year}</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <i className="pi pi-clock text-green-600"></i>
-                                    <div>
-                                        <p className="text-sm text-gray-500">Last Updated</p>
-                                        <p className="font-semibold">{vehicle.updated_at || 'N/A'}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="flex justify-end gap-3 mt-auto">
-                                <motion.button 
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    onClick={() => handleEditVehicle(vehicle)}
-                                    className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-full transition-colors duration-300"
-                                >
-                                    <FontAwesomeIcon icon={faEdit} />
-                                    <span>Edit</span>
-                                </motion.button>
-                                <motion.button 
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    onClick={() => handleArchiveVehicle(vehicle)}
-                                    className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-full transition-colors duration-300"
-                                >
-                                    <i className="pi pi-inbox"></i>
-                                    <span>Archive</span>
-                                </motion.button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </Card>
-        );
-    };
-
-    const handleImageUpload = ({ fileList: newFileList }) => {
-        setFileList(newFileList);
-        if (newFileList.length > 0) {
-            const file = newFileList[0].originFileObj;
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setVehicleImage(reader.result);
-            };
-            reader.readAsDataURL(file);
+    const handleSort = (field) => {
+        if (sortField === field) {
+            setSortOrder(sortOrder === "asc" ? "desc" : "asc");
         } else {
-            setVehicleImage(null);
+            setSortField(field);
+            setSortOrder("asc");
         }
-    };
-
-    const handleLicenseChange = (e) => {
-        const sanitized = sanitizeAndValidateLicense(e.target.value);
-        setVehicleLicensed(sanitized);
     };
 
     return (
-        <div className="flex h-screen bg-gradient-to-br from-green-100 to-white overflow-hidden">
-            <div className="flex-none">
+      <div className="flex h-screen overflow-hidden bg-gradient-to-br from-green-100 to-white">
+      {/* Fixed Sidebar */}
+      <div className="flex-shrink-0">
                 <Sidebar />
             </div>
-            <div className="flex-1 overflow-y-auto bg-white bg-opacity-60 mt-20">
-                <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5 }}
-                    className="p-6 lg:p-10"
-                >
-                    <h2 className="text-4xl font-bold mb-6 text-green-800 drop-shadow-sm">Vehicle Management</h2>
-                    <div className="bg-white rounded-lg shadow-md p-6 mb-6 border border-gray-100">
-                        <div className="flex flex-col md:flex-row items-center justify-between mb-4">
-                            <motion.div 
-                                whileHover={{ scale: 1.05 }}
-                                className="relative w-full md:w-64 mb-4 md:mb-0"
-                            >
-                                <input
-                                    type="text"
-                                    onChange={handleSearchChange}
-                                    value={searchTerm}
-                                    placeholder="Search vehicles..."
-                                    className="w-full pl-10 pr-4 py-2 rounded-full border border-green-300 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-300"
-                                />
-                                <FontAwesomeIcon icon={faSearch} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-400" />
-                            </motion.div>
-                            <motion.button 
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={handleAddVehicle}
-                                className="w-full md:w-auto bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out flex items-center justify-center shadow-md"
-                            >
-                                <FontAwesomeIcon icon={faPlus} className="mr-2" /> Add Vehicle
-                            </motion.button>
+            
+            <div className="flex-grow p-6 sm:p-8 overflow-y-auto">
+                <div className="p-[2.5rem] lg:p-12 min-h-screen">
+                    <motion.div 
+                        initial={{ opacity: 0, y: -50 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5 }}
+                        className="mb-8"
+                    >
+                        <div className="mb-4 mt-20">
+                           
+                            <h2 className="text-2xl font-bold text-green-900 mt-5">
+                                Vehicle Management
+                            </h2>
                         </div>
+                    </motion.div>
 
-                        {loading ? (
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                className="flex justify-center items-center h-64"
-                            >
-                                <div className="loader"></div>
-                            </motion.div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <Table 
-                                    columns={columns} 
-                                    dataSource={filteredVehicles}
-                                    rowKey="vehicle_id"
-                                    pagination={{
-                                        pageSize: pageSize,
-                                        showSizeChanger: true,
-                                        pageSizeOptions: ['10', '20', '50'],
-                                        showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
-                                        onChange: (page, pageSize) => {
-                                            setPageSize(pageSize);
-                                        }
-                                    }}
-                                    scroll={{ x: 1300 }}
-                                    bordered
-                                    size="middle"
-                                    className="vehicle-table"
-                                    style={{ backgroundColor: 'white' }}
-                                    locale={{
-                                        emptyText: (
-                                            <div className="text-center py-8">
-                                                <i className="pi pi-car text-6xl text-gray-300 mb-4"></i>
-                                                <p className="text-xl text-gray-500">No vehicles found</p>
-                                            </div>
-                                        )
-                                    }}
-                                />
+                    {/* Search and Filters */}
+                    <div className="bg-[#fafff4] p-4 rounded-lg shadow-sm mb-6">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                            <div className="flex flex-col md:flex-row gap-4 flex-1">
+                                <div className="flex-1">
+                                    <Input
+                                        placeholder="Search vehicles..."
+                                        allowClear
+                                        prefix={<SearchOutlined />}
+                                        size="large"
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value.toLowerCase())}
+                                        className="w-full"
+                                    />
+                                </div>
                             </div>
+                            <div className="flex gap-2">
+                                <Tooltip title="Refresh data">
+                                    <Button
+                                        icon={<ReloadOutlined />}
+                                        onClick={handleRefresh}
+                                        size="large"
+                                    />
+                                </Tooltip>
+                                <Button
+                                    type="primary"
+                                    icon={<PlusOutlined />}
+                                    size="large"
+                                    onClick={handleAddVehicle}
+                                    className="bg-lime-900 hover:bg-green-600"
+                                >
+                                    Add Vehicle
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Table */}
+                    <div className="relative overflow-x-auto shadow-md sm:rounded-lg bg-[#fafff4] dark:bg-green-100">
+                        {loading ? (
+                            <div className="flex justify-center items-center h-64">
+                                <div className="loader"></div>
+                            </div>
+                        ) : (
+                            <>
+                                <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
+                                    <thead className="text-xs text-gray-700 uppercase bg-green-400/20 dark:bg-green-900/20 dark:text-green-900">
+                                        <tr>
+                                            <th scope="col" className="px-6 py-3" onClick={() => handleSort('vehicle_id')}>
+                                                <div className="flex items-center cursor-pointer hover:text-gray-900">
+                                                    ID
+                                                    {sortField === 'vehicle_id' && (
+                                                        <span className="ml-1">
+                                                            {sortOrder === "asc" ? "↑" : "↓"}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </th>
+                                            <th scope="col" className="px-6 py-3">
+                                                <div className="flex items-center">
+                                                    Image
+                                                </div>
+                                            </th>
+                                            <th scope="col" className="px-6 py-3" onClick={() => handleSort('vehicle_license')}>
+                                                <div className="flex items-center cursor-pointer hover:text-gray-900">
+                                                    License
+                                                    {sortField === 'vehicle_license' && (
+                                                        <span className="ml-1">
+                                                            {sortOrder === "asc" ? "↑" : "↓"}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </th>
+                                            <th scope="col" className="px-6 py-3" onClick={() => handleSort('vehicle_make_name')}>
+                                                <div className="flex items-center cursor-pointer hover:text-gray-900">
+                                                    Make
+                                                    {sortField === 'vehicle_make_name' && (
+                                                        <span className="ml-1">
+                                                            {sortOrder === "asc" ? "↑" : "↓"}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </th>
+                                            <th scope="col" className="px-6 py-3" onClick={() => handleSort('vehicle_category_name')}>
+                                                <div className="flex items-center cursor-pointer hover:text-gray-900">
+                                                    Category
+                                                    {sortField === 'vehicle_category_name' && (
+                                                        <span className="ml-1">
+                                                            {sortOrder === "asc" ? "↑" : "↓"}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </th>
+                                            <th scope="col" className="px-6 py-3" onClick={() => handleSort('vehicle_model_name')}>
+                                                <div className="flex items-center cursor-pointer hover:text-gray-900">
+                                                    Model
+                                                    {sortField === 'vehicle_model_name' && (
+                                                        <span className="ml-1">
+                                                            {sortOrder === "asc" ? "↑" : "↓"}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </th>
+                                            <th scope="col" className="px-6 py-3" onClick={() => handleSort('year')}>
+                                                <div className="flex items-center cursor-pointer hover:text-gray-900">
+                                                    Year
+                                                    {sortField === 'year' && (
+                                                        <span className="ml-1">
+                                                            {sortOrder === "asc" ? "↑" : "↓"}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </th>
+                                            <th scope="col" className="px-6 py-3">
+                                                <div className="flex items-center">
+                                                    Status
+                                                </div>
+                                            </th>
+                                            <th scope="col" className="px-6 py-3">
+                                                <div className="flex items-center">
+                                                    Actions
+                                                </div>
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredVehicles && filteredVehicles.length > 0 ? (
+                                            filteredVehicles
+                                                .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                                                .map((vehicle) => (
+                                                    <tr
+                                                        key={vehicle.vehicle_id}
+                                                        className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 border-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600"
+                                                    >
+                                                        <td className="px-6 py-4">{vehicle.vehicle_id}</td>
+                                                        <td className="px-6 py-4">
+                                                            {vehicle.vehicle_pic ? (
+                                                                <div className="cursor-pointer" onClick={() => handleViewImage(getImageUrl(vehicle.vehicle_pic))}>
+                                                                    <img 
+                                                                        src={getImageUrl(vehicle.vehicle_pic)} 
+                                                                        alt={vehicle.vehicle_model_name} 
+                                                                        className="w-12 h-12 object-cover rounded-md shadow-sm hover:opacity-80 transition-opacity"
+                                                                    />
+                                                                </div>
+                                                            ) : (
+                                                                <div className="w-12 h-12 bg-gray-200 rounded-md flex items-center justify-center text-gray-400">
+                                                                    <i className="pi pi-car text-xl"></i>
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex items-center">
+                                                                <FaEye className="mr-2 text-green-900" />
+                                                                <span className="font-medium">{vehicle.vehicle_license}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4">{vehicle.vehicle_make_name}</td>
+                                                        <td className="px-6 py-4">{vehicle.vehicle_category_name}</td>
+                                                        <td className="px-6 py-4">{vehicle.vehicle_model_name}</td>
+                                                        <td className="px-6 py-4">{vehicle.year}</td>
+                                                        <td className="px-6 py-4">
+                                                            <Tag 
+                                                                value={vehicle.status_availability_name || 'Unknown'} 
+                                                                severity={vehicle.status_availability_name?.toLowerCase() === 'available' ? 'success' : 'danger'}
+                                                                className="px-2 py-1 text-xs font-semibold"
+                                                            />
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex space-x-2">
+                                                                <Button
+                                                                    type="primary"
+                                                                    icon={<EditOutlined />}
+                                                                    onClick={() => handleEditVehicle(vehicle)}
+                                                                    size="middle"
+                                                                    className="bg-green-900 hover:bg-lime-900"
+                                                                />
+                                                                <Button
+                                                                    danger
+                                                                    icon={<DeleteOutlined />}
+                                                                    onClick={() => handleArchiveVehicle(vehicle)}
+                                                                    size="middle"
+                                                                />
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={9} className="px-6 py-24 text-center">
+                                                    <Empty
+                                                        image={Empty.PRESENTED_IMAGE_SIMPLE}
+                                                        description={
+                                                            <span className="text-gray-500 dark:text-gray-400">
+                                                                No vehicles found
+                                                            </span>
+                                                        }
+                                                    />
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+
+                                {/* Pagination */}
+                                <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+                                    <Pagination
+                                        current={currentPage}
+                                        pageSize={pageSize}
+                                        total={filteredVehicles ? filteredVehicles.length : 0}
+                                        onChange={(page, size) => {
+                                            setCurrentPage(page);
+                                            setPageSize(size);
+                                        }}
+                                        showSizeChanger={true}
+                                        showTotal={(total, range) =>
+                                            `${range[0]}-${range[1]} of ${total} items`
+                                        }
+                                        className="flex justify-end"
+                                    />
+                                </div>
+                            </>
                         )}
                     </div>
-                </motion.div>
+                </div>
             </div>
 
+            {/* Add/Edit Modal */}
             <Modal
-                title={selectedVehicleId ? "Edit Vehicle" : "Add Vehicle"}
+                title={
+                    <div className="flex items-center">
+                        <FaEye className="mr-2 text-green-900" /> 
+                        {selectedVehicleId ? "Edit Vehicle" : "Add Vehicle"}
+                    </div>
+                }
                 open={showAddModal || showEditModal}
                 onCancel={handleCloseModal}
                 okText={selectedVehicleId ? "Update" : "Add"}
@@ -881,6 +867,36 @@ const VehicleEntry = () => {
                         </div>
                     </div>
                 </Form>
+            </Modal>
+
+            {/* Confirm Delete Modal */}
+            <Modal
+                title={<div className="text-red-600 flex items-center"><ExclamationCircleOutlined className="mr-2" /> Confirm Deletion</div>}
+                open={showConfirmDelete}
+                onCancel={() => setShowConfirmDelete(false)}
+                footer={[
+                    <Button key="back" onClick={() => setShowConfirmDelete(false)}>
+                        Cancel
+                    </Button>,
+                    <Button
+                        key="submit"
+                        type="primary"
+                        danger
+                        loading={loading}
+                        onClick={() => confirmDelete()}
+                        icon={<DeleteOutlined />}
+                    >
+                        Delete
+                    </Button>,
+                ]}
+            >
+                <Alert
+                    message="Warning"
+                    description={`Are you sure you want to archive this vehicle? This action cannot be undone.`}
+                    type="warning"
+                    showIcon
+                    icon={<ExclamationCircleOutlined />}
+                />
             </Modal>
 
             {/* Image Preview Modal */}

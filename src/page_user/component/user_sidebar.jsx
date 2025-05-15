@@ -495,11 +495,11 @@ const Sidebar = () => {
                 isExpanded={isDesktopSidebarOpen}
               />
 
-<MiniSidebarItem 
+            <MiniSidebarItem 
                 icon={FaComments} 
                 text="Chat" 
-                link="/chat" 
-                active={activeItem === '/chat'}
+                link="/Faculty/Chat" 
+                active={activeItem === '/Faculty/Chat'}
                 badge={notifications.length}
                 isExpanded={isDesktopSidebarOpen}
               />
@@ -574,8 +574,8 @@ const Sidebar = () => {
               <SidebarItem 
                 icon={FaComments} 
                 text="Chat" 
-                link="/chat" 
-                active={activeItem === '/chat'} 
+                link="/Faculty/Chat" 
+                active={activeItem === '/Faculty/Chat'} 
                 badge={notifications.length}
               />
               
@@ -592,9 +592,9 @@ const Sidebar = () => {
 
           {/* Main Content */}
           <main className={`flex-1 bg-gray-50 dark:bg-gray-800 min-h-screen overflow-x-hidden transition-all duration-300 ${
-            !isDesktopSidebarOpen 
+            isDesktopSidebarOpen 
               ? 'lg:ml-64 pl-0 mb-[300px]' 
-              : 'lg:ml-64 pl-0 mb-[300px]'
+              : 'lg:ml-16 pl-0 mb-[300px]'
           }`}>
             {/* Content will be rendered here */}
           </main>

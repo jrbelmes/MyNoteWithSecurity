@@ -28,9 +28,10 @@ function Logins() {
     const [setResetKey] = useState('');
     const [isVerifyingEmail, setIsVerifyingEmail] = useState(false);
     const [isSendingOtp, setIsSendingOtp] = useState(false);
+    const [canResendLoginOtp, setCanResendLoginOtp] = useState(false);
 
-    const [otpDigits, setOtpDigits] = useState(Array(8).fill(''));
-    const [otpRefs] = useState(Array(8).fill(0).map(() => React.createRef()));
+    const [otpDigits, setOtpDigits] = useState(Array(6).fill(''));
+    const [otpRefs] = useState(Array(6).fill(0).map(() => React.createRef()));
     const [showCaptchaAfterEmail, setShowCaptchaAfterEmail] = useState(false);
     const [forgotPasswordCaptchaRef] = useState(React.createRef());
     const [forgotPasswordCaptchaText, setForgotPasswordCaptchaText] = useState('');
@@ -50,11 +51,9 @@ function Logins() {
         special: false
     });
     const [showLoginOTP, setShowLoginOTP] = useState(false);
-    const [loginOtpDigits, setLoginOtpDigits] = useState(Array(8).fill(''));
-    const [loginOtpRefs] = useState(Array(8).fill(0).map(() => React.createRef()));
+    const [loginOtpDigits, setLoginOtpDigits] = useState(Array(6).fill(''));
+    const [loginOtpRefs] = useState(Array(6).fill(0).map(() => React.createRef()));
     const [isVerifyingLoginOtp, setIsVerifyingLoginOtp] = useState(false);
-    const [allowSevenDayAuth, setAllowSevenDayAuth] = useState(false);
-    const [setCanResendLoginOtp] = useState(false);
     const [loginResendTimer, setLoginResendTimer] = useState(180); // 3 minutes
     const [isResendingLoginOtp, setIsResendingLoginOtp] = useState(false);
     const [lastTimerUpdate, setLastTimerUpdate] = useState(Date.now());
@@ -450,63 +449,38 @@ function Logins() {
                     timestamp: new Date().getTime() // Add timestamp for additional security
                 });
     
-                // Continue with existing login flow...
-                // Step 2: Check if 2FA is active
-                const is2FAactive = userData.is_2FAactive === "1";
-    
-                if (is2FAactive && !showLoginOTP) {
-                    // Step 3: If 2FA is active and OTP input is not shown, send OTP
-                    const otpResponse = await axios.post(`${apiUrl}update_master2.php`, {
-                        operation: "sendLoginOTP",
-                        json: { 
-                            id: username
-                        }
-                    });
-    
-                    if (otpResponse.data.status === "success") {
+                // Now we'll check for 2FA status
+                const otpResponse = await axios.post(`${apiUrl}update_master2.php`, {
+                    operation: "sendLoginOTP",
+                    json: { 
+                        id: userData.user_id
+                    }
+                });
+                
+                console.log("OTP response:", otpResponse.data);
+                
+                // Check the specific message from the API
+                if (otpResponse.data.status === "success") {
+                    if (otpResponse.data.message === "Login OTP sent successfully") {
+                        // Store user_id temporarily for OTP verification
+                        SecureStorage.setSessionItem("temp_user_id", userData.user_id);
+                        
                         // Show OTP input form
                         setShowLoginOTP(true);
                         notify("OTP has been sent to your email. Please verify.");
-                    } else {
-                        notify("Failed to send OTP. Please try again.", 'error');
-                    }
-                } else if (is2FAactive && showLoginOTP) {
-                    // Step 4: If 2FA is active and OTP input is shown, verify OTP
-                    const otpValue = loginOtpDigits.join('');
-                    if (otpValue.length !== 8) {
-                        notify("Please enter complete OTP", 'error');
-                        return;
-                    }
-    
-                    const otpResponse = await axios.post(`${apiUrl}update_master2.php`, {
-                        operation: "validateLoginOTP",
-                        json: { 
-                            id: username,
-                            otp: otpValue
-                        }
-                    });
-    
-                    if (otpResponse.data.status === "success" && otpResponse.data.authenticated) {
-                        // If user opted for 7-day authentication, update auth period
-                        if (allowSevenDayAuth) {
-                            await axios.post(`${apiUrl}update_master2.php`, {
-                                operation: "updateAuthPeriod",
-                                json: { 
-                                    user_id: userData.user_id
-                                }
-                            });
-                        }
-    
+                    } else if (otpResponse.data.message === "2FA is not active for this user") {
+                        // 2FA is not active, proceed with direct login
+                        console.log("2FA not active, proceeding with direct login");
+                        
                         // Save API URL before clearing localStorage
                         const savedApiUrl = apiUrl;
                         
-                        // Complete login
                         localStorage.clear();
                         sessionStorage.clear();
                         
                         // Restore API URL
                         SecureStorage.setLocalItem("url", savedApiUrl);
-    
+                
                         // Set localStorage items securely
                         SecureStorage.setLocalItem("user_id", userData.user_id);
                         SecureStorage.setLocalItem("name", `${userData.firstname} ${userData.middlename} ${userData.lastname}`.trim());
@@ -518,8 +492,8 @@ function Logins() {
                         SecureStorage.setLocalItem("profile_pic", userData.profile_pic || "");
                         SecureStorage.setLocalItem("loggedIn", "true");
                         SecureStorage.setLocalItem("lastActivity", Date.now().toString());
-    
-                        // Set sessionStorage items securely
+                        
+
                         SecureStorage.setSessionItem("user_id", userData.user_id);
                         SecureStorage.setSessionItem("name", `${userData.firstname} ${userData.middlename} ${userData.lastname}`.trim());
                         SecureStorage.setSessionItem("school_id", userData.school_id);
@@ -529,21 +503,20 @@ function Logins() {
                         SecureStorage.setSessionItem("department_id", userData.department_id);
                         SecureStorage.setSessionItem("profile_pic", userData.profile_pic || "");
                         SecureStorage.setSessionItem("loggedIn", "true");
-    
-                        // Refresh the session cookie to ensure it's valid after login
+
                         refreshSessionCookie('userSession');
-                        
+                
                         // Handle "Remember Me" functionality
                         if (rememberMe) {
                             localStorage.setItem("rememberedUsername", username);
                         } else {
                             localStorage.removeItem("rememberedUsername");
                         }
-    
+
                         // Log user data and storage operations
                         console.log("User data:", userData);
                         console.log("Setting user level:", userData.user_level_name);
-                        
+                    
                         
                         // Get the stored user level (it's automatically decrypted by getLocalItem)
                         const userLevel = SecureStorage.getLocalItem("user_level");
@@ -557,7 +530,7 @@ function Logins() {
                                 break;
                             case "Personnel":
                                 notify("Personnel Login Successful");
-                                setTimeout(() => navigateTo("/personnelDashboard"), 100);
+                                setTimeout(() => navigateTo("/Personnel/Dashboard"), 100);
                                 break;
                             case "Admin":
                                 notify("Admin Login Successful");
@@ -565,20 +538,21 @@ function Logins() {
                                 break;
                             case "Dean":
                             case "Department Head":
-                                    notify("Dean Login Successful");
-                                    setTimeout(() => navigateTo("/Department/Dashboard"), 100);
-                                    break;
+                                notify("Dean Login Successful");
+                                setTimeout(() => navigateTo("/Department/Dashboard"), 100);
+                                break;
                             default:
                                 notify("User Login Successful");
                                 setTimeout(() => navigateTo("/Faculty/Dashboard"), 100);
                         }
                     } else {
-                        notify("Invalid OTP. Please try again.", 'error');
-                        setLoginOtpDigits(Array(8).fill(''));
+                        // Unknown success message, default to OTP verification to be safe
+                        SecureStorage.setSessionItem("temp_user_id", userData.user_id);
+                        setShowLoginOTP(true);
+                        notify("Verification required. Please check your email for an OTP.");
                     }
                 } else {
-                    // Step 5: If 2FA is not active, proceed with direct login
-                    console.log("2FA not active, proceeding with direct login");
+
                     
                     // Save API URL before clearing localStorage
                     const savedApiUrl = apiUrl;
@@ -588,7 +562,7 @@ function Logins() {
                     
                     // Restore API URL
                     SecureStorage.setLocalItem("url", savedApiUrl);
-    
+
                     // Set localStorage items securely
                     SecureStorage.setLocalItem("user_id", userData.user_id);
                     SecureStorage.setLocalItem("name", `${userData.firstname} ${userData.middlename} ${userData.lastname}`.trim());
@@ -601,7 +575,6 @@ function Logins() {
                     SecureStorage.setLocalItem("loggedIn", "true");
                     SecureStorage.setLocalItem("lastActivity", Date.now().toString());
                     
-
                     SecureStorage.setSessionItem("user_id", userData.user_id);
                     SecureStorage.setSessionItem("name", `${userData.firstname} ${userData.middlename} ${userData.lastname}`.trim());
                     SecureStorage.setSessionItem("school_id", userData.school_id);
@@ -613,24 +586,16 @@ function Logins() {
                     SecureStorage.setSessionItem("loggedIn", "true");
 
                     refreshSessionCookie('userSession');
-    
+
                     // Handle "Remember Me" functionality
                     if (rememberMe) {
                         localStorage.setItem("rememberedUsername", username);
                     } else {
                         localStorage.removeItem("rememberedUsername");
                     }
-
-                    // Log user data and storage operations
-                    console.log("User data:", userData);
-                    console.log("Setting user level:", userData.user_level_name);
-                
                     
-                    // Get the stored user level (it's automatically decrypted by getLocalItem)
-                    const userLevel = SecureStorage.getLocalItem("user_level");
-                    console.log("Retrieved user level:", userLevel);
-
                     // Navigate based on user level
+                    const userLevel = SecureStorage.getLocalItem("user_level");
                     switch(userLevel) {
                         case "Super Admin":
                             notify("Super Admin Login Successful");
@@ -649,7 +614,6 @@ function Logins() {
                             notify("Dean Login Successful");
                             setTimeout(() => navigateTo("/Department/Dashboard"), 100);
                             break;
-
                         default:
                             notify("User Login Successful");
                             setTimeout(() => navigateTo("/Faculty/Dashboard"), 100);
@@ -744,12 +708,12 @@ function Logins() {
         setOtpDigits(newOtpDigits);
 
         // Move to next input if value is entered
-        if (value && index < 7) {
+        if (value && index < 5) {
             otpRefs[index + 1].current.focus();
         }
         
         // Auto-verify if all digits are filled
-        if (value && index === 7) {
+        if (value && index === 5) {
             const allFilled = newOtpDigits.every(digit => digit !== '');
             if (allFilled) {
                 handleVerifyOtp();
@@ -773,7 +737,7 @@ function Logins() {
 
     const handleVerifyOtp = async () => {
         const otpValue = otpDigits.join('');
-        if (otpValue.length !== 8) {
+        if (otpValue.length !== 6) {
             notify("Please enter complete OTP", 'error');
             return;
         }
@@ -790,7 +754,7 @@ function Logins() {
                 notify("OTP verified successfully");
             } else {
                 notify(response.data.message || "Invalid OTP", 'error');
-                setOtpDigits(Array(8).fill(''));
+                setOtpDigits(Array(6).fill(''));
             }
         } catch (error) {
             notify("Error validating OTP", 'error');
@@ -859,7 +823,7 @@ function Logins() {
         setForgotPasswordCaptchaInput('');
         setIsForgotPasswordCaptchaCorrect(null);
         setShowCaptchaAfterEmail(false);
-        setOtpDigits(Array(8).fill(''));
+        setOtpDigits(Array(6).fill(''));
         setShowOtpInput(false);
         setResendTimer(180);
         setCanResendOtp(false);
@@ -893,7 +857,7 @@ function Logins() {
         newOtpDigits[index] = value;
         setLoginOtpDigits(newOtpDigits);
 
-        if (value && index < 7) {
+        if (value && index < 5) {
             loginOtpRefs[index + 1].current.focus();
         }
     };
@@ -906,94 +870,77 @@ function Logins() {
 
     const handleVerifyLoginOTP = async () => {
         const otpValue = loginOtpDigits.join('');
-        if (otpValue.length !== 8) {
+        if (otpValue.length !== 6) {
             notify("Please enter complete OTP", 'error');
             return;
         }
 
         setIsVerifyingLoginOtp(true);
         try {
-            // First verify OTP
-            const response = await axios.post(`${localStorage.getItem("url")}update_master2.php`, {
+            // Get user_id if it was stored temporarily during initial login attempt
+            const userData = SecureStorage.getSessionItem("temp_user_id") || username;
+            const apiUrl = SecureStorage.getLocalItem("url");
+            
+            // Verify OTP
+            const response = await axios.post(`${apiUrl}update_master2.php`, {
                 operation: "validateLoginOTP",
                 json: { 
-                    id: username,
+                    id: userData,
                     otp: otpValue
                 }
             });
+            console.log(response.data)
 
             if (response.data.status === "success" && response.data.authenticated) {
-                // If user opted for 7-day authentication, update auth period
-                if (allowSevenDayAuth) {
-                    const authResponse = await axios.post(`${localStorage.getItem("url")}update_master2.php`, {
-                        operation: "updateAuthPeriod",
-                        json: { 
-                            user_id: response.data.user_id
-                        }
-                    });
+                // If authenticated, process the user data
+                // Get the API URL
+                const apiUrl = SecureStorage.getLocalItem("url");
+                
+                // Clear existing storage but preserve API URL
+                localStorage.clear();
+                sessionStorage.clear();
+                
+                // Restore API URL
+                SecureStorage.setLocalItem("url", apiUrl);
+
+                // Check if user data is available in the response
+                if (response.data.user_data) {
+                    // Use user data directly from the response
+                    const userDetails = response.data.user_data;
                     
-                    if (authResponse.data.status !== "success") {
-                        notify("Failed to set authentication period", 'error');
-                    }
-                }
-
-                // Proceed with login
-                const loginResponse = await axios.post(`${localStorage.getItem("url")}login.php`, {
-                    operation: "login",
-                    json: { 
-                        username: username, 
-                        password: password 
-                    }
-                });
-
-                if (loginResponse.data.status === "success") {
-                    const userData = loginResponse.data.data;
-                    
-                    // Clear existing storage
-                    localStorage.clear();
-                    sessionStorage.clear();
-
                     // Set localStorage items securely
-                    SecureStorage.setLocalItem("user_id", userData.user_id);
-                    SecureStorage.setLocalItem("name", `${userData.firstname} ${userData.middlename} ${userData.lastname}`.trim());
-                    SecureStorage.setLocalItem("school_id", userData.school_id);
-                    SecureStorage.setLocalItem("contact_number", userData.contact_number);
-                    SecureStorage.setLocalItem("user_level", userData.user_level_name);
-                    SecureStorage.setLocalItem("user_level_id", userData.user_level_id);
-                    SecureStorage.setLocalItem("department_id", userData.department_id);
-                    SecureStorage.setLocalItem("profile_pic", userData.profile_pic || "");
+                    SecureStorage.setLocalItem("user_id", userDetails.user_id);
+                    SecureStorage.setLocalItem("name", `${userDetails.firstname} ${userDetails.middlename} ${userDetails.lastname}`.trim());
+                    SecureStorage.setLocalItem("school_id", userDetails.school_id);
+                    SecureStorage.setLocalItem("contact_number", userDetails.contact_number);
+                    SecureStorage.setLocalItem("user_level", userDetails.user_level_name);
+                    SecureStorage.setLocalItem("user_level_id", userDetails.user_level_id);
+                    SecureStorage.setLocalItem("department_id", userDetails.department_id);
+                    SecureStorage.setLocalItem("profile_pic", userDetails.profile_pic || "");
                     SecureStorage.setLocalItem("loggedIn", "true");
+                    SecureStorage.setLocalItem("lastActivity", Date.now().toString());
                 
                     // Set sessionStorage items securely
-                    SecureStorage.setSessionItem("user_id", userData.user_id);
-                    SecureStorage.setSessionItem("name", `${userData.firstname} ${userData.middlename} ${userData.lastname}`.trim());
-                    SecureStorage.setSessionItem("school_id", userData.school_id);
-                    SecureStorage.setSessionItem("contact_number", userData.contact_number);
-                    SecureStorage.setSessionItem("user_level", userData.user_level_name);
-                    SecureStorage.setSessionItem("user_level_id", userData.user_level_id);
-                    SecureStorage.setSessionItem("department_id", userData.department_id);
-                    SecureStorage.setSessionItem("profile_pic", userData.profile_pic || "");
+                    SecureStorage.setSessionItem("user_id", userDetails.user_id);
+                    SecureStorage.setSessionItem("name", `${userDetails.firstname} ${userDetails.middlename} ${userDetails.lastname}`.trim());
+                    SecureStorage.setSessionItem("school_id", userDetails.school_id);
+                    SecureStorage.setSessionItem("contact_number", userDetails.contact_number);
+                    SecureStorage.setSessionItem("user_level", userDetails.user_level_name);
+                    SecureStorage.setSessionItem("user_level_id", userDetails.user_level_id);
+                    SecureStorage.setSessionItem("department_id", userDetails.department_id);
+                    SecureStorage.setSessionItem("profile_pic", userDetails.profile_pic || "");
                     SecureStorage.setSessionItem("loggedIn", "true");
                     
-                    // Handle "Remember Me" functionality
-                    if (rememberMe) {
-                        localStorage.setItem("rememberedUsername", username);
-                    } else {
-                        localStorage.removeItem("rememberedUsername");
-                    }
-
-                    // Log user data and storage operations
-                    console.log("User data:", userData);
-                    console.log("Setting user level:", userData.user_level_name);
+                    // Set session cookie
+                    setSessionCookie('userSession', {
+                        user_id: userDetails.user_id,
+                        school_id: userDetails.school_id,
+                        user_level: userDetails.user_level_name,
+                        timestamp: new Date().getTime()
+                    });
                     
-                    // Store the user level
-                    SecureStorage.setLocalItem("user_level", userData.user_level_name);
-                    
-                    // Get the stored user level (it's automatically decrypted by getLocalItem)
-                    const userLevel = SecureStorage.getLocalItem("user_level");
-                    console.log("Retrieved user level:", userLevel);
-
                     // Navigate based on user level
+                    const userLevel = userDetails.user_level_name;
                     switch(userLevel) {
                         case "Super Admin":
                             notify("Super Admin Login Successful");
@@ -1008,24 +955,119 @@ function Logins() {
                             setTimeout(() => navigateTo("/adminDashboard"), 100);
                             break;
                         case "Dean":
+                        case "Secretary":
                             notify("Dean Login Successful");
-                            setTimeout(() => navigateTo("/deanDashboard"), 100);
+                            setTimeout(() => navigateTo("/Department/Dashboard"), 100);
                             break;
                         default:
                             notify("User Login Successful");
-                            setTimeout(() => navigateTo("/dashboard"), 100);
+                            setTimeout(() => navigateTo("/Faculty/Dashboard"), 100);
                     }
                 } else {
-                    notify("Error retrieving user data", 'error');
+                    // If user_data is not in the response, we need to fetch user details
+                    // using the user_id from the authentication response
+                    const userId = response.data.user_id;
+                    
+                    // Set basic authenticated state
+                    SecureStorage.setLocalItem("user_id", userId);
+                    SecureStorage.setLocalItem("loggedIn", "true");
+                    SecureStorage.setLocalItem("lastActivity", Date.now().toString());
+                    
+                    SecureStorage.setSessionItem("user_id", userId);
+                    SecureStorage.setSessionItem("loggedIn", "true");
+                    
+                    // Set cookie with limited data
+                    setSessionCookie('userSession', {
+                        user_id: userId,
+                        timestamp: new Date().getTime()
+                    });
+                    
+                    // Fetch the user's full details
+                    try {
+                        const userDetailsResponse = await axios.post(`${apiUrl}fetchMaster.php`, {
+                            operation: "fetchUsersById",
+                            id: userId
+                        });
+                        
+                        console.log("User details fetched:", userDetailsResponse.data);
+                        
+                        if (userDetailsResponse.data.status === "success" && 
+                            userDetailsResponse.data.data && 
+                            userDetailsResponse.data.data.length > 0) {
+                            
+                            const userDetails = userDetailsResponse.data.data[0];
+                            
+                            // Set full user data
+                            SecureStorage.setLocalItem("name", `${userDetails.users_fname} ${userDetails.users_mname} ${userDetails.users_lname}`.trim());
+                            SecureStorage.setLocalItem("school_id", userDetails.users_school_id);
+                            SecureStorage.setLocalItem("contact_number", userDetails.users_contact_number);
+                            SecureStorage.setLocalItem("user_level", userDetails.user_level_name);
+                            SecureStorage.setLocalItem("user_level_id", userDetails.users_user_level_id);
+                            SecureStorage.setLocalItem("department_id", userDetails.users_department_id);
+                            SecureStorage.setLocalItem("profile_pic", userDetails.users_pic || "");
+                            
+                            SecureStorage.setSessionItem("name", `${userDetails.users_fname} ${userDetails.users_mname} ${userDetails.users_lname}`.trim());
+                            SecureStorage.setSessionItem("school_id", userDetails.users_school_id);
+                            SecureStorage.setSessionItem("contact_number", userDetails.users_contact_number);
+                            SecureStorage.setSessionItem("user_level", userDetails.user_level_name);
+                            SecureStorage.setSessionItem("user_level_id", userDetails.users_user_level_id);
+                            SecureStorage.setSessionItem("department_id", userDetails.users_department_id);
+                            SecureStorage.setSessionItem("profile_pic", userDetails.users_pic || "");
+                            
+                            // Update session cookie with more details
+                            refreshSessionCookie('userSession');
+                            
+                            // Navigate based on user level
+                            const userLevel = userDetails.user_level_name;
+                            switch(userLevel) {
+                                case "Super Admin":
+                                    notify("Super Admin Login Successful");
+                                    setTimeout(() => navigateTo("/adminDashboard"), 100);
+                                    break;
+                                case "Personnel":
+                                    notify("Personnel Login Successful");
+                                    setTimeout(() => navigateTo("/Personnel/Dashboard"), 100);
+                                    break;
+                                case "Admin":
+                                    notify("Admin Login Successful");
+                                    setTimeout(() => navigateTo("/adminDashboard"), 100);
+                                    break;
+                                case "Dean":
+                                case "Secretary":
+                                    notify("Dean Login Successful");
+                                    setTimeout(() => navigateTo("/Department/Dashboard"), 100);
+                                    break;
+                                default:
+                                    notify("User Login Successful");
+                                    setTimeout(() => navigateTo("/Faculty/Dashboard"), 100);
+                            }
+                        } else {
+                            // If user details fetch fails, redirect to login
+                            notify("Authentication successful but failed to load user details. Please try again.", 'error');
+                            navigateTo("/");
+                        }
+                    } catch (error) {
+                        console.error("Error fetching user details:", error);
+                        notify("Authentication successful but failed to load user details. Please try again.", 'error');
+                        navigateTo("/");
+                    }
+                }
+                
+                // Handle "Remember Me" functionality
+                if (rememberMe) {
+                    localStorage.setItem("rememberedUsername", username);
+                } else {
+                    localStorage.removeItem("rememberedUsername");
                 }
             } else {
                 notify("Invalid OTP", 'error');
-                setLoginOtpDigits(Array(8).fill(''));
+                console.log(response.data)
+                setLoginOtpDigits(Array(6).fill(''));
             }
         } catch (error) {
             console.error('Error during OTP verification:', error);
             notify("Error verifying OTP", 'error');
-            setLoginOtpDigits(Array(8).fill(''));
+            setLoginOtpDigits(Array(6).fill(''));
         } finally {
             setIsVerifyingLoginOtp(false);
         }
@@ -1034,17 +1076,33 @@ function Logins() {
     const handleResendLoginOTP = async () => {
         setIsResendingLoginOtp(true);
         try {
-            const response = await axios.post(`${localStorage.getItem("url")}update_master2.php`, {
+            // Get the user_id if available
+            const userData = SecureStorage.getSessionItem("temp_user_id");
+            
+            // Get and decrypt the stored URL
+            const apiUrl = SecureStorage.getLocalItem("url");
+            
+            const response = await axios.post(`${apiUrl}update_master2.php`, {
                 operation: "sendLoginOTP",
                 json: { 
-                    id: username
+                    id: userData || username
                 }
             });
+            
 
             if (response.data.status === "success") {
                 setLoginResendTimer(180);
                 setCanResendLoginOtp(false);
-                notify("OTP has been resent to your email");
+                
+                if (response.data.message === "Login OTP sent successfully") {
+                    notify("OTP has been resent to your email");
+                
+                } else if (response.data.message === "2FA is not active for this user") {
+                    notify("2FA is not active for this user");
+                    // May want to redirect to login page or offer to activate 2FA
+                } else {
+                    notify("OTP request processed");
+                }
             } else {
                 notify(response.data.message || "Failed to resend OTP", 'error');
             }
@@ -1305,20 +1363,6 @@ function Logins() {
                                             ))}
                                         </div>
                                         
-                                        {/* Remember Device Option */}
-                                        <div className="flex items-center space-x-2 bg-gray-50 p-4 rounded-xl">
-                                            <input
-                                                type="checkbox"
-                                                id="allowSevenDayAuth"
-                                                checked={allowSevenDayAuth}
-                                                onChange={(e) => setAllowSevenDayAuth(e.target.checked)}
-                                                className="h-5 w-5 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
-                                            />
-                                            <label htmlFor="allowSevenDayAuth" className="text-sm text-gray-700">
-                                                Remember this device for 7 days
-                                            </label>
-                                        </div>
-
                                         {/* Verify Button */}
                                         <button
                                             onClick={handleVerifyLoginOTP}

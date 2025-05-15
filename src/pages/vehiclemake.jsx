@@ -1,15 +1,20 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Button, Modal, Form, Input, Table, Space, Tooltip } from 'antd';
+import { Button, Modal, Form, Input, Table, Space, Tooltip, Empty, Pagination } from 'antd';
 import { toast, Toaster } from 'sonner';
 import Sidebar from './Sidebar';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faTrashAlt, faCar, faPlus, faSearch, faEdit } from '@fortawesome/free-solid-svg-icons';
+import { faTrashAlt, faCar, faPlus, faSearch, faEdit } from '@fortawesome/free-solid-svg-icons';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { FaArrowLeft} from 'react-icons/fa';
+import { FaArrowLeft, FaEdit, FaTrashAlt, FaPlus, FaSearch, FaEye } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { sanitizeInput, validateInput } from '../utils/sanitize';
 import { SecureStorage } from '../utils/encryption';
+import { PlusOutlined, ExclamationCircleOutlined, DeleteOutlined, EditOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Tag } from 'primereact/tag';
+import 'primereact/resources/themes/lara-light-indigo/theme.css';
+import 'primereact/resources/primereact.min.css';
+import 'primeicons/primeicons.css';
 
 const VehicleMakes = () => {
   const navigate = useNavigate();
@@ -23,6 +28,9 @@ const VehicleMakes = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortField, setSortField] = useState('vehicle_make_id');
+  const [sortOrder, setSortOrder] = useState('desc');
   const encryptedUrl = SecureStorage.getLocalItem("url");
 
   useEffect(() => {
@@ -185,152 +193,142 @@ const VehicleMakes = () => {
     setFormData({ id: '', name: '' });
   };
 
-  // Table columns configuration
-  const columns = [
-    {
-      title: 'Make Name',
-      dataIndex: 'vehicle_make_name',
-      key: 'vehicle_make_name',
-      sorter: (a, b) => a.vehicle_make_name.localeCompare(b.vehicle_make_name),
-      render: (text) => <span className="font-semibold text-green-800">{text}</span>
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      fixed: 'right',
-      width: 150,
-      render: (_, record) => (
-        <Space>
-          <Tooltip title="Edit Make">
-            <Button 
-              type="primary" 
-              icon={<FontAwesomeIcon icon={faEdit} />} 
-              onClick={() => handleEdit(record.vehicle_make_id)}
-              size="small"
-              className="bg-green-500 hover:bg-green-600 border-green-500"
-            />
-          </Tooltip>
-          <Tooltip title="Delete Make">
-            <Button 
-              icon={<FontAwesomeIcon icon={faTrashAlt} />} 
-              onClick={() => handleDelete(record.vehicle_make_id)}
-              size="small"
-              className="text-red-600 hover:text-red-700 border-red-300 hover:border-red-400"
-            />
-          </Tooltip>
-        </Space>
-      )
+  const handleRefresh = () => {
+    fetchMakes();
+    setSearchTerm('');
+  };
+  
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortOrder("asc");
     }
-  ];
+  };
 
   return (
-    <div className="flex flex-col lg:flex-row min-h-screen bg-gradient-to-br from-white to-green-100">
-      <Sidebar />
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="flex-grow p-6 lg:p-10"
-      >
-                <div className="mb-4 mt-20">
-                    <Button variant="link" onClick={() => navigate('/Master')} className="text-green-800">
-                        <FaArrowLeft className="mr-2" /> Back to Master
-                    </Button>
+    <div className="flex h-screen overflow-hidden bg-gradient-to-br from-green-100 to-white">
+      {/* Fixed Sidebar */}
+      <div className="flex-shrink-0">
+        <Sidebar />
+      </div>
+      
+      {/* Scrollable Content Area */}
+      <div className="flex-grow p-6 sm:p-8 overflow-y-auto">
+        <div className="p-[2.5rem] lg:p-12 min-h-screen">
+          <motion.div 
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="mb-8"
+          >
+            <div className="mb-4 mt-20">
+              <Button variant="link" onClick={() => navigate('/Master')} className="text-green-800">
+                <FaArrowLeft className="mr-2" /> Back to Master
+              </Button>
+              <h2 className="text-2xl font-bold text-green-900 mt-5">
+                Vehicle Makes Management
+              </h2>
+            </div>
+          </motion.div>
+
+          {/* Search and Filters */}
+          <div className="bg-[#fafff4] p-4 rounded-lg shadow-sm mb-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="flex flex-col md:flex-row gap-4 flex-1">
+                <div className="flex-1">
+                  <Input
+                    placeholder="Search makes by name"
+                    allowClear
+                    prefix={<SearchOutlined />}
+                    size="large"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full"
+                  />
                 </div>
-        
-        <h2 className="text-4xl font-bold text-green-800 drop-shadow-lg mb-6">Vehicle Makes</h2>
-        
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6 border border-gray-100">
-          <div className="flex flex-col md:flex-row items-center justify-between mb-4">
-            <motion.div 
-              whileHover={{ scale: 1.05 }}
-              className="relative w-full md:w-64 mb-4 md:mb-0"
-            >
-              <Input
-                prefix={<FontAwesomeIcon icon={faSearch} className="text-green-400" />}
-                placeholder="Search makes..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 rounded-full border border-green-300 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-300"
-              />
-            </motion.div>
-            
-            <motion.button 
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={handleAdd}
-              className="w-full md:w-auto bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out flex items-center justify-center shadow-md"
-            >
-              <FontAwesomeIcon icon={faPlus} className="mr-2" /> Add Make
-            </motion.button>
+              </div>
+              <div className="flex gap-2">
+                <Tooltip title="Refresh data">
+                  <Button
+                    icon={<ReloadOutlined />}
+                    onClick={handleRefresh}
+                    size="large"
+                  />
+                </Tooltip>
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  size="large"
+                  onClick={handleAdd}
+                  className="bg-lime-900 hover:bg-green-600"
+                >
+                  Add Make
+                </Button>
+              </div>
+            </div>
           </div>
 
-          {loading ? (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex justify-center items-center h-64"
-            >
-              <div className="loader"></div>
-            </motion.div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table 
-                columns={columns} 
-                dataSource={filteredMakes}
-                rowKey="vehicle_make_id"
-                pagination={{
-                  pageSize: pageSize,
-                  showSizeChanger: true,
-                  pageSizeOptions: ['10', '20', '50'],
-                  showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
-                  onChange: (page, pageSize) => {
-                    setPageSize(pageSize);
-                  }
-                }}
-                bordered
-                size="middle"
-                className="vehicle-make-table"
-                style={{ backgroundColor: 'white' }}
-                locale={{
-                  emptyText: (
-                    <div className="text-center py-8">
-                      <i className="pi pi-search text-6xl text-gray-300 mb-4"></i>
-                      <p className="text-xl text-gray-500">No vehicle makes found</p>
-                    </div>
-                  )
-                }}
-              />
-            </div>
-          )}
+          {/* Table */}
+          <div className="relative overflow-x-auto shadow-md sm:rounded-lg bg-[#fafff4] dark:bg-green-100">
+            {loading ? (
+              <div className="flex justify-center items-center h-64">
+                <div className="loader"></div>
+              </div>
+            ) : (
+              <>
+                <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
+                                    <thead className="text-xs text-gray-700 uppercase bg-green-400/20 dark:bg-green-900/20 dark:text-green-900">                    <tr>                      <th scope="col" className="px-6 py-3" onClick={() => handleSort('vehicle_make_name')}>                        <div className="flex items-center cursor-pointer hover:text-gray-900">                          Make Name                          {sortField === 'vehicle_make_name' && (                            <span className="ml-1">                              {sortOrder === "asc" ? "↑" : "↓"}                            </span>                          )}                        </div>                      </th>                      <th scope="col" className="px-6 py-3">                        <div className="flex items-center">                          Actions                        </div>                      </th>                    </tr>                  </thead>
+                  <tbody>
+                    {filteredMakes && filteredMakes.length > 0 ? (
+                      filteredMakes
+                        .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                        .map((make) => (
+                                                    <tr                            key={make.vehicle_make_id}                            className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 border-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600"                          >                            <td className="px-6 py-4">                              <div className="flex items-center">                                <FaEye className="mr-2 text-green-900" />                                <span className="font-medium">{make.vehicle_make_name}</span>                              </div>                            </td>                            <td className="px-6 py-4">                              <div className="flex space-x-2">                                <Button                                  type="primary"                                  icon={<EditOutlined />}                                  onClick={() => handleEdit(make.vehicle_make_id)}                                  size="middle"                                  className="bg-green-900 hover:bg-lime-900"                                />                                <Button                                  danger                                  icon={<DeleteOutlined />}                                  onClick={() => handleDelete(make.vehicle_make_id)}                                  size="middle"                                />                              </div>                            </td>                          </tr>
+                        ))
+                    ) : (
+                                            <tr>                        <td colSpan={2} className="px-6 py-24 text-center">                          <Empty                            image={Empty.PRESENTED_IMAGE_SIMPLE}                            description={                              <span className="text-gray-500 dark:text-gray-400">                                No makes found                              </span>                            }                          />                        </td>                      </tr>
+                    )}
+                  </tbody>
+                </table>
+
+                {/* Pagination */}
+                <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+                  <Pagination
+                    current={currentPage}
+                    pageSize={pageSize}
+                    total={filteredMakes ? filteredMakes.length : 0}
+                    onChange={(page, size) => {
+                      setCurrentPage(page);
+                      setPageSize(size);
+                    }}
+                    showSizeChanger={true}
+                    showTotal={(total, range) =>
+                      `${range[0]}-${range[1]} of ${total} items`
+                    }
+                    className="flex justify-end"
+                  />
+                </div>
+              </>
+            )}
+          </div>
         </div>
-      </motion.div>
+      </div>
 
       {/* Add/Edit Vehicle Make Modal */}
       <Modal
         title={
           <div className="flex items-center">
-            <FontAwesomeIcon icon={faCar} className="mr-2 text-green-600" /> 
+            <FaEye className="mr-2 text-green-900" /> 
             {editMode ? 'Edit Vehicle Make' : 'Add Vehicle Make'}
           </div>
         }
         open={showModal}
         onCancel={closeModal}
-        footer={[
-          <Button key="cancel" onClick={closeModal}>
-            Cancel
-          </Button>,
-          <Button 
-            key="submit" 
-            type="primary" 
-            onClick={handleSave} 
-            loading={isSubmitting}
-            className="bg-green-600 hover:bg-green-700"
-          >
-            {isSubmitting ? 'Saving...' : 'Save'}
-          </Button>
-        ]}
+        okText={editMode ? 'Update' : 'Add'}
+        onOk={handleSave}
+        confirmLoading={isSubmitting}
       >
         <Form layout="vertical">
           <Form.Item 
@@ -349,27 +347,29 @@ const VehicleMakes = () => {
 
       {/* Confirm Delete Modal */}
       <Modal
-        title={
-          <div className="text-red-600 font-bold flex items-center">
-            <FontAwesomeIcon icon={faTrashAlt} className="mr-2" /> 
-            Confirm Deletion
-          </div>
-        }
+        title={<div className="text-red-600 flex items-center"><ExclamationCircleOutlined className="mr-2" /> Confirm Deletion</div>}
         open={showConfirmDelete}
         onCancel={() => setShowConfirmDelete(false)}
         footer={[
-          <Button key="cancel" onClick={() => setShowConfirmDelete(false)}>
+          <Button key="back" onClick={() => setShowConfirmDelete(false)}>
             Cancel
           </Button>,
-          <Button 
-            key="delete" 
-            danger 
+          <Button
+            key="submit"
+            type="primary"
+            danger
+            loading={loading}
             onClick={confirmDelete}
+            icon={<DeleteOutlined />}
           >
             Delete
-          </Button>
+          </Button>,
         ]}
       >
+        <div className="text-yellow-600 flex items-center mb-4">
+          <ExclamationCircleOutlined className="mr-2 text-yellow-600" />
+          <span>Warning</span>
+        </div>
         <p>Are you sure you want to delete this vehicle make?</p>
         <p className="text-gray-500 text-sm mt-2">This action cannot be undone.</p>
       </Modal>

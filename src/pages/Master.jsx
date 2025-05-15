@@ -1,11 +1,19 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { FaCar, FaPlus, FaTools, FaCogs, FaListAlt, FaEye } from 'react-icons/fa';
-import axios from 'axios';
-import Sidebar from './Sidebar';
-import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { SecureStorage } from '../utils/encryption';
-import { sanitizeInput, validateInput } from '../utils/sanitize';
+import {
+  FaCar,
+  FaCogs,
+  FaEye,
+  FaListAlt,
+  FaPlus,
+  FaTools,
+} from "react-icons/fa";
+import React, { useCallback, useEffect, useState } from "react";
+import { sanitizeInput, validateInput } from "../utils/sanitize";
+
+import { SecureStorage } from "../utils/encryption";
+import Sidebar from "./Sidebar";
+import axios from "axios";
+import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 
 const Master = () => {
   const navigate = useNavigate();
@@ -14,42 +22,43 @@ const Master = () => {
   const [isAddModelModalOpen, setIsAddModelModalOpen] = useState(false);
   const [isAddEquipmentModalOpen, setIsAddEquipmentModalOpen] = useState(false);
   const [isAddUserLevelModalOpen, setIsAddUserLevelModalOpen] = useState(false);
-  const [isAddDepartmentModalOpen, setIsAddDepartmentModalOpen] = useState(false);
+  const [isAddDepartmentModalOpen, setIsAddDepartmentModalOpen] =
+    useState(false);
   const [isAddConditionModalOpen, setIsAddConditionModalOpen] = useState(false);
   const [isAddHolidayModalOpen, setIsAddHolidayModalOpen] = useState(false);
   
-  const [categoryName, setCategoryName] = useState('');
-  const [makeName, setMakeName] = useState('');
-  const [modelName, setModelName] = useState('');
-  const [equipmentName, setEquipmentName] = useState('');
-  const [userLevelName, setUserLevelName] = useState('');
-  const [userLevelDesc, setUserLevelDesc] = useState('');
-  const [departmentName, setDepartmentName] = useState('');
-  const [conditionName, setConditionName] = useState('');
-  const [holidayName, setHolidayName] = useState('');
-  const [holidayDate, setHolidayDate] = useState('');
+  const [categoryName, setCategoryName] = useState("");
+  const [makeName, setMakeName] = useState("");
+  const [modelName, setModelName] = useState("");
+  const [equipmentName, setEquipmentName] = useState("");
+  const [userLevelName, setUserLevelName] = useState("");
+  const [userLevelDesc, setUserLevelDesc] = useState("");
+  const [departmentName, setDepartmentName] = useState("");
+  const [conditionName, setConditionName] = useState("");
+  const [holidayName, setHolidayName] = useState("");
+  const [holidayDate, setHolidayDate] = useState("");
   
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedMake, setSelectedMake] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedMake, setSelectedMake] = useState("");
   const [categories, setCategories] = useState([]);
   const [makes, setMakes] = useState([]);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [popupMessage, setPopupMessage] = useState('');
+  const [popupMessage, setPopupMessage] = useState("");
   const encryptedUrl = SecureStorage.getLocalItem("url");
 
-  const user_level_id = localStorage.getItem('user_level_id');
+  const user_level_id = localStorage.getItem("user_level_id");
 
   const fetchCategoriesAndMakes = useCallback(async () => {
     setLoading(true);
     try {
       const response = await axios.post(`${encryptedUrl}vehicle_master.php`, {
-        operation: 'fetchCategoriesAndMakes',
+        operation: "fetchCategoriesAndMakes",
       });
       const data = response.data;
 
-      if (data.status === 'success') {
+      if (data.status === "success") {
         setCategories(data.categories);
         setMakes(data.makes);
       } else {
@@ -57,7 +66,7 @@ const Master = () => {
         setIsSuccess(false);
       }
     } catch (error) {
-      setMessage('Error fetching data.');
+      setMessage("Error fetching data.");
       setIsSuccess(false);
     } finally {
       setLoading(false);
@@ -69,18 +78,22 @@ const Master = () => {
   }, [fetchCategoriesAndMakes]);
 
   useEffect(() => {
-            const encryptedUserLevel = SecureStorage.getSessionItem("user_level_id"); 
-            console.log("this is encryptedUserLevel", encryptedUserLevel);
-            if (encryptedUserLevel !== '1' && encryptedUserLevel !== '2' && encryptedUserLevel !== '4') {
-                localStorage.clear();
-                navigate('/gsd');
-            }
-        }, [navigate]);
+    const encryptedUserLevel = SecureStorage.getSessionItem("user_level_id");
+    console.log("this is encryptedUserLevel", encryptedUserLevel);
+    if (
+      encryptedUserLevel !== "1" &&
+      encryptedUserLevel !== "2" &&
+      encryptedUserLevel !== "4"
+    ) {
+      localStorage.clear();
+      navigate("/gsd");
+    }
+  }, [navigate]);
 
   const handleSaveData = async (operation, data) => {
-    const isValid = Object.values(data).every(value => validateInput(value));
+    const isValid = Object.values(data).every((value) => validateInput(value));
     if (!isValid) {
-      setMessage('Invalid input detected');
+      setMessage("Invalid input detected");
       setIsSuccess(false);
       return;
     }
@@ -95,22 +108,23 @@ const Master = () => {
         json: JSON.stringify(sanitizedData),
       });
 
-      if (response.data.status === 'success') {
-        const name = operation === 'saveCategoryData' 
-          ? 'Category' 
-          : operation === 'saveMakeData' 
-          ? 'Make' 
-          : operation === 'saveModelData' 
-          ? 'Model'
-          : operation === 'saveEquipmentCategory'
-          ? 'Equipment'
-          : operation === 'saveUserLevelData'
-          ? 'User Level' 
-          : operation === 'saveDepartmentData'
-          ? 'Department'
-          : operation === 'saveConditionData'
-          ? 'Condition'
-          : 'Position';
+      if (response.data.status === "success") {
+        const name =
+          operation === "saveCategoryData"
+            ? "Category"
+            : operation === "saveMakeData"
+            ? "Make"
+            : operation === "saveModelData"
+            ? "Model"
+            : operation === "saveEquipmentCategory"
+            ? "Equipment"
+            : operation === "saveUserLevelData"
+            ? "User Level"
+            : operation === "saveDepartmentData"
+            ? "Department"
+            : operation === "saveConditionData"
+            ? "Condition"
+            : "Position";
 
         setMessage(`${name} added successfully!`);
         setIsSuccess(true);
@@ -119,7 +133,7 @@ const Master = () => {
         clearInputs(); // Only clear inputs, don't close modal
 
         setTimeout(() => {
-          setPopupMessage('');
+          setPopupMessage("");
         }, 3000);
       } else {
         setMessage(`Error: ${response.data.message}`);
@@ -178,19 +192,19 @@ const Master = () => {
   };
 
   const clearInputs = () => {
-    setCategoryName('');
-    setMakeName('');
-    setModelName('');
-    setEquipmentName('');
-    setUserLevelName('');
-    setUserLevelDesc('');
-    setDepartmentName('');
-    setConditionName('');
-    setHolidayName('');
-    setHolidayDate('');
-    setSelectedCategory('');
-    setSelectedMake('');
-    setMessage('');
+    setCategoryName("");
+    setMakeName("");
+    setModelName("");
+    setEquipmentName("");
+    setUserLevelName("");
+    setUserLevelDesc("");
+    setDepartmentName("");
+    setConditionName("");
+    setHolidayName("");
+    setHolidayDate("");
+    setSelectedCategory("");
+    setSelectedMake("");
+    setMessage("");
   };
 
   const resetForm = () => {
@@ -207,47 +221,58 @@ const Master = () => {
 
   const handleSaveCategoryData = (e) => {
     e.preventDefault();
-    handleSaveData('saveCategoryData', { vehicle_category_name: categoryName });
+    handleSaveData("saveCategoryData", { vehicle_category_name: categoryName });
   };
 
   const handleSaveMakeData = (e) => {
     e.preventDefault();
-    handleSaveData('saveMakeData', { vehicle_make_name: makeName });
+    handleSaveData("saveMakeData", { vehicle_make_name: makeName });
   };
 
   const handleSaveModelData = (e) => {
     e.preventDefault();
     if (!selectedCategory || !selectedMake) {
-      setMessage('Please select both a category and a make.');
+      setMessage("Please select both a category and a make.");
       setIsSuccess(false);
       return;
     }
-    handleSaveData('saveModelData', { name: modelName, category_id: selectedCategory, make_id: selectedMake });
+    handleSaveData("saveModelData", {
+      name: modelName,
+      category_id: selectedCategory,
+      make_id: selectedMake,
+    });
   };
 
   const handleSaveEquipmentData = (e) => {
     e.preventDefault();
-    handleSaveData('saveEquipmentCategory', { equipments_category_name: equipmentName });
+    handleSaveData("saveEquipmentCategory", {
+      equipments_category_name: equipmentName,
+    });
   };
 
   const handleSaveUserLevelData = (e) => {
     e.preventDefault();
-    handleSaveData('saveUserLevelData', { user_level_name: userLevelName, user_level_desc: userLevelDesc });
+    handleSaveData("saveUserLevelData", {
+      user_level_name: userLevelName,
+      user_level_desc: userLevelDesc,
+    });
   };
 
   const handleSaveDepartmentData = async (e) => {
     e.preventDefault();
-    handleSaveData('saveDepartmentData', { departments_name: departmentName });
+    handleSaveData("saveDepartmentData", { departments_name: departmentName });
   };
 
   const handleSaveConditionData = (e) => {
     e.preventDefault();
     if (!conditionName.trim()) {
-      setMessage('Condition name is required.');
+      setMessage("Condition name is required.");
       setIsSuccess(false);
       return;
     }
-    handleSaveData('saveConditionData', { condition_name: conditionName.trim() });
+    handleSaveData("saveConditionData", {
+      condition_name: conditionName.trim(),
+    });
   };
 
   const handleInputChange = (setter) => (e) => {
@@ -256,60 +281,139 @@ const Master = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-green-100 to-white">
+    <div className="flex flex-col md:flex-row h-screen bg-gradient-to-br from-green-100 to-white">
       <Sidebar />
-      <div className="flex-grow p-8 overflow-y-auto mt-20">
-        <motion.h1 
-          initial={{ opacity: 0, y: -50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="text-4xl font-bold mb-8 text-green-800"
-        >
-           Masters
-        </motion.h1>
-        
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {[
-            { title: 'Vehicle Category', icon: <FaCar />, action: () => setIsAddCategoryModalOpen(true), viewPath: '/vehicleCategory' },
-            { title: 'Vehicle Make', icon: <FaTools />, action: () => setIsAddMakeModalOpen(true), viewPath: '/vehiclemake' },
-            { title: 'Vehicle Model', icon: <FaCogs />, action: () => setIsAddModelModalOpen(true), viewPath: '/vehiclemodel' },
-            { title: 'Departments', icon: <FaListAlt />, action: () => setIsAddDepartmentModalOpen(true), viewPath: '/departments' },
-            { title: 'Equipments', icon: <FaListAlt />, action: () => setIsAddEquipmentModalOpen(true), viewPath: '/equipmentCat' },
-            // { title: 'Condition', icon: <FaCogs />, action: () => setIsAddConditionModalOpen(true), viewPath: '/condition' },
-            // { title: 'Holidays', icon: <FaPlus />, action: () => setIsAddHolidayModalOpen(true) },
-          ].map((card, index) => (
-            <motion.div 
-              key={index}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3, delay: index * 0.1 }}
-              whileHover={{ scale: 1.05 }}
-              className="bg-white rounded-lg shadow-lg overflow-hidden"
+      <div className="flex-grow  overflow-y-auto mt-20">
+        <div className="flex-grow p-6 sm:p-8 overflow-y-auto">
+          {/* Masters Header */}
+          <div className="bg-[#fafff4] p-4 border rounded-lg shadow-md mb-6 mt-[5rem] md:mt-0 w-full">
+            <motion.h1
+              initial={{ opacity: 0, y: -50 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="text-2xl font-custom-font font-bold text-green-900"
             >
-              <div className="p-6 bg-gradient-to-r from-green-400 to-green-600">
-                <div className="text-white text-3xl mb-2">{card.icon}</div>
-                <h3 className="text-xl font-semibold text-white">{card.title}</h3>
-              </div>
-              <div className="p-4 flex justify-between">
-                <motion.button 
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={() => { card.action(); setMessage(''); }} 
-                  className="p-2 bg-green-500 text-white rounded-full hover:bg-green-600 transition duration-300"
-                >
-                  <FaPlus />
-                </motion.button>
-                <motion.button 
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={() => navigate(card.viewPath)} 
-                  className="p-2 bg-green-500 text-white rounded-full hover:bg-green-600 transition duration-300"
-                >
-                  <FaEye />
-                </motion.button>
-              </div>
-            </motion.div>
-          ))}
+              Masters
+            </motion.h1>
+          </div>
+          {/* Responsive Grid for Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {[
+              {
+                title: "Vehicle Category",
+                icon: <FaCar />,
+                action: () => setIsAddCategoryModalOpen(true),
+                viewPath: "/vehicleCategory",
+              },
+              {
+                title: "Vehicle Make",
+                icon: <FaTools />,
+                action: () => setIsAddMakeModalOpen(true),
+                viewPath: "/vehiclemake",
+              },
+              {
+                title: "Vehicle Model",
+                icon: <FaCogs />,
+                action: () => setIsAddModelModalOpen(true),
+                viewPath: "/vehiclemodel",
+              },
+              {
+                title: "Departments",
+                icon: <FaListAlt />,
+                action: () => setIsAddDepartmentModalOpen(true),
+                viewPath: "/departments",
+              },
+              {
+                title: "Equipments",
+                icon: <FaListAlt />,
+                action: () => setIsAddEquipmentModalOpen(true),
+                viewPath: "/equipmentCat",
+              },
+              {
+                title: "Condition",
+                icon: <FaCogs />,
+                action: () => setIsAddConditionModalOpen(true),
+                viewPath: "/condition",
+              },
+              {
+                title: "Holidays", 
+                icon: <FaPlus />, 
+                action: () => setIsAddHolidayModalOpen(true),
+                viewPath: "/holidays",
+              },
+            ].map((card, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.3, delay: index * 0.1 }}
+                whileHover={{ scale: 1.02 }}
+                className="bg-[#fafff4] rounded-2xl shadow-md overflow-hidden w-full flex items-center justify-between p-4 md:block md:flex-none md:items-start md:justify-normal md:p-0"
+              >
+                {/* Mobile View (simple list item) */}
+                <div className="md:hidden flex items-center gap-4 w-full">
+                  <div className="text-green-900 text-2xl">{card.icon}</div>
+                  <h3 className="text-lg font-semibold text-green-950 flex-grow">
+                    {card.title}
+                  </h3>
+                  <div className="flex gap-2">
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => {
+                        card.action();
+                        setMessage("");
+                      }}
+                      className="w-10 h-10 flex items-center justify-center bg-lime-900 text-white rounded-full hover:bg-green-600 transition duration-300"
+                    >
+                      <FaPlus className="text-sm" />
+                    </motion.button>
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => navigate(card.viewPath)}
+                      className="w-10 h-10 flex items-center justify-center bg-green-900 text-white rounded-full hover:bg-lime-900 transition duration-300"
+                    >
+                      <FaEye className="text-sm" />
+                    </motion.button>
+                  </div>
+                </div>
+
+                {/* Desktop View (card) */}
+                <div className="hidden md:block ">
+                  <div className="pb-6 border-b border-green-900/20">
+                    <div className="text-green-900 text-3xl mb-2">
+                      {card.icon}
+                    </div>
+                    <h3 className="text-lg font-semibold text-green-950">
+                      {card.title}
+                    </h3>
+                  </div>
+                  <div className="pr-4 pt-4 flex justify-between items-center gap-4">
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => {
+                        card.action();
+                        setMessage("");
+                      }}
+                      className="flex-1 py-2 bg-lime-900 text-white rounded-full hover:bg-green-600 transition duration-300 text-sm"
+                    >
+                      <FaPlus className="mx-auto" />
+                    </motion.button>
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => navigate(card.viewPath)}
+                      className="flex-1 py-2 bg-green-900 text-white rounded-full hover:bg-lime-900 transition duration-300 text-sm"
+                    >
+                      <FaEye className="mx-auto" />
+                    </motion.button>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+        </div>
         </div>
 
         {/* Modal for Adding Category */}
@@ -326,8 +430,19 @@ const Master = () => {
                   className="border border-gray-300 rounded px-4 py-2 w-full mb-4"
                 />
                 <div className="flex justify-end">
-                  <button type="button" onClick={resetForm} className="mr-2 py-2 px-4 bg-gray-500 text-white rounded">Cancel</button>
-                  <button type="submit" className="py-2 px-4 bg-blue-500 text-white rounded">Save</button>
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className="mr-2 py-2 px-4 bg-gray-500 text-white rounded"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="py-2 px-4 bg-blue-500 text-white rounded"
+                  >
+                    Save
+                  </button>
                 </div>
               </form>
             </div>
@@ -348,8 +463,19 @@ const Master = () => {
                   className="border border-gray-300 rounded px-4 py-2 w-full mb-4"
                 />
                 <div className="flex justify-end">
-                  <button type="button" onClick={resetForm} className="mr-2 py-2 px-4 bg-gray-500 text-white rounded">Cancel</button>
-                  <button type="submit" className="py-2 px-4 bg-blue-500 text-white rounded">Save</button>
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className="mr-2 py-2 px-4 bg-gray-500 text-white rounded"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="py-2 px-4 bg-blue-500 text-white rounded"
+                  >
+                    Save
+                  </button>
                 </div>
               </form>
             </div>
@@ -369,7 +495,10 @@ const Master = () => {
                 >
                   <option value="">Select Category</option>
                   {categories.map((category) => (
-                    <option key={category.vehicle_category_id} value={category.vehicle_category_id}>
+                    <option
+                      key={category.vehicle_category_id}
+                      value={category.vehicle_category_id}
+                    >
                       {category.vehicle_category_name}
                     </option>
                   ))}
@@ -381,7 +510,10 @@ const Master = () => {
                 >
                   <option value="">Select Make</option>
                   {makes.map((make) => (
-                    <option key={make.vehicle_make_id} value={make.vehicle_make_id}>
+                    <option
+                      key={make.vehicle_make_id}
+                      value={make.vehicle_make_id}
+                    >
                       {make.vehicle_make_name}
                     </option>
                   ))}
@@ -394,8 +526,19 @@ const Master = () => {
                   className="border border-gray-300 rounded px-4 py-2 w-full mb-4"
                 />
                 <div className="flex justify-end">
-                  <button type="button" onClick={resetForm} className="mr-2 py-2 px-4 bg-gray-500 text-white rounded">Cancel</button>
-                  <button type="submit" className="py-2 px-4 bg-blue-500 text-white rounded">Save</button>
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className="mr-2 py-2 px-4 bg-gray-500 text-white rounded"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="py-2 px-4 bg-blue-500 text-white rounded"
+                  >
+                    Save
+                  </button>
                 </div>
               </form>
             </div>
@@ -416,8 +559,19 @@ const Master = () => {
                   className="border border-gray-300 rounded px-4 py-2 w-full mb-4"
                 />
                 <div className="flex justify-end">
-                  <button type="button" onClick={resetForm} className="mr-2 py-2 px-4 bg-gray-500 text-white rounded">Cancel</button>
-                  <button type="submit" className="py-2 px-4 bg-blue-500 text-white rounded">Save</button>
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className="mr-2 py-2 px-4 bg-gray-500 text-white rounded"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="py-2 px-4 bg-blue-500 text-white rounded"
+                  >
+                    Save
+                  </button>
                 </div>
               </form>
             </div>
@@ -444,8 +598,19 @@ const Master = () => {
                   className="border border-gray-300 rounded px-4 py-2 w-full mb-4"
                 />
                 <div className="flex justify-end">
-                  <button type="button" onClick={resetForm} className="mr-2 py-2 px-4 bg-gray-500 text-white rounded">Cancel</button>
-                  <button type="submit" className="py-2 px-4 bg-blue-500 text-white rounded">Save</button>
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className="mr-2 py-2 px-4 bg-gray-500 text-white rounded"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="py-2 px-4 bg-blue-500 text-white rounded"
+                  >
+                    Save
+                  </button>
                 </div>
               </form>
             </div>
@@ -466,8 +631,19 @@ const Master = () => {
                   className="border border-gray-300 rounded px-4 py-2 w-full mb-4"
                 />
                 <div className="flex justify-end">
-                  <button type="button" onClick={resetForm} className="mr-2 py-2 px-4 bg-gray-500 text-white rounded">Cancel</button>
-                  <button type="submit" className="py-2 px-4 bg-blue-500 text-white rounded">Save</button>
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className="mr-2 py-2 px-4 bg-gray-500 text-white rounded"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="py-2 px-4 bg-blue-500 text-white rounded"
+                  >
+                    Save
+                  </button>
                 </div>
               </form>
             </div>
@@ -488,8 +664,19 @@ const Master = () => {
                   className="border border-gray-300 rounded px-4 py-2 w-full mb-4"
                 />
                 <div className="flex justify-end">
-                  <button type="button" onClick={resetForm} className="mr-2 py-2 px-4 bg-gray-500 text-white rounded">Cancel</button>
-                  <button type="submit" className="py-2 px-4 bg-blue-500 text-white rounded">Save</button>
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className="mr-2 py-2 px-4 bg-gray-500 text-white rounded"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="py-2 px-4 bg-blue-500 text-white rounded"
+                  >
+                    Save
+                  </button>
                 </div>
               </form>
             </div>
@@ -509,24 +696,21 @@ const Master = () => {
                   placeholder="Enter holiday name"
                   className="border border-gray-300 rounded px-4 py-2 w-full mb-4"
                 />
-                <input
-                  type="date"
-                  value={holidayDate}
-                  onChange={(e) => setHolidayDate(e.target.value)}
-                  className="border border-gray-300 rounded px-4 py-2 w-full mb-4"
-                />
+                <input                  type="date"                  value={holidayDate}                  onChange={(e) => setHolidayDate(e.target.value)}                  className="border border-gray-300 rounded px-4 py-2 w-full mb-4"                />
                 <div className="flex justify-end">
-                  <button 
-                    type="button" 
-                    onClick={() => {
-                      clearInputs();
-                      setIsAddHolidayModalOpen(false);
-                    }} 
+                  <button
+                    type="button"
+                    onClick={resetForm}
                     className="mr-2 py-2 px-4 bg-gray-500 text-white rounded"
                   >
                     Cancel
                   </button>
-                  <button type="submit" className="py-2 px-4 bg-blue-500 text-white rounded">Save</button>
+                  <button
+                    type="submit"
+                    className="py-2 px-4 bg-blue-500 text-white rounded"
+                  >
+                    Save
+                  </button>
                 </div>
               </form>
             </div>
@@ -534,7 +718,7 @@ const Master = () => {
         )}
 
         {popupMessage && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 50 }}
@@ -545,7 +729,7 @@ const Master = () => {
         )}
 
         {message && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 50 }}

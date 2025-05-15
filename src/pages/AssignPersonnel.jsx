@@ -3,9 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import Sidebar from './Sidebar';
 import { SecureStorage } from '../utils/encryption';
-import { Table, Button, Tag, Space, Input, Tooltip, Modal, Select, Form } from 'antd';
+import { Table, Button, Tag, Space, Input, Tooltip, Modal, Select, Form, Empty, Pagination } from 'antd';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSearch, faUserPlus, faEye, faCheckCircle } from '@fortawesome/free-solid-svg-icons';
+import { faSearch, faUserPlus, faEye, faCheckCircle, faSyncAlt } from '@fortawesome/free-solid-svg-icons';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
 
@@ -25,6 +25,9 @@ const AssignPersonnel = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortField, setSortField] = useState("createdAt");
+  const [sortOrder, setSortOrder] = useState("desc");
 
   const handleOpenModal = async (reservation) => {
     setLoading(true);
@@ -372,6 +375,15 @@ const AssignPersonnel = () => {
     }
   };
 
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortOrder("asc");
+    }
+  };
+
   useEffect(() => {
     fetchPersonnel();
   }, []);
@@ -398,7 +410,8 @@ const AssignPersonnel = () => {
       dataIndex: 'id',
       key: 'id',
       width: 80,
-      sorter: (a, b) => a.id - b.id,
+      sorter: true,
+      sortOrder: sortField === 'id' ? sortOrder : null,
     },
     {
       title: 'Type',
@@ -406,7 +419,7 @@ const AssignPersonnel = () => {
       key: 'type',
       width: 100,
       render: (text) => (
-        <Tag color={text === 'Venue' ? 'green' : 'blue'} className="px-2 py-1">
+        <Tag color={text === 'Venue' ? 'green' : 'blue'} className="rounded-full px-2 py-1 text-xs font-medium">
           {text}
         </Tag>
       ),
@@ -415,25 +428,30 @@ const AssignPersonnel = () => {
         { text: 'Vehicle', value: 'Vehicle' },
       ],
       onFilter: (value, record) => record.type === value,
+      sorter: true,
+      sortOrder: sortField === 'type' ? sortOrder : null,
     },
     {
       title: 'Reservation Name',
       dataIndex: 'name',
       key: 'name',
-      sorter: (a, b) => a.name.localeCompare(b.name),
-      render: (text) => <span className="font-semibold text-green-800">{text}</span>
+      sorter: true, 
+      sortOrder: sortField === 'name' ? sortOrder : null,
+      render: (text) => <span className="font-medium text-green-800">{text}</span>
     },
     {
       title: 'Assigned Personnel',
       dataIndex: 'personnel',
       key: 'personnel',
+      sorter: true,
+      sortOrder: sortField === 'personnel' ? sortOrder : null,
       render: (text) => {
         if (text === 'N/A') {
           return <span className="text-gray-500 italic">Not Assigned</span>;
         }
         return (
           <div className="flex items-center">
-            <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center mr-2 text-blue-600 font-medium">
+            <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center mr-2 text-green-600 font-medium">
               {text.charAt(0)}
             </div>
             <span>{text}</span>
@@ -446,7 +464,8 @@ const AssignPersonnel = () => {
       dataIndex: 'createdAt',
       key: 'createdAt',
       width: 170,
-      sorter: (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
+      sorter: true,
+      sortOrder: sortField === 'createdAt' ? sortOrder : null,
       render: (text) => dayjs(text).format('MMM D, YYYY HH:mm')
     },
     {
@@ -454,18 +473,20 @@ const AssignPersonnel = () => {
       dataIndex: 'status',
       key: 'status',
       width: 120,
+      sorter: true,
+      sortOrder: sortField === 'status' ? sortOrder : null,
       render: (status, record) => {
         if (status === 'Not Assigned') {
-          return <Tag color="warning">Not Assigned</Tag>;
+          return <Tag color="warning" className="rounded-full px-2 py-1 text-xs font-medium">Not Assigned</Tag>;
         } else if (status === 'Assigned') {
           const allCompleted = record.checklists && record.checklists.every(item => item.status === 'completed');
           return (
-            <Tag color={allCompleted ? "success" : "processing"}>
+            <Tag color={allCompleted ? "success" : "processing"} className="rounded-full px-2 py-1 text-xs font-medium">
               {allCompleted ? 'Ready to Complete' : 'In Progress'}
             </Tag>
           );
         } else {
-          return <Tag color="success">Completed</Tag>;
+          return <Tag color="success" className="rounded-full px-2 py-1 text-xs font-medium">Completed</Tag>;
         }
       }
     },
@@ -483,7 +504,7 @@ const AssignPersonnel = () => {
                 icon={<FontAwesomeIcon icon={faUserPlus} />}
                 onClick={() => handleOpenModal(record)}
                 size="small"
-                className="bg-green-500 hover:bg-green-600 border-green-500"
+                className="bg-green-900 hover:bg-lime-900 border-green-900"
               >
                 Assign
               </Button>
@@ -514,7 +535,7 @@ const AssignPersonnel = () => {
                     icon={<FontAwesomeIcon icon={faCheckCircle} />}
                     onClick={() => handleComplete(record.id, record.personnel_id)}
                     size="small"
-                    className="bg-green-500 hover:bg-green-600 border-green-500"
+                    className="bg-green-900 hover:bg-lime-900 border-green-900"
                   >
                     Complete
                   </Button>
@@ -543,22 +564,38 @@ const AssignPersonnel = () => {
     },
   ];
 
+  const handleRefresh = () => {
+    if (activeTab === 'Not Assigned') {
+      fetchNotAssignedReservations();
+    } else if (activeTab === 'Assigned') {
+      fetchAssignedReservations();
+    } else if (activeTab === 'Completed') {
+      fetchCompletedReservations();
+    }
+  };
+
   return (
-    <div className="flex h-screen bg-gradient-to-br from-green-100 to-white overflow-hidden">
-      <div className="flex-none">
+    <div className="flex h-screen overflow-hidden bg-gradient-to-br from-green-100 to-white">
+      <div className="flex-shrink-0">
         <Sidebar />
       </div>
-      <div className="flex-1 overflow-y-auto bg-gradient-to-br from-white to-green-100 mt-20">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="p-6 lg:p-10"
-        >
-          <h2 className="text-4xl font-bold mb-6 text-green-800 drop-shadow-sm">Assign Personnel</h2>
+      <div className="flex-grow p-6 sm:p-8 overflow-y-auto">
+        <div className="p-[2.5rem] lg:p-12 min-h-screen">
+          <motion.div 
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="mb-8"
+          >
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <h2 className="text-2xl font-custom-font font-bold text-green-900 mt-5">
+                Assign Personnel
+              </h2>
+            </div>
+          </motion.div>
           
           {/* Tabs */}
-          <div className="mb-6 bg-white p-2 rounded-xl shadow-md inline-flex">
+          <div className="mb-6 bg-[#fafff4] p-2 rounded-xl shadow-md inline-flex">
             {['Not Assigned', 'Assigned', 'Completed'].map((tab) => (
               <motion.button
                 key={tab}
@@ -567,7 +604,7 @@ const AssignPersonnel = () => {
                 onClick={() => setActiveTab(tab)}
                 className={`px-6 py-3 rounded-lg transition-all duration-200 ${
                   activeTab === tab
-                    ? 'bg-green-500 text-white shadow-sm'
+                    ? 'bg-green-900 text-white shadow-sm'
                     : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
@@ -586,74 +623,125 @@ const AssignPersonnel = () => {
           </div>
           
           {/* Search & Controls */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6 border border-gray-100">
-            <div className="flex flex-col md:flex-row items-center justify-between mb-4">
-              <motion.div 
-                whileHover={{ scale: 1.05 }}
-                className="relative w-full md:w-64 mb-4 md:mb-0"
-              >
-                <Input
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search reservations..."
-                  prefix={<FontAwesomeIcon icon={faSearch} className="text-gray-400" />}
-                  className="rounded-full border border-green-300"
-                />
-              </motion.div>
-            </div>
-
-            {/* Table */}
-            {loading && reservations.length === 0 ? (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="flex justify-center items-center h-64"
-              >
-                <div className="loader"></div>
-              </motion.div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table 
-                  columns={columns} 
-                  dataSource={filteredReservations}
-                  rowKey="id"
-                  pagination={{
-                    pageSize: pageSize,
-                    showSizeChanger: true,
-                    pageSizeOptions: ['10', '20', '50'],
-                    showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
-                    onChange: (page, pageSize) => {
-                      setPageSize(pageSize);
-                    }
-                  }}
-                  scroll={{ x: 1100 }}
-                  bordered
-                  size="middle"
-                  loading={loading}
-                  className="assignment-table"
-                  style={{ backgroundColor: 'white' }}
-                  locale={{
-                    emptyText: (
-                      <div className="text-center py-8">
-                        <svg className="mx-auto h-12 w-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                        </svg>
-                        <p className="mt-2 text-sm text-gray-500">No reservations found</p>
-                      </div>
-                    )
-                  }}
-                />
+          <div className="bg-[#fafff4] p-4 rounded-lg shadow-sm mb-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="flex flex-col md:flex-row gap-4 flex-1">
+                <div className="flex-1">
+                  <Input
+                    placeholder="Search reservations by name"
+                    allowClear
+                    prefix={<FontAwesomeIcon icon={faSearch} className="text-gray-400" />}
+                    size="large"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full"
+                  />
+                </div>
               </div>
-            )}
+              <div className="flex gap-2">
+                <Tooltip title="Refresh data">
+                  <Button
+                    icon={<FontAwesomeIcon icon={faSyncAlt} />}
+                    onClick={handleRefresh}
+                    size="large"
+                  />
+                </Tooltip>
+              </div>
+            </div>
           </div>
-        </motion.div>
+
+          {/* Table */}
+          <div className="relative overflow-x-auto shadow-md sm:rounded-lg bg-[#fafff4] dark:bg-green-100">
+            <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
+              <thead className="text-xs text-gray-700 uppercase bg-green-400/20 dark:bg-green-900/20 dark:text-green-900">
+                <tr>
+                  {columns.map((column) => (
+                    <th
+                      key={column.key}
+                      scope="col"
+                      className="px-6 py-3"
+                      onClick={() =>
+                        column.sorter && handleSort(column.dataIndex)
+                      }
+                    >
+                      <div className="flex items-center cursor-pointer hover:text-gray-900">
+                        {column.title}
+                        {sortField === column.dataIndex && (
+                          <span className="ml-1">
+                            {sortOrder === "asc" ? "↑" : "↓"}
+                          </span>
+                        )}
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredReservations.length > 0 ? (
+                  filteredReservations
+                    .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                    .map((record) => (
+                      <tr
+                        key={record.id}
+                        className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 border-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600"
+                      >
+                        {columns.map((column) => (
+                          <td
+                            key={`${record.id}-${column.key}`}
+                            className="px-6 py-4"
+                          >
+                            {column.render
+                              ? column.render(record[column.dataIndex], record)
+                              : record[column.dataIndex]}
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                ) : (
+                  <tr>
+                    <td
+                      colSpan={columns.length}
+                      className="px-6 py-24 text-center"
+                    >
+                      <Empty
+                        image={Empty.PRESENTED_IMAGE_SIMPLE}
+                        description={
+                          <span className="text-gray-500 dark:text-gray-400">
+                            No reservations found
+                          </span>
+                        }
+                      />
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+
+            {/* Pagination */}
+            <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+              <Pagination
+                current={currentPage}
+                pageSize={pageSize}
+                total={filteredReservations.length}
+                onChange={(page, size) => {
+                  setCurrentPage(page);
+                  setPageSize(size);
+                }}
+                showSizeChanger={true}
+                showTotal={(total, range) =>
+                  `${range[0]}-${range[1]} of ${total} items`
+                }
+                className="flex justify-end"
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Assignment Modal */}
       <Modal
         title={
-          <div className="text-xl font-bold text-green-700">
+          <div className="text-xl font-bold text-green-900">
             Assign Personnel
             {selectedReservation && (
               <div className="text-sm font-normal text-gray-500 mt-1">
@@ -673,7 +761,7 @@ const AssignPersonnel = () => {
             type="primary" 
             loading={loading} 
             onClick={handleAssign}
-            className="bg-green-500"
+            className="bg-green-900 hover:bg-lime-900"
           >
             Assign Personnel
           </Button>
@@ -711,12 +799,12 @@ const AssignPersonnel = () => {
             <div className="bg-gray-50 p-4 rounded-lg max-h-60 overflow-y-auto border border-gray-200">
               {formData.checklists.map((categoryList, categoryIndex) => (
                 <div key={categoryIndex} className="mb-4">
-                  <h4 className="font-medium text-green-600 sticky top-0 bg-gray-50 py-1 border-b border-gray-200 mb-2">
+                  <h4 className="font-medium text-green-900 sticky top-0 bg-gray-50 py-1 border-b border-gray-200 mb-2">
                     {categoryList.category}
                   </h4>
                   {categoryList.items.map((checklist, index) => (
                     <div key={index} className="flex items-center py-1.5 px-2 hover:bg-gray-100 rounded-md ml-2">
-                      <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                      <div className="w-2 h-2 bg-green-600 rounded-full mr-2"></div>
                       <span className="text-sm text-gray-700">{checklist.name}</span>
                     </div>
                   ))}
@@ -734,7 +822,7 @@ const AssignPersonnel = () => {
 
       {/* Checklist Modal */}
       <Modal
-        title="Checklist Items"
+        title={<div className="text-xl font-bold text-green-900">Checklist Items</div>}
         open={isChecklistModalOpen}
         onCancel={() => setIsChecklistModalOpen(false)}
         footer={[
@@ -759,7 +847,7 @@ const AssignPersonnel = () => {
               </span>
               <Tag 
                 color={checklist.status === 'completed' ? 'success' : 'warning'}
-                className="capitalize"
+                className="capitalize rounded-full px-2 py-0.5 text-xs"
               >
                 {checklist.status}
               </Tag>

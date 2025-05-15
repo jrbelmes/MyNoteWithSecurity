@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { FaUser, FaLock, FaShieldAlt, FaEdit, FaTimes, FaCheck, FaToggleOn, FaToggleOff, FaIdCard, FaBuilding, FaEnvelope, FaPhone, FaChevronDown, FaEye, FaEyeSlash, FaInfoCircle } from 'react-icons/fa';
+import { FaUser, FaLock, FaShieldAlt, FaEdit, FaTimes, FaCheck, FaToggleOn, FaToggleOff, FaIdCard, FaBuilding, FaEnvelope, FaPhone, FaChevronDown, FaEye, FaEyeSlash, FaInfoCircle, FaClock } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SecureStorage } from '../../utils/encryption';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const ProfileAdminModal = ({ isOpen, onClose }) => {
   // User data states
@@ -21,11 +23,18 @@ const ProfileAdminModal = ({ isOpen, onClose }) => {
   // Add a state for departments
   const [departments, setDepartments] = useState([]);
 
+  // Add a state for loading 2FA status
+  const [is2FALoading, setIs2FALoading] = useState(false);
+
+  // Add state for disabling 2FA
+  const [isDisabling2FA, setIsDisabling2FA] = useState(false);
+
   // Fetch user data from API
   useEffect(() => {
     if (isOpen) {
       fetchUserData();
       fetchDepartments();
+      fetch2FAStatus();
       
       // Check if user is admin
       const userLevelId = SecureStorage.getSessionItem('user_level_id');
@@ -105,10 +114,50 @@ const ProfileAdminModal = ({ isOpen, onClose }) => {
     }
   };
 
+  // Function to fetch 2FA status
+  const fetch2FAStatus = async () => {
+    try {
+      setIs2FALoading(true);
+      const userId = SecureStorage.getSessionItem('user_id') || '42';
+      
+      const response = await fetch('http://localhost/coc/gsd/update_master2.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          operation: "fetch2FA",
+          json: {
+            user_id: userId
+          }
+        })
+      });
+      
+      const responseData = await response.json();
+      console.log('2FA Status Response:', responseData);
+      
+      if (responseData && responseData.status === 'success') {
+        setTwoFactorData(responseData);
+        setTwoFactorEnabled(responseData.is_active);
+      } else {
+        console.error('Failed to fetch 2FA status', responseData);
+      }
+    } catch (error) {
+      console.error("Error fetching 2FA status:", error);
+    } finally {
+      setIs2FALoading(false);
+    }
+  };
+
   const [isEditing, setIsEditing] = useState(false);
   const [editedData, setEditedData] = useState({...userData});
   const [activeTab, setActiveTab] = useState('profile');
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [twoFactorData, setTwoFactorData] = useState({
+    is_active: false,
+    expires_at: '',
+    requires_verification: false
+  });
   const [showTwoFactorSetup, setShowTwoFactorSetup] = useState(false);
   const [twoFactorDuration, setTwoFactorDuration] = useState(1); // Default to 1 day
   const [passwordData, setPasswordData] = useState({
@@ -130,6 +179,13 @@ const ProfileAdminModal = ({ isOpen, onClose }) => {
     hasNumber: false,
     hasSpecial: false
   });
+  const [isVerifyingEmail, setIsVerifyingEmail] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [verificationError, setVerificationError] = useState('');
+
+  // State for loading indicators
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isSendingVerification, setIsSendingVerification] = useState(false);
 
   // Handle modal close with ESC key
   useEffect(() => {
@@ -323,20 +379,195 @@ const ProfileAdminModal = ({ isOpen, onClose }) => {
     }
   };
 
-  const handleToggle2FA = () => {
-    // This function now only handles disabling 2FA
+  const handleToggle2FA = async () => {
     if (twoFactorEnabled) {
-      setTwoFactorEnabled(false);
+      // Handle disabling 2FA
+      try {
+        setIsDisabling2FA(true);
+        const userId = SecureStorage.getSessionItem('user_id') || '42';
+        
+        const response = await fetch('http://localhost/coc/gsd/update_master2.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            operation: "disable2FA",
+            json: {
+              user_id: userId
+            }
+          })
+        });
+        
+        const responseData = await response.json();
+        if (responseData && responseData.status === 'success') {
+          setTwoFactorEnabled(false);
+          setTwoFactorData({
+            is_active: false,
+            expires_at: '',
+            requires_verification: false
+          });
+          toast.success('Two-factor authentication disabled successfully!', {
+            position: "bottom-right",
+            autoClose: 5000,
+            hideProgressBar: false,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: true,
+          });
+        } else {
+          toast.error('Failed to disable two-factor authentication.', {
+            position: "bottom-right",
+            autoClose: 5000,
+            hideProgressBar: false,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: true,
+          });
+        }
+      } catch (error) {
+        console.error("Error disabling 2FA:", error);
+        toast.error('An error occurred while disabling two-factor authentication.', {
+          position: "bottom-right",
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+      } finally {
+        setIsDisabling2FA(false);
+      }
+    }
+  };
+
+  const handleVerifyCode = async () => {
+    if (verificationCode.trim() === '') {
+      setVerificationError('Please enter the verification code');
+      return;
+    }
+    
+    try {
+      setIsVerifying(true);
+      const userId = SecureStorage.getSessionItem('user_id') || userData.users_id;
+      
+      const response = await fetch('http://localhost/coc/gsd/update_master2.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          operation: "validateEmailVerification",
+          json: {
+            user_id: userId,
+            token: verificationCode,
+            duration: twoFactorDuration.toString()
+          }
+        })
+      });
+      
+      const data = await response.json();
+      if (data.status === 'success') {
+        toast.success('Two-factor authentication enabled successfully!', {
+          position: "bottom-right",
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+        setTwoFactorEnabled(true);
+        setShowTwoFactorSetup(false);
+        setIsVerifyingEmail(false);
+        // Save the duration setting to SecureStorage
+        SecureStorage.setSessionItem('2faDuration', twoFactorDuration.toString());
+      } else {
+        setVerificationError(data.message || 'Invalid verification code. Please try again.');
+        toast.error('Invalid verification code. Please try again.', {
+          position: "bottom-right",
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+      }
+    } catch (error) {
+      console.error("Error validating verification code:", error);
+      setVerificationError('An error occurred while validating the verification code.');
+      toast.error('An error occurred while validating the verification code.', {
+        position: "bottom-right",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const sendEmailVerification = async () => {
+    setIsVerifyingEmail(true);
+    setVerificationError('');
+    try {
+      setIsSendingVerification(true);
+      const userId = SecureStorage.getSessionItem('user_id') || userData.users_id;
+
+      console.log("userId", userId);
+      const response = await fetch('http://localhost/coc/gsd/update_master2.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          operation: "sendEmailVerification",
+          json: {
+            user_id: userId
+          }
+        })
+      });
+      
+      const data = await response.json();
+      if (data.status !== 'success') {
+        setVerificationError(data.message || 'Failed to send verification email. Please try again.');
+        toast.error('Failed to send verification email. Please try again.', {
+          position: "bottom-right",
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+      } else {
+        toast.info('Verification email sent! Please check your inbox.', {
+          position: "bottom-right",
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+      }
+    } catch (error) {
+      console.error("Error sending verification email:", error);
+      setVerificationError('An error occurred while sending verification email. Please try again.');
+      toast.error('An error occurred while sending verification email.', {
+        position: "bottom-right",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+    } finally {
+      setIsSendingVerification(false);
     }
   };
 
   const handle2FAVerification = () => {
-    // Here you would verify the code with the server
-    // For demo purposes:
-    setTwoFactorEnabled(true);
-    setShowTwoFactorSetup(false);
-    // Save the duration setting to SecureStorage
-    SecureStorage.setSessionItem('2faDuration', twoFactorDuration.toString());
+    sendEmailVerification();
   };
 
   // Render a restricted field with appropriate styling
@@ -393,6 +624,7 @@ const ProfileAdminModal = ({ isOpen, onClose }) => {
   return (
     <AnimatePresence>
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <ToastContainer />
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -632,6 +864,9 @@ const ProfileAdminModal = ({ isOpen, onClose }) => {
                         <FaShieldAlt className="text-green-600 dark:text-green-400" size={18} />
                       </div>
                       <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Two-Factor Authentication</h3>
+                      {is2FALoading && (
+                        <div className="ml-2 animate-spin h-4 w-4 border-2 border-green-500 border-t-transparent rounded-full"></div>
+                      )}
                     </div>
                     <button 
                       onClick={() => setShowTwoFactorSetup(!showTwoFactorSetup)}
@@ -652,18 +887,39 @@ const ProfileAdminModal = ({ isOpen, onClose }) => {
                   </p>
                   
                   {twoFactorEnabled && (
-                    <div className="flex items-center justify-between mt-3 mb-2">
-                      <div className="flex items-center space-x-2 bg-green-100 dark:bg-green-800/30 text-green-600 dark:text-green-400 px-3 py-1.5 rounded-full text-sm font-medium">
-                        <FaToggleOn size={20} />
-                        <span>Enabled</span>
+                    <div className="space-y-3 mb-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2 bg-green-100 dark:bg-green-800/30 text-green-600 dark:text-green-400 px-3 py-1.5 rounded-full text-sm font-medium">
+                          <FaToggleOn size={20} />
+                          <span>Enabled</span>
+                        </div>
+                        <button 
+                          onClick={handleToggle2FA}
+                          disabled={isDisabling2FA}
+                          className={`text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium flex items-center space-x-1 bg-red-50 dark:bg-red-900/20 px-3 py-1.5 rounded-full hover:bg-red-100 dark:hover:bg-red-800/30 transition-colors ${isDisabling2FA ? 'opacity-70 cursor-not-allowed' : ''}`}
+                        >
+                          {isDisabling2FA ? (
+                            <>
+                              <div className="animate-spin h-4 w-4 border-2 border-red-500 border-t-transparent rounded-full mr-1"></div>
+                              <span>Disabling...</span>
+                            </>
+                          ) : (
+                            <>
+                              <FaTimes size={14} />
+                              <span>Disable 2FA</span>
+                            </>
+                          )}
+                        </button>
                       </div>
-                      <button 
-                        onClick={handleToggle2FA} 
-                        className="text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium flex items-center space-x-1"
-                      >
-                        <FaTimes size={12} />
-                        <span>Disable</span>
-                      </button>
+                      
+                      {twoFactorData.expires_at && (
+                        <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg">
+                          <FaClock className="text-gray-500 dark:text-gray-400" />
+                          <span>
+                            Expires on: <span className="font-medium">{new Date(twoFactorData.expires_at).toLocaleString()}</span>
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )}
                   
@@ -707,20 +963,101 @@ const ProfileAdminModal = ({ isOpen, onClose }) => {
                                 twoFactorDuration === days
                                   ? 'bg-green-100 border-green-500 text-green-700 dark:bg-green-800/30 dark:border-green-600 dark:text-green-400'
                                   : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700'
-                              } transition-colors`}
+                              } transition-colors flex flex-col items-center justify-center`}
                             >
-                              {days} {days === 1 ? 'Day' : 'Days'}
+                              <span className="font-bold">{days}</span>
+                              <span className="text-xs">{days === 1 ? 'Day' : 'Days'}</span>
                             </button>
                           ))}
                         </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                          Your 2FA session will expire after <span className="font-medium text-green-600 dark:text-green-400">{twoFactorDuration} {twoFactorDuration === 1 ? 'day' : 'days'}</span>, requiring re-verification for enhanced security.
+                        </p>
                       </div>
                       
-                      <button
-                        onClick={handle2FAVerification}
-                        className="w-full px-6 py-3 bg-green-600 text-white rounded-lg font-medium transition-all hover:bg-green-700"
-                      >
-                        Enable Two-Factor Authentication
-                      </button>
+                      {isVerifyingEmail ? (
+                        <div className="mb-5 border border-blue-200 dark:border-blue-800 p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20">
+                          <h5 className="font-medium text-blue-800 dark:text-blue-400 mb-3 flex items-center space-x-2">
+                            <FaShieldAlt className="text-blue-600 dark:text-blue-400" />
+                            <span>Email Verification</span>
+                          </h5>
+                          <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
+                            A verification code has been sent to your email. Please enter it below to continue.
+                          </p>
+                          <div className="mb-3">
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="text"
+                                value={verificationCode}
+                                onChange={(e) => setVerificationCode(e.target.value)}
+                                placeholder="Enter verification code"
+                                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                              />
+                            </div>
+                            <div className="flex items-center mt-2 text-xs text-blue-600 dark:text-blue-400">
+                              <FaInfoCircle className="mr-1" />
+                              <span>This code will enable 2FA for {twoFactorDuration} {twoFactorDuration === 1 ? 'day' : 'days'}.</span>
+                            </div>
+                            {verificationError && (
+                              <p className="text-red-500 text-sm mt-2 bg-red-50 dark:bg-red-900/20 p-2 rounded border border-red-100 dark:border-red-800/50 flex items-center">
+                                <FaTimes className="mr-2 text-red-500" />
+                                {verificationError}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex space-x-3">
+                            <button
+                              onClick={handleVerifyCode}
+                              disabled={isVerifying || !verificationCode}
+                              className={`flex-1 px-4 py-2 ${isVerifying || !verificationCode ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'} text-white rounded-lg font-medium transition-all flex items-center justify-center`}
+                            >
+                              {isVerifying ? (
+                                <>
+                                  <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                  Verifying...
+                                </>
+                              ) : (
+                                <>
+                                  <FaCheck className="mr-2" /> Verify Code
+                                </>
+                              )}
+                            </button>
+                            <button
+                              onClick={sendEmailVerification}
+                              disabled={isSendingVerification}
+                              className={`px-4 py-2 ${isSendingVerification ? 'bg-gray-300 dark:bg-gray-600' : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600'} text-gray-700 dark:text-gray-300 rounded-lg font-medium transition-all flex items-center`}
+                            >
+                              {isSendingVerification ? (
+                                <>
+                                  <div className="w-4 h-4 mr-2 border-2 border-gray-600 dark:border-gray-300 border-t-transparent rounded-full animate-spin"></div>
+                                  Sending...
+                                </>
+                              ) : (
+                                <>
+                                  <FaEnvelope className="mr-2" /> Resend Code
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={handle2FAVerification}
+                          disabled={isSendingVerification}
+                          className={`w-full px-6 py-3 mb-4 ${isSendingVerification ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'} text-white rounded-lg font-medium transition-all flex items-center justify-center`}
+                        >
+                          {isSendingVerification ? (
+                            <>
+                              <div className="w-5 h-5 mr-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                              Sending Verification...
+                            </>
+                          ) : (
+                            <>
+                              <FaShieldAlt className="mr-2" /> Enable Two-Factor Authentication
+                            </>
+                          )}
+                        </button>
+                      )}
                       
                       <div className="mt-4 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg">
                         <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">Important:</p>

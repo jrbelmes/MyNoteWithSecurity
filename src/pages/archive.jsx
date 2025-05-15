@@ -70,7 +70,7 @@ const Archive = () => {
         }));
         setUsers(allUsers);
       } else {
-        toast.error("Error fetching users: " + response.data.message);
+        
       }
     } catch (error) {
       console.error('Error fetching users:', error);

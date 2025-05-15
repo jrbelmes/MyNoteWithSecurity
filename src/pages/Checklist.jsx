@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Tabs, Table, Button, Card, Space, Typography, Modal, Select, Input, List, message, Tag, Tooltip } from 'antd';
-import { PlusOutlined, EditOutlined, EyeOutlined } from '@ant-design/icons';
+import { Tabs, Table, Button, Card, Space, Typography, Modal, Select, Input, List, message, Tag, Tooltip, Pagination } from 'antd';
+import { PlusOutlined, EditOutlined, EyeOutlined, SearchOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faSearch, faEye } from '@fortawesome/free-solid-svg-icons';
 import { motion } from 'framer-motion';
@@ -28,6 +28,9 @@ function Checklist() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortField, setSortField] = useState("checklistCount");
+  const [sortOrder, setSortOrder] = useState("desc");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -124,6 +127,7 @@ function Checklist() {
       message.error('Failed to fetch checklist items');
     }
   };
+  
   const handleEditChecklist = async (item) => {
     try {
       const response = await fetch('http://localhost/coc/gsd/fetch2.php', {
@@ -174,24 +178,31 @@ function Checklist() {
     setNewItem('');
   };
 
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortOrder("asc");
+    }
+  };
+
   const columns = [
     {
       title: 'Name of Resource',
       dataIndex: 'name',
       key: 'name',
-      sorter: (a, b) => a.name.localeCompare(b.name),
-      render: (text) => <span className="font-semibold text-green-800">{text}</span>
+      sorter: true,
+      sortOrder: sortField === 'name' ? sortOrder : null,
+      render: (text) => <span className="font-medium">{text}</span>
     },
     {
       title: 'No. Checklist',
       dataIndex: 'checklistCount',
       key: 'checklistCount',
-      sorter: (a, b) => a.checklistCount - b.checklistCount,
-      render: (count) => (
-        <Tag color={count > 0 ? 'green' : 'volcano'} className="px-2 py-1">
-          {count}
-        </Tag>
-      )
+      sorter: true,
+      sortOrder: sortField === 'checklistCount' ? sortOrder : null,
+            render: (count) => <span className="font-medium">{count}</span>
     },
     {
       title: 'Action',
@@ -209,7 +220,7 @@ function Checklist() {
                 record.id
               )}
               size="small"
-              className="bg-green-500 hover:bg-green-600 border-green-500"
+              className="bg-green-900 hover:bg-lime-900"
             />
           </Tooltip>
         </Space>
@@ -323,6 +334,60 @@ function Checklist() {
     }
   };
 
+  const handleRefresh = () => {
+    const fetchChecklists = async () => {
+      setLoading(true);
+      try {
+        const response = await fetch('http://localhost/coc/gsd/fetch2.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({ operation: 'fetchChecklist' })
+        });
+        const result = await response.json();
+        if (result.status === 'success') {
+          // Transform data for venues
+          const venueList = Object.values(result.data.venues || {}).map(item => ({
+            key: `v${item.id}`,
+            id: item.id,
+            name: item.name,
+            checklistCount: item.count
+          }));
+          setVenueData(venueList);
+
+          // Transform data for equipment
+          const equipmentList = Object.values(result.data.equipment || {}).map(item => ({
+            key: `e${item.id}`,
+            id: item.id,
+            name: item.name,
+            checklistCount: item.count
+          }));
+          setEquipmentData(equipmentList);
+
+          // Transform data for vehicles
+          const vehicleList = Object.values(result.data.vehicles || {}).map(item => ({
+            key: `vh${item.id}`,
+            id: item.id,
+            name: item.name,
+            checklistCount: item.count
+          }));
+          setVehicleData(vehicleList);
+          
+          message.success('Data refreshed successfully');
+        }
+      } catch (error) {
+        console.error('Error fetching checklists:', error);
+        message.error('Failed to refresh data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchChecklists();
+  };
+
   const filteredVenueData = venueData.filter(venue => 
     venue.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -335,85 +400,214 @@ function Checklist() {
     vehicle.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const renderTabContent = (data) => (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="bg-white rounded-lg shadow-md p-6 mb-6 border border-gray-100"
-    >
-      <div className="flex flex-col md:flex-row items-center justify-between mb-6">
-        <motion.div 
-          whileHover={{ scale: 1.05 }}
-          className="relative w-full md:w-64 mb-4 md:mb-0"
-        >
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search resources..."
-            className="w-full pl-10 pr-4 py-2 rounded-full border border-green-300 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-300"
-          />
-          <FontAwesomeIcon icon={faSearch} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-400" />
-        </motion.div>
-        <motion.button 
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => setIsModalVisible(true)}
-          className="w-full md:w-auto bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out flex items-center justify-center shadow-md"
-        >
-          <FontAwesomeIcon icon={faPlus} className="mr-2" /> Add Checklist
-        </motion.button>
+  const EnhancedFilters = () => (
+    <div className="bg-[#fafff4] p-4 rounded-lg shadow-sm mb-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex flex-col md:flex-row gap-4 flex-1">
+          <div className="flex-1">
+            <Input
+              placeholder="Search resources..."
+              allowClear
+              prefix={<SearchOutlined />}
+              size="large"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full"
+            />
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Tooltip title="Refresh data">
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={handleRefresh}
+              size="large"
+            />
+          </Tooltip>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            size="large"
+            onClick={() => setIsModalVisible(true)}
+            className="bg-lime-900 hover:bg-green-600"
+          >
+            Add Checklist
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderTabContent = (data) => {
+    let sortedData = [...data];
+    if (sortField) {
+      sortedData.sort((a, b) => {
+        let compareA = a[sortField];
+        let compareB = b[sortField];
+        
+        if (typeof compareA === 'string') {
+          compareA = compareA.toLowerCase();
+          compareB = compareB.toLowerCase();
+          return sortOrder === 'asc' ? compareA.localeCompare(compareB) : compareB.localeCompare(compareA);
+        } else {
+          return sortOrder === 'asc' ? compareA - compareB : compareB - compareA;
+        }
+      });
+    }
+    
+    const paginatedData = sortedData.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+    
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+      >
+        <EnhancedFilters />
+        
+        <div className="relative overflow-x-auto shadow-md sm:rounded-lg bg-[#fafff4] dark:bg-green-100">
+          <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
+            <thead className="text-xs text-gray-700 uppercase bg-green-400/20 dark:bg-green-900/20 dark:text-green-900">
+              <tr>
+                {columns.map((column) => (
+                  <th
+                    key={column.key}
+                    scope="col"
+                    className="px-6 py-3"
+                    onClick={() => column.sorter && handleSort(column.dataIndex)}
+                  >
+                    <div className="flex items-center cursor-pointer hover:text-gray-900">
+                      {column.title}
+                      {sortField === column.dataIndex && (
+                        <span className="ml-1">
+                          {sortOrder === "asc" ? "↑" : "↓"}
+                        </span>
+                      )}
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedData.length > 0 ? (
+                paginatedData.map((record) => (
+                  <tr
+                    key={record.key}
+                    className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 border-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600"
+                  >
+                    {columns.map((column) => (
+                      <td
+                        key={`${record.key}-${column.key}`}
+                        className="px-6 py-4"
+                      >
+                        {column.render
+                          ? column.render(record[column.dataIndex], record)
+                          : record[column.dataIndex]}
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={columns.length} className="px-6 py-24 text-center">
+                    <div className="text-center py-6">
+                      <PlusOutlined className="text-5xl text-gray-300 mb-4" />
+                      <p className="text-xl text-gray-500">No checklists found</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+          
+          <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex justify-end">
+              <Pagination
+                current={currentPage}
+                pageSize={pageSize}
+                total={data.length}
+                onChange={(page, size) => {
+                  setCurrentPage(page);
+                  setPageSize(size);
+                }}
+                showSizeChanger={true}
+                showTotal={(total, range) =>
+                  `${range[0]}-${range[1]} of ${total} items`
+                }
+              />
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    );
+  };
+
+  const items = [
+    {
+      key: '1',
+      label: <span className="text-lg font-medium">Venue</span>,
+      children: renderTabContent(filteredVenueData),
+    },
+    {
+      key: '2',
+      label: <span className="text-lg font-medium">Equipment</span>,
+      children: renderTabContent(filteredEquipmentData),
+    },
+    {
+      key: '3',
+      label: <span className="text-lg font-medium">Vehicle</span>,
+      children: renderTabContent(filteredVehicleData),
+    },
+  ];
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-gradient-to-br from-green-100 to-white">
+      {/* Fixed Sidebar */}        
+      <div className="flex-shrink-0">     
+        <Sidebar />
       </div>
 
-      {loading ? (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="flex justify-center items-center h-64"
-        >
-          <div className="loader"></div>
-        </motion.div>
-      ) : (
-        <div className="overflow-x-auto">
-          <Table 
-            columns={columns} 
-            dataSource={data}
-            rowKey="key"
-            pagination={{
-              pageSize: pageSize,
-              showSizeChanger: true,
-              pageSizeOptions: ['10', '20', '50'],
-              showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
-              onChange: (page, pageSize) => {
-                setPageSize(pageSize);
-              }
-            }}
-            bordered
-            size="middle"
-            className="checklist-table"
-            style={{ backgroundColor: 'white' }}
-            locale={{
-              emptyText: (
-                <div className="text-center py-8">
-                  <PlusOutlined className="text-5xl text-gray-300 mb-4" />
-                  <p className="text-xl text-gray-500">No checklists found</p>
-                </div>
-              )
-            }}
+      {/* Scrollable Content Area */}
+      <div className="flex-grow p-6 sm:p-8 overflow-y-auto">
+        <div className="p-[2.5rem] lg:p-12 min-h-screen">
+          <motion.div 
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="mb-8"
+          >
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <h2 className="text-2xl font-custom-font font-bold text-green-900 mt-5">
+                Checklist Management
+              </h2>
+            </div>
+          </motion.div>
+
+          <Tabs
+            activeKey={currentTab}
+            onChange={setCurrentTab}
+            items={items}
+            type="card"
+            className="checklist-tabs"
+            size="large"
+            tabBarStyle={{ marginBottom: '1rem', fontWeight: 'bold' }}
           />
         </div>
-      )}
+      </div>
 
+      {/* Add Checklist Modal */}
       <Modal
-        title="Add Checklist"
+        title={
+          <div className="text-green-700 font-bold">
+            Add Checklist
+          </div>
+        }
         open={isModalVisible}
         onCancel={() => setIsModalVisible(false)}
         onOk={handleSaveChecklist}
         okButtonProps={{
           disabled: !resourceType || !selectedResource || checklistItems.length === 0,
-          className: 'bg-green-500'
+          className: 'bg-green-900 hover:bg-lime-900'
         }}
         okText="Save Checklist"
       >
@@ -448,20 +642,20 @@ function Checklist() {
               onPressEnter={handleAddItem}
               className="rounded-l-md"
             />
-            <Button type="primary" onClick={handleAddItem} className="bg-green-500 hover:bg-green-600">Add</Button>
+            <Button type="primary" onClick={handleAddItem} className="bg-green-900 hover:bg-lime-900">Add</Button>
           </Space.Compact>
           
           <List
             bordered
-            className="rounded-md max-h-60 overflow-y-auto"
+            className="rounded-md max-h-60 overflow-y-auto bg-[#fafff4]"
             dataSource={checklistItems}
             renderItem={(item, index) => (
-              <List.Item className="flex justify-between items-center">
+              <List.Item className="flex justify-between items-center border-b border-green-100">
                 <div className="flex items-center">
-                  <span className="bg-green-100 text-green-600 rounded-full w-6 h-6 inline-flex items-center justify-center mr-3 text-xs font-bold">
+                  <span className="bg-green-500 text-white rounded-full w-6 h-6 inline-flex items-center justify-center mr-3 text-xs font-bold">
                     {index + 1}
                   </span>
-                  <span>{item}</span>
+                  <span className="text-green-800">{item}</span>
                 </div>
                 <Button 
                   type="text" 
@@ -478,28 +672,30 @@ function Checklist() {
         </Space>
       </Modal>
 
+      {/* View Checklist Modal */}
       <Modal
         title={
-          <div className="flex items-center text-green-700">
-            <FontAwesomeIcon icon={faEye} className="mr-2" />
+          <div className="flex items-center text-green-700 font-bold">
+            <EyeOutlined className="mr-2" />
             <span>View Checklist</span>
           </div>
         }
         open={isViewModalVisible}
         onCancel={() => setIsViewModalVisible(false)}
         footer={[
-          <Button key="close" onClick={() => setIsViewModalVisible(false)} className="bg-green-500 text-white hover:bg-green-600">
+          <Button key="close" onClick={() => setIsViewModalVisible(false)} className="bg-green-900 hover:bg-lime-900 text-white">
             Close
           </Button>
         ]}
+        width={600}
       >
         <List
           bordered
-          className="mt-4 rounded-md bg-green-50"
+          className="mt-4 rounded-md bg-[#fafff4]"
           dataSource={viewChecklistItems}
           renderItem={(item, index) => (
             <List.Item className="border-b border-green-100 py-3">
-              <div className="flex items-center">
+              <div className="flex items-center w-full">
                 <span className="bg-green-500 text-white rounded-full w-7 h-7 inline-flex items-center justify-center mr-3 text-sm font-bold">
                   {index + 1}
                 </span>
@@ -508,7 +704,7 @@ function Checklist() {
                   type="link" 
                   icon={<EditOutlined />} 
                   onClick={() => startEdit(item)} 
-                  className="text-green-500 hover:text-green-600 ml-auto"
+                  className="text-green-700 hover:text-green-900 ml-auto"
                 />
               </div>
             </List.Item>
@@ -530,7 +726,7 @@ function Checklist() {
               className="rounded-md mb-2"
             />
             <Space>
-              <Button type="primary" onClick={() => handleEditChecklist(currentEditItem)} className="bg-green-500 hover:bg-green-600">
+              <Button type="primary" onClick={() => handleEditChecklist(currentEditItem)} className="bg-green-900 hover:bg-lime-900">
                 Save
               </Button>
               <Button onClick={cancelEdit} className="bg-gray-300 hover:bg-gray-400">
@@ -540,49 +736,6 @@ function Checklist() {
           </div>
         )}
       </Modal>
-    </motion.div>
-  );
-
-  const items = [
-    {
-      key: '1',
-      label: <span className="text-lg font-medium">Venue</span>,
-      children: renderTabContent(filteredVenueData),
-    },
-    {
-      key: '2',
-      label: <span className="text-lg font-medium">Equipment</span>,
-      children: renderTabContent(filteredEquipmentData),
-    },
-    {
-      key: '3',
-      label: <span className="text-lg font-medium">Vehicle</span>,
-      children: renderTabContent(filteredVehicleData),
-    },
-  ];
-
-  return (
-    <div className="flex flex-col lg:flex-row bg-gradient-to-br from-white to-green-100 min-h-screen">
-      <Sidebar />
-      <div className="flex-grow p-8 lg:p-12 mt-20">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="mb-8"
-        >
-          <h2 className="text-4xl font-bold text-gray-800 mb-6">Checklist Management</h2>
-          <Tabs
-            activeKey={currentTab}
-            onChange={setCurrentTab}
-            items={items}
-            type="card"
-            className="checklist-tabs"
-            size="large"
-            tabBarStyle={{ marginBottom: '1rem', fontWeight: 'bold' }}
-          />
-        </motion.div>
-      </div>
     </div>
   );
 }

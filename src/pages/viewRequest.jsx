@@ -7,7 +7,7 @@ import {FaCar, FaBuilding, FaTools} from 'react-icons/fa';
 import { motion } from 'framer-motion';
 import 'react-datepicker/dist/react-datepicker.css';
 import { useNavigate } from 'react-router-dom';
-import { Modal, Tabs,Tag,  Button, Alert, Table, Tooltip, Input, Radio, Space } from 'antd';
+import { Modal, Tabs, Tag, Button, Alert, Table, Tooltip, Input, Radio, Space, Empty, Pagination } from 'antd';
 import { 
     CarOutlined, 
     BuildOutlined, 
@@ -540,7 +540,7 @@ const ReservationRequests = () => {
                 render: (text, record) => (
                     <div className="flex items-center">
                         {getIconForType(record.type)}
-                        <span className="ml-2">{text || record.reservation_destination || 'Untitled'}</span>
+                        <span className="ml-2 font-medium">{text || record.reservation_destination || 'Untitled'}</span>
                     </div>
                 ),
             },
@@ -576,7 +576,9 @@ const ReservationRequests = () => {
                     status === 'Pending' ? 'blue' :
                     status === 'Approved' ? 'green' :
                     status === 'Declined' ? 'red' : 'default'
-                    }>
+                    }
+                    className="rounded-full px-2 py-1 text-xs font-medium flex items-center justify-center"
+                    >
                     {record.active === "0" ? "Final Confirmation" : "Waiting for Approval"}
                     </Tag>
                 ),
@@ -589,6 +591,7 @@ const ReservationRequests = () => {
                         type="primary"
                         onClick={() => fetchReservationDetails(record.reservation_id)}
                         icon={<EyeOutlined />}
+                        className="bg-green-900 hover:bg-lime-900"
                     >
                         View
                     </Button>
@@ -597,32 +600,87 @@ const ReservationRequests = () => {
         ];
 
         return (
-            <Table
-                columns={columns}
-                dataSource={data}
-                rowKey="reservation_id"
-                pagination={{
-                    current: currentPage,
-                    pageSize: pageSize,
-                    total: filteredReservations.length,
-                    onChange: (page, size) => {
-                        setCurrentPage(page);
-                        setPageSize(size);
-                    },
-                    showSizeChanger: true,
-                    showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
-                }}
-                onChange={(pagination, filters, sorter) => {
-                    if (sorter.field) {
-                        handleSort(sorter.field);
-                    }
-                }}
-            />
+            <div className="relative overflow-x-auto shadow-md sm:rounded-lg bg-[#fafff4] dark:bg-green-100">
+                <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
+                    <thead className="text-xs text-gray-700 uppercase bg-green-400/20 dark:bg-green-900/20 dark:text-green-900">
+                        <tr>
+                            {columns.map((column) => (
+                                <th
+                                    key={column.key}
+                                    scope="col"
+                                    className="px-6 py-3"
+                                    onClick={() => column.sorter && handleSort(column.dataIndex)}
+                                >
+                                    <div className="flex items-center cursor-pointer hover:text-gray-900">
+                                        {column.title}
+                                        {sortField === column.dataIndex && (
+                                            <span className="ml-1">
+                                                {sortOrder === "asc" ? "↑" : "↓"}
+                                            </span>
+                                        )}
+                                    </div>
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {data.length > 0 ? (
+                            data.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                                .map((record) => (
+                                    <tr
+                                        key={record.reservation_id}
+                                        className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 border-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600"
+                                    >
+                                        {columns.map((column) => (
+                                            <td
+                                                key={`${record.reservation_id}-${column.key}`}
+                                                className="px-6 py-4"
+                                            >
+                                                {column.render
+                                                    ? column.render(record[column.dataIndex], record)
+                                                    : record[column.dataIndex]}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                ))
+                        ) : (
+                            <tr>
+                                <td colSpan={columns.length} className="px-6 py-24 text-center">
+                                    <Empty
+                                        image={Empty.PRESENTED_IMAGE_SIMPLE}
+                                        description={
+                                            <span className="text-gray-500 dark:text-gray-400">
+                                                No reservations found
+                                            </span>
+                                        }
+                                    />
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+
+                {/* Pagination */}
+                <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+                    <Pagination
+                        current={currentPage}
+                        pageSize={pageSize}
+                        total={data.length}
+                        onChange={(page, size) => {
+                            setCurrentPage(page);
+                            setPageSize(size);
+                        }}
+                        showSizeChanger={true}
+                        showTotal={(total, range) => `${range[0]}-${range[1]} of ${total} items`}
+                        className="flex justify-end"
+                    />
+                </div>
+            </div>
         );
     };
 
     const EnhancedFilters = () => (
-        <div className="bg-white p-4 rounded-lg shadow-sm mb-6">
+        <div className="bg-[#fafff4] p-4 rounded-lg shadow-sm mb-6">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div className="flex flex-col md:flex-row gap-4 flex-1">
                     <div className="flex-1">
@@ -655,7 +713,7 @@ const ReservationRequests = () => {
         {
             key: '1',
             label: (
-                <span>
+                <span className="text-green-800">
                     <ClockCircleOutlined /> Waiting for Approval
                 </span>
             ),
@@ -671,7 +729,7 @@ const ReservationRequests = () => {
         {
             key: '2',
             label: (
-                <span>
+                <span className="text-green-800">
                     <CheckCircleOutlined /> Final Confirmation
                 </span>
             ),
@@ -687,7 +745,7 @@ const ReservationRequests = () => {
         {
             key: '3',
             label: (
-                <span>
+                <span className="text-green-800">
                     <HistoryOutlined /> History
                 </span>
             ),
@@ -707,103 +765,104 @@ const ReservationRequests = () => {
 
     // Replace the existing card rendering code in the return statement
     return (
-        <div className="flex flex-col lg:flex-row bg-gradient-to-br from-white to-green-100 min-h-screen">
+        <div className="flex h-screen overflow-hidden bg-gradient-to-br from-green-100 to-white">
             <Sidebar />
-            <div className="flex-grow p-8 lg:p-12 mt-20">
-                <motion.div
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5 }}
-                    className="mb-8"
-                >
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                        <h2 className="text-4xl font-bold text-gray-800">
-                            Reservation Requests
-                        </h2>
-                    </div>
-                </motion.div>
-
-
-                {/* Enhanced Filters */}
-                <EnhancedFilters />
-
-                <Tabs 
-                    activeKey={activeTab} 
-                    onChange={handleTabChange}
-                    items={items}
-                    className="bg-white p-4 rounded-lg shadow-sm"
-                />
-
-                {/* Detail Modal for Accepting */}
-                <DetailModal 
-                    visible={isDetailModalOpen}
-                    onClose={() => {
-                        setIsDetailModalOpen(false);
-                        setCurrentRequest(null);
-                        setReservationDetails(null);
-                    }}
-                    reservationDetails={reservationDetails}
-                    setReservationDetails={setReservationDetails}
-                    onAccept={handleAccept}
-                    onDecline={() => setIsDeclineModalOpen(true)}
-                    isAccepting={isAccepting}
-                    isDeclining={isDeclining}
-                    setIsDeclineReasonModalOpen={setIsDeclineReasonModalOpen}
-                />
-
-                {/* Decline Reason Modal */}
-                <Modal
-                    title="Select Decline Reason"
-                    visible={isDeclineReasonModalOpen}
-                    onCancel={() => setIsDeclineReasonModalOpen(false)}
-                    maskClosable={false}
-                    zIndex={1002}
-                    footer={[
-                        <Button key="back" onClick={() => setIsDeclineReasonModalOpen(false)}>
-                            Cancel
-                        </Button>,
-                        <Button 
-                            key="submit" 
-                            type="primary" 
-                            danger
-                            loading={isDeclining}
-                            onClick={handleDecline}
-                            disabled={!declineReason || (declineReason === 'other' && !customReason)}
-                        >
-                            Decline
-                        </Button>,
-                    ]}
-                >
-                    <Radio.Group 
-                        onChange={(e) => setDeclineReason(e.target.value)} 
-                        value={declineReason}
+            <div className="flex-grow p-6 sm:p-8 overflow-y-auto">
+                <div className="p-[2.5rem] lg:p-12 min-h-screen">
+                    <motion.div
+                        initial={{ opacity: 0, y: -50 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5 }}
+                        className="mb-8"
                     >
-                        <Space direction="vertical">
-                            {declineReasons.map(reason => (
-                                <Radio key={reason.value} value={reason.value}>
-                                    {reason.label}
-                                </Radio>
-                            ))}
-                        </Space>
-                    </Radio.Group>
-                    {declineReason === 'other' && (
-                        <Input.TextArea 
-                            rows={4} 
-                            value={customReason} 
-                            onChange={(e) => setCustomReason(e.target.value)} 
-                            placeholder="Enter custom reason"
-                            className="mt-4"
-                        />
-                    )}
-                </Modal>
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                            <h2 className="text-2xl font-custom-font font-bold text-green-900 mt-5">
+                                Reservation Requests
+                            </h2>
+                        </div>
+                    </motion.div>
 
-                {/* Priority Conflict Modal */}
-                <PriorityConflictModal
-                    visible={isPriorityConflictModalOpen}
-                    onClose={() => setIsPriorityConflictModalOpen(false)}
-                    conflictingReservations={conflictingReservations}
-                    onConfirm={handleAcceptWithOverride}
-                />
+                    {/* Enhanced Filters */}
+                    <EnhancedFilters />
+
+                    <Tabs 
+                        activeKey={activeTab} 
+                        onChange={handleTabChange}
+                        items={items}
+                        className="bg-[#fafff4] p-4 rounded-lg shadow-sm"
+                    />
+
+                    {/* Detail Modal for Accepting */}
+                    <DetailModal 
+                        visible={isDetailModalOpen}
+                        onClose={() => {
+                            setIsDetailModalOpen(false);
+                            setCurrentRequest(null);
+                            setReservationDetails(null);
+                        }}
+                        reservationDetails={reservationDetails}
+                        setReservationDetails={setReservationDetails}
+                        onAccept={handleAccept}
+                        onDecline={() => setIsDeclineModalOpen(true)}
+                        isAccepting={isAccepting}
+                        isDeclining={isDeclining}
+                        setIsDeclineReasonModalOpen={setIsDeclineReasonModalOpen}
+                    />
+
+                    {/* Decline Reason Modal */}
+                    <Modal
+                        title="Select Decline Reason"
+                        visible={isDeclineReasonModalOpen}
+                        onCancel={() => setIsDeclineReasonModalOpen(false)}
+                        maskClosable={false}
+                        zIndex={1002}
+                        footer={[
+                            <Button key="back" onClick={() => setIsDeclineReasonModalOpen(false)}>
+                                Cancel
+                            </Button>,
+                            <Button 
+                                key="submit" 
+                                type="primary" 
+                                danger
+                                loading={isDeclining}
+                                onClick={handleDecline}
+                                disabled={!declineReason || (declineReason === 'other' && !customReason)}
+                            >
+                                Decline
+                            </Button>,
+                        ]}
+                    >
+                        <Radio.Group 
+                            onChange={(e) => setDeclineReason(e.target.value)} 
+                            value={declineReason}
+                        >
+                            <Space direction="vertical">
+                                {declineReasons.map(reason => (
+                                    <Radio key={reason.value} value={reason.value}>
+                                        {reason.label}
+                                    </Radio>
+                                ))}
+                            </Space>
+                        </Radio.Group>
+                        {declineReason === 'other' && (
+                            <Input.TextArea 
+                                rows={4} 
+                                value={customReason} 
+                                onChange={(e) => setCustomReason(e.target.value)} 
+                                placeholder="Enter custom reason"
+                                className="mt-4"
+                            />
+                        )}
+                    </Modal>
+
+                    {/* Priority Conflict Modal */}
+                    <PriorityConflictModal
+                        visible={isPriorityConflictModalOpen}
+                        onClose={() => setIsPriorityConflictModalOpen(false)}
+                        conflictingReservations={conflictingReservations}
+                        onConfirm={handleAcceptWithOverride}
+                    />
+                </div>
             </div>
         </div>
     );
@@ -1034,6 +1093,7 @@ const DetailModal = ({ visible, onClose, reservationDetails, setReservationDetai
                     size="large" 
                     icon={<CheckCircleOutlined />}
                     disabled={!priorityCheck.hasPriority || isDisabled}
+                    className="bg-green-900 hover:bg-lime-900"
                 >
                     Accept
                 </Button>,
@@ -1132,7 +1192,7 @@ const DetailModal = ({ visible, onClose, reservationDetails, setReservationDetai
         >
             <div className="p-0">
                 {/* Header Section */}
-                <div className="bg-gradient-to-r from-blue-600 to-green-500 p-6 rounded-t-lg">
+                <div className="bg-gradient-to-r from-green-700 to-lime-500 p-6 rounded-t-lg">
                     <div className="flex justify-between items-center">
                         <div>
                             <div className="flex items-center gap-2">
@@ -1354,7 +1414,7 @@ const DetailModal = ({ visible, onClose, reservationDetails, setReservationDetai
                                                     title: 'Driver',
                                                     dataIndex: 'driver',
                                                     key: 'driver',
-                                                    render: (text) => (
+                                                    render: (text, record) => (
                                                         <div className="flex items-center justify-between">
                                                             <div className="flex items-center">
                                                                 <UserOutlined className="mr-2 text-blue-500" />
@@ -1425,7 +1485,7 @@ const PriorityConflictModal = ({ visible, onClose, conflictingReservations, onCo
     return (
         <Modal
             title={
-                <div className="flex items-center gap-2 text-red-500">
+                <div className="flex items-center gap-2 text-green-800">
                     <InfoCircleOutlined />
                     <span>Existing Reservation Details</span>
                 </div>
@@ -1449,7 +1509,7 @@ const PriorityConflictModal = ({ visible, onClose, conflictingReservations, onCo
             ]}
         >
             <Alert
-                message="Resource Conflict Detected"
+                message="Warning"
                 description="The following reservation is currently using these resources for the requested time slot. You can override this reservation based on priority level."
                 type="warning"
                 showIcon
@@ -1458,7 +1518,7 @@ const PriorityConflictModal = ({ visible, onClose, conflictingReservations, onCo
             
             <div className="space-y-4">
                 {conflictingReservations.map((reservation, index) => (
-                    <div key={index} className="border rounded-lg p-4 bg-gray-50">
+                    <div key={index} className="border rounded-lg p-4 bg-[#fafff4]">
                         <div className="grid gap-4">
                             {/* Header with Priority Level */}
                             <div className="flex justify-between items-center border-b border-gray-200 pb-3">
@@ -1532,4 +1592,3 @@ const PriorityConflictModal = ({ visible, onClose, conflictingReservations, onCo
 };
 
 export default ReservationRequests;
-

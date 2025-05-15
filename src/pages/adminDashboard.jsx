@@ -449,7 +449,7 @@ const Dashboard = () => {
             if (response.data && response.data.status === 'success') {
                 setRecentRequests(response.data.data);
             } else {
-                toast.error('Error fetching requests');
+            
             }
         } catch (error) {
             console.error('Error:', error);
@@ -718,7 +718,7 @@ const Dashboard = () => {
 
     return (
         <motion.div 
-            className={`dashboard-container flex min-h-screen bg-gradient-to-br from-white to-green-100 ${fadeIn ? 'fade-in' : ''} ${darkMode ? 'dark' : ''}`}
+            className={`dashboard-container flex min-h-screen bg-gradient-to-br from-green-100 to-white ${fadeIn ? 'fade-in' : ''} ${darkMode ? 'dark' : ''}`}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5 }}
@@ -730,31 +730,31 @@ const Dashboard = () => {
                    
 
                     {/* Main Content with scrollable area */}
-                    <div className="flex-1 p-6 space-y-6 bg-gradient-to-br from-white via-gray-50/50 to-lightcream/20">
+                    <div className="flex-1 p-6 space-y-6 bg-gradient-to-br from-white to-green-100">
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                             <StatCard
                                 title="Venues"
                                 value={totals.venues}
                                 icon={<FaBuilding />}
-                                color="bg-gradient-to-r from-primary to-primary-dark"
+                                color="bg-gradient-to-r from-lime-900 to-green-900"
                             />
                             <StatCard
                                 title="Equipment"
                                 value={totals.equipments}
                                 icon={<FaTools />}
-                                color="bg-gradient-to-r from-primary to-primary-dark"
+                                color="bg-gradient-to-r from-lime-900 to-green-900"
                             />
                             <StatCard
                                 title="Vehicles"
                                 value={totals.vehicles}
                                 icon={<FaCar />}
-                                color="bg-gradient-to-r from-primary to-primary-dark"
+                                color="bg-gradient-to-r from-lime-900 to-green-900"
                             />
                             <StatCard
                                 title="Users"
                                 value={totals.users}
                                 icon={<FaUsers />}
-                                color="bg-gradient-to-r from-primary to-primary-dark"
+                                color="bg-gradient-to-r from-lime-900 to-green-900"
                             />
                         </div>
                         {/* Top Row with Active Reservations only */}
@@ -764,9 +764,9 @@ const Dashboard = () => {
                                 variants={containerVariants}
                                 initial="hidden"
                                 animate="visible"
-                                className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm overflow-hidden border border-gray-100 dark:bg-gray-800/90 dark:border-gray-700"
+                                className="bg-[#fafff4] rounded-xl shadow-sm overflow-hidden border border-gray-100 dark:bg-gray-800/90 dark:border-gray-700"
                             >
-                                <div className="bg-gradient-to-r from-primary/90 to-primary-dark/90 p-4 flex justify-between items-center">
+                                <div className="bg-gradient-to-r from-lime-900 to-green-900 p-4 flex justify-between items-center">
                                     <h2 className="text-white text-lg font-semibold flex items-center">
                                         <FaClock className="mr-2" /> Active Reservations
                                     </h2>
@@ -857,8 +857,8 @@ const Dashboard = () => {
                             className="grid grid-cols-1 lg:grid-cols-3 gap-6"
                         >
                             {/* Venues In Use */}
-                            <motion.div variants={itemVariants} className="bg-white/95 backdrop-blur-sm rounded-xl shadow-sm overflow-hidden border border-gray-100 dark:bg-gray-800/90 dark:border-gray-700">
-                                <div className="bg-gradient-to-r from-primary/90 to-primary-dark/90 p-4 flex justify-between items-center">
+                            <motion.div variants={itemVariants} className="bg-[#fafff4] rounded-xl shadow-sm overflow-hidden border border-gray-100 dark:bg-gray-800/90 dark:border-gray-700">
+                                <div className="bg-gradient-to-r from-lime-900 to-green-900 p-4 flex justify-between items-center">
                                     <h2 className="text-white text-lg font-semibold flex items-center">
                                         <FaBuilding className="mr-2" /> Venues In Use
                                     </h2>
@@ -923,8 +923,8 @@ const Dashboard = () => {
                             </motion.div>
 
                             {/* Vehicles In Use */}
-                            <motion.div variants={itemVariants} className="bg-white/95 backdrop-blur-sm rounded-xl shadow-sm overflow-hidden border border-gray-100 dark:bg-gray-800/90 dark:border-gray-700">
-                                <div className="bg-gradient-to-r from-primary/90 to-primary-dark/90 p-4 flex justify-between items-center">
+                            <motion.div variants={itemVariants} className="bg-[#fafff4] rounded-xl shadow-sm overflow-hidden border border-gray-100 dark:bg-gray-800/90 dark:border-gray-700">
+                                <div className="bg-gradient-to-r from-lime-900 to-green-900 p-4 flex justify-between items-center">
                                     <h2 className="text-white text-lg font-semibold flex items-center">
                                         <FaCar className="mr-2" /> Vehicles In Use
                                     </h2>
@@ -989,8 +989,8 @@ const Dashboard = () => {
                             </motion.div>
 
                             {/* Equipment In Use */}
-                            <motion.div variants={itemVariants} className="bg-white/95 backdrop-blur-sm rounded-xl shadow-sm overflow-hidden border border-gray-100 dark:bg-gray-800/90 dark:border-gray-700">
-                                <div className="bg-gradient-to-r from-primary/90 to-primary-dark/90 p-4 flex justify-between items-center">
+                            <motion.div variants={itemVariants} className="bg-[#fafff4] rounded-xl shadow-sm overflow-hidden border border-gray-100 dark:bg-gray-800/90 dark:border-gray-700">
+                                <div className="bg-gradient-to-r from-lime-900 to-green-900 p-4 flex justify-between items-center">
                                     <h2 className="text-white text-lg font-semibold flex items-center">
                                         <FaTools className="mr-2" /> Equipment In Use
                                     </h2>
@@ -1073,12 +1073,12 @@ const Dashboard = () => {
                         exit={{ opacity: 0 }}
                     >
                         <motion.div
-                            className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full mx-4 overflow-hidden border border-gray-100 dark:border-gray-700"
+                            className="bg-[#fafff4] rounded-lg shadow-xl max-w-4xl w-full mx-4 overflow-hidden border border-gray-100 dark:border-gray-700"
                             initial={{ scale: 0.9, y: 20 }}
                             animate={{ scale: 1, y: 0 }}
                             exit={{ scale: 0.9, y: 20 }}
                         >
-                            <div className="bg-gradient-to-r from-primary/90 to-primary-dark/90 p-4">
+                            <div className="bg-gradient-to-r from-lime-900 to-green-900 p-4">
                                 <h2 className="text-xl font-bold text-white flex items-center">
                                     <FaCalendar className="mr-2" /> Reservation Details
                                 </h2>
@@ -1222,7 +1222,7 @@ const Dashboard = () => {
                             <div className="bg-gray-50 dark:bg-gray-700 p-4 flex justify-end">
                                 <button
                                     onClick={() => setModalOpen(false)}
-                                    className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark transition-colors"
+                                    className="px-4 py-2 bg-lime-900 text-white rounded-md hover:bg-green-900 transition-colors"
                                 >
                                     Close
                                 </button>

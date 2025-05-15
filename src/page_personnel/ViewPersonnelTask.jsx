@@ -52,7 +52,7 @@ const ViewPersonnelTask = () => {
 
   const handleEquipmentDefectQtyChange = (e) => {
     const value = e.target.value;
-    const totalQuantity = selectedTask?.equipment?.quantity || 0;
+    const totalQuantity = selectedTask?.equipments?.[0]?.quantity || 0;
 
     if (value < 0) {
       setEquipmentDefectQty('0');
@@ -90,10 +90,24 @@ const ViewPersonnelTask = () => {
   };
 
   const isAllChecklistsCompleted = (task) => {
-    const venueCompleted = task.venue?.checklists?.every(item => item.isChecked === "1") ?? true;
-    const vehicleCompleted = task.vehicle?.checklists?.every(item => item.isChecked === "1") ?? true;
-    const equipmentCompleted = task.equipment?.checklists?.every(item => item.isChecked === "1") ?? true;
-    return venueCompleted && vehicleCompleted && equipmentCompleted;
+    if (!task) return false;
+    
+    // Check all venues checklists
+    const venuesCompleted = task.venues?.every(venue => 
+      venue.checklists?.every(item => item.isChecked === "1" || item.isChecked === 1) ?? true
+    ) ?? true;
+    
+    // Check all vehicles checklists
+    const vehiclesCompleted = task.vehicles?.every(vehicle => 
+      vehicle.checklists?.every(item => item.isChecked === "1" || item.isChecked === 1) ?? true
+    ) ?? true;
+    
+    // Check all equipments checklists
+    const equipmentsCompleted = task.equipments?.every(equipment => 
+      equipment.checklists?.every(item => item.isChecked === "1" || item.isChecked === 1) ?? true
+    ) ?? true;
+    
+    return venuesCompleted && vehiclesCompleted && equipmentsCompleted;
   };
 
   const fetchConditions = async () => {
@@ -218,7 +232,17 @@ const ViewPersonnelTask = () => {
 
   const handleModalOpen = (task) => {
     console.log('Selected Task:', task);
-    setSelectedTask(task);
+    // Transform data structure to match the code's expectations
+    const transformedTask = {
+      ...task,
+      venue: task.venues?.[0] || null,
+      vehicle: task.vehicles?.[0] || null,
+      equipment: task.equipments?.[0] || null,
+      venues: task.venues || [],
+      vehicles: task.vehicles || [],
+      equipments: task.equipments || []
+    };
+    setSelectedTask(transformedTask);
     setIsModalOpen(true);
   };
 
@@ -302,37 +326,68 @@ const ViewPersonnelTask = () => {
         };
       };
 
-      if (selectedTask.venue && venueCondition) {
+      // Handle all venues
+      if (selectedTask.venues && selectedTask.venues.length > 0 && venueCondition) {
         const venueConditionId = conditions.find(c => c.condition_name === venueCondition)?.id;
-        if (selectedTask.venue.reservation_venue_id && venueConditionId) {
-          conditionsPayload.conditions.venue = createConditionPayload(
-            venueConditionId,
-            otherVenueCondition,
-            selectedTask.venue.reservation_venue_id
-          );
-        }
+        
+        conditionsPayload.conditions.venue = {
+          reservation_ids: [],
+          condition_ids: [],
+          other_reasons: [],
+          qty_bad: []
+        };
+        
+        // Add each venue to the payload
+        selectedTask.venues.forEach(venue => {
+          if (venue.reservation_venue_id && venueConditionId) {
+            conditionsPayload.conditions.venue.reservation_ids.push(venue.reservation_venue_id);
+            conditionsPayload.conditions.venue.condition_ids.push(venueConditionId);
+            conditionsPayload.conditions.venue.other_reasons.push(venueCondition === 'Other' ? otherVenueCondition : null);
+            conditionsPayload.conditions.venue.qty_bad.push('0');
+          }
+        });
       }
 
-      if (selectedTask.vehicle && vehicleCondition) {
+      // Handle all vehicles
+      if (selectedTask.vehicles && selectedTask.vehicles.length > 0 && vehicleCondition) {
         const vehicleConditionId = conditions.find(c => c.condition_name === vehicleCondition)?.id;
-        if (selectedTask.vehicle.reservation_vehicle_id && vehicleConditionId) {
-          conditionsPayload.conditions.vehicle = createConditionPayload(
-            vehicleConditionId,
-            otherVehicleCondition,
-            selectedTask.vehicle.reservation_vehicle_id
-          );
-        }
+        
+        conditionsPayload.conditions.vehicle = {
+          reservation_ids: [],
+          condition_ids: [],
+          other_reasons: [],
+          qty_bad: []
+        };
+        
+        // Add each vehicle to the payload
+        selectedTask.vehicles.forEach(vehicle => {
+          if (vehicle.reservation_vehicle_id && vehicleConditionId) {
+            conditionsPayload.conditions.vehicle.reservation_ids.push(vehicle.reservation_vehicle_id);
+            conditionsPayload.conditions.vehicle.condition_ids.push(vehicleConditionId);
+            conditionsPayload.conditions.vehicle.other_reasons.push(vehicleCondition === 'Other' ? otherVehicleCondition : null);
+            conditionsPayload.conditions.vehicle.qty_bad.push('0');
+          }
+        });
       }
 
-      if (selectedTask.equipment && equipmentCondition) {
-        if (selectedTask.equipment.reservation_equipment_id) {
-          conditionsPayload.conditions.equipment = createConditionPayload(
-            equipmentCondition,
-            otherEquipmentCondition,
-            selectedTask.equipment.reservation_equipment_id,
-            equipmentDefectQty
-          );
-        }
+      // Handle all equipment
+      if (selectedTask.equipments && selectedTask.equipments.length > 0 && equipmentCondition) {
+        conditionsPayload.conditions.equipment = {
+          reservation_ids: [],
+          condition_ids: [],
+          other_reasons: [],
+          qty_bad: []
+        };
+        
+        // Add each equipment to the payload
+        selectedTask.equipments.forEach(equipment => {
+          if (equipment.reservation_equipment_id) {
+            conditionsPayload.conditions.equipment.reservation_ids.push(equipment.reservation_equipment_id);
+            conditionsPayload.conditions.equipment.condition_ids.push(equipmentCondition);
+            conditionsPayload.conditions.equipment.other_reasons.push(equipmentCondition === '6' ? otherEquipmentCondition : null);
+            conditionsPayload.conditions.equipment.qty_bad.push(needsDefectQuantity(equipmentCondition) ? (equipmentDefectQty || '0') : '0');
+          }
+        });
       }
 
       const conditionResponse = await axios.post('http://localhost/coc/gsd/personnel.php', conditionsPayload, {
@@ -463,7 +518,7 @@ const ViewPersonnelTask = () => {
   const totalPages = Math.ceil(tasks.length / tasksPerPage);
 
   const calculateProgress = (task) => {
-    const items = task.venue_tasks?.length > 0 ? task.venue_tasks : task.vehicle_tasks;
+    const items = task.venues?.length > 0 ? task.venues : task.vehicles;
     if (!items || items.length === 0) return 0;
     const completed = items.filter(item => item.release_isActive === '1').length;
     return Math.round((completed / items.length) * 100);
@@ -580,17 +635,22 @@ const ViewPersonnelTask = () => {
   );
 
   const renderSubmitButton = () => {
-    const canSubmit = selectedTask && 
-      isTaskInProgress(selectedTask) && 
-      isAllChecklistsCompleted(selectedTask);
+    const isPassedEndDate = selectedTask && isTaskInProgress(selectedTask);
+    const isChecklistsCompleted = selectedTask && isAllChecklistsCompleted(selectedTask);
+    const hasConditions = hasValidConditions();
+    
+    const canSubmit = isPassedEndDate && isChecklistsCompleted && hasConditions;
 
     const getButtonTooltip = () => {
       if (!selectedTask) return '';
-      if (!isTaskInProgress(selectedTask)) {
+      if (!isPassedEndDate) {
         return 'This task can only be submitted after the reservation time';
       }
-      if (!isAllChecklistsCompleted(selectedTask)) {
+      if (!isChecklistsCompleted) {
         return 'Complete all checklist items before submitting';
+      }
+      if (!hasConditions) {
+        return 'Select conditions for all items';
       }
       return '';
     };
@@ -722,26 +782,26 @@ const ViewPersonnelTask = () => {
               )}
             </div>
 
-            {selectedTask.venue?.checklists?.length > 0 && (
-              <div className="bg-white rounded-xl p-6 border border-gray-200">
+            {selectedTask.venues && selectedTask.venues.map((venue, index) => (
+              <div key={venue.reservation_venue_id} className="bg-white rounded-xl p-6 border border-gray-200">
                 <div className="flex justify-between items-center mb-4">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Venue Inspection</h3>
-                    <p className="text-sm text-gray-500">Location: {selectedTask.venue.name}</p>
+                    <h3 className="text-lg font-semibold text-gray-900">Venue Inspection {selectedTask.venues.length > 1 ? `(${index + 1}/${selectedTask.venues.length})` : ''}</h3>
+                    <p className="text-sm text-gray-500">Location: {venue.name}</p>
                     <div className="mt-2">
                       <span className={`inline-flex items-center px-3 py-1 text-xs font-medium rounded-full ${
-                        selectedTask.venue?.is_released === 1 || selectedTask.venue?.is_released === "1"
+                        venue.is_released === 1 || venue.is_released === "1"
                           ? 'bg-green-100 text-green-800'
                           : 'bg-gray-100 text-gray-800'
                       }`}>
-                        {selectedTask.venue?.is_released === 1 || selectedTask.venue?.is_released === "1" ? 'Released' : 'Not Released'}
+                        {venue.is_released === 1 || venue.is_released === "1" ? 'Released' : 'Not Released'}
                       </span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {canBeReleased(selectedTask) && !selectedTask.venue?.is_released && (
+                    {canBeReleased(selectedTask) && !venue.is_released && (
                       <button
-                        onClick={() => handleRelease('venue', selectedTask.venue.reservation_venue_id)}
+                        onClick={() => handleRelease('venue', venue.reservation_venue_id)}
                         disabled={isSubmitting}
                         className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50"
                       >
@@ -772,7 +832,7 @@ const ViewPersonnelTask = () => {
                   </div>
                 </div>
                 <div className="space-y-3">
-                  {selectedTask.venue.checklists.map((item) => (
+                  {venue.checklists && venue.checklists.map((item) => (
                     <div key={item.checklist_venue_id} 
                          className="bg-gray-50 p-4 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors">
                       <div className="flex items-center justify-between">
@@ -806,28 +866,28 @@ const ViewPersonnelTask = () => {
                   ))}
                 </div>
               </div>
-            )}
+            ))}
 
-            {selectedTask.vehicle?.checklists?.length > 0 && (
-              <div className="bg-white rounded-xl p-6 border border-gray-200">
+            {selectedTask.vehicles && selectedTask.vehicles.map((vehicle, index) => (
+              <div key={vehicle.reservation_vehicle_id} className="bg-white rounded-xl p-6 border border-gray-200">
                 <div className="flex justify-between items-center mb-4">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Vehicle Inspection</h3>
-                    <p className="text-sm text-gray-500">Vehicle: {selectedTask.vehicle.vehicle_license}</p>
+                    <h3 className="text-lg font-semibold text-gray-900">Vehicle Inspection {selectedTask.vehicles.length > 1 ? `(${index + 1}/${selectedTask.vehicles.length})` : ''}</h3>
+                    <p className="text-sm text-gray-500">Vehicle: {vehicle.vehicle_license}</p>
                     <div className="mt-2">
                       <span className={`inline-flex items-center px-3 py-1 text-xs font-medium rounded-full ${
-                        selectedTask.vehicle?.is_released === 1 || selectedTask.vehicle?.is_released === "1"
+                        vehicle.is_released === 1 || vehicle.is_released === "1"
                           ? 'bg-green-100 text-green-800'
                           : 'bg-gray-100 text-gray-800'
                       }`}>
-                        {selectedTask.vehicle?.is_released === 1 || selectedTask.vehicle?.is_released === "1" ? 'Released' : 'Not Released'}
+                        {vehicle.is_released === 1 || vehicle.is_released === "1" ? 'Released' : 'Not Released'}
                       </span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {canBeReleased(selectedTask) && !selectedTask.vehicle?.is_released && (
+                    {canBeReleased(selectedTask) && !vehicle.is_released && (
                       <button
-                        onClick={() => handleRelease('vehicle', selectedTask.vehicle.reservation_vehicle_id)}
+                        onClick={() => handleRelease('vehicle', vehicle.reservation_vehicle_id)}
                         disabled={isSubmitting}
                         className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50"
                       >
@@ -859,7 +919,7 @@ const ViewPersonnelTask = () => {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  {selectedTask.vehicle.checklists.map((item) => (
+                  {vehicle.checklists && vehicle.checklists.map((item) => (
                     <div key={item.checklist_vehicle_id} 
                          className="bg-gray-50 p-3 rounded-lg border border-gray-100">
                       <div className="flex flex-col sm:flex-row sm:items-center gap-2">
@@ -895,32 +955,32 @@ const ViewPersonnelTask = () => {
                   ))}
                 </div>
               </div>
-            )}
+            ))}
 
-            {selectedTask.equipment?.checklists?.length > 0 && (
-              <div className="bg-white rounded-xl p-6 border border-gray-200">
+            {selectedTask.equipments && selectedTask.equipments.map((equipment, index) => (
+              <div key={equipment.reservation_equipment_id} className="bg-white rounded-xl p-6 border border-gray-200">
                 <div className="flex justify-between items-center mb-4">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Equipment Inspection</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">Equipment Inspection {selectedTask.equipments.length > 1 ? `(${index + 1}/${selectedTask.equipments.length})` : ''}</h3>
                     <div className="flex items-center gap-2 text-sm text-gray-500">
-                      <p>Equipment: {selectedTask.equipment.name}</p>
+                      <p>Equipment: {equipment.name}</p>
                       <span className="text-gray-400">•</span>
-                      <p>Quantity: {selectedTask.equipment.quantity || '0'}</p>
+                      <p>Quantity: {equipment.quantity || '0'}</p>
                     </div>
                     <div className="mt-2">
                       <span className={`inline-flex items-center px-3 py-1 text-xs font-medium rounded-full ${
-                        selectedTask.equipment?.is_released === 1 || selectedTask.equipment?.is_released === "1"
+                        equipment.is_released === 1 || equipment.is_released === "1"
                           ? 'bg-green-100 text-green-800'
                           : 'bg-gray-100 text-gray-800'
                       }`}>
-                        {selectedTask.equipment?.is_released === 1 || selectedTask.equipment?.is_released === "1" ? 'Released' : 'Not Released'}
+                        {equipment.is_released === 1 || equipment.is_released === "1" ? 'Released' : 'Not Released'}
                       </span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {canBeReleased(selectedTask) && !selectedTask.equipment?.is_released && (
+                    {canBeReleased(selectedTask) && !equipment.is_released && (
                       <button
-                        onClick={() => handleRelease('equipment', selectedTask.equipment.reservation_equipment_id)}
+                        onClick={() => handleRelease('equipment', equipment.reservation_equipment_id)}
                         disabled={isSubmitting}
                         className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50"
                       >
@@ -954,7 +1014,7 @@ const ViewPersonnelTask = () => {
                   </div>
                 </div>
                 <div className="space-y-3">
-                  {selectedTask.equipment.checklists.map((item) => (
+                  {equipment.checklists && equipment.checklists.map((item) => (
                     <div key={item.checklist_equipment_id} 
                          className="bg-gray-50 p-3 rounded-lg border border-gray-100">
                       <div className="flex flex-col sm:flex-row sm:items-center gap-2">
@@ -990,7 +1050,7 @@ const ViewPersonnelTask = () => {
                   ))}
                 </div>
               </div>
-            )}
+            ))}
 
           </div>
         ) : (
@@ -1008,6 +1068,29 @@ const ViewPersonnelTask = () => {
       </div>
     </div>
   );
+
+  // Add a function to check if condition selections are valid
+  const hasValidConditions = () => {
+    const hasVenues = selectedTask?.venues?.length > 0;
+    const hasVehicles = selectedTask?.vehicles?.length > 0;
+    const hasEquipments = selectedTask?.equipments?.length > 0;
+    
+    const isVenueConditionValid = !hasVenues || venueCondition !== '';
+    const isVehicleConditionValid = !hasVehicles || vehicleCondition !== '';
+    const isEquipmentConditionValid = !hasEquipments || equipmentCondition !== '';
+    
+    // Also check "Other" conditions have text values if selected
+    const isOtherVenueValid = venueCondition !== 'Other' || otherVenueCondition.trim() !== '';
+    const isOtherVehicleValid = vehicleCondition !== 'Other' || otherVehicleCondition.trim() !== '';
+    const isOtherEquipmentValid = equipmentCondition !== '6' || otherEquipmentCondition.trim() !== '';
+    
+    // For equipment, check if quantity is provided when needed
+    const isEquipmentQtyValid = !needsDefectQuantity(equipmentCondition) || 
+      (equipmentDefectQty !== '' && parseInt(equipmentDefectQty) > 0);
+    
+    return isVenueConditionValid && isVehicleConditionValid && isEquipmentConditionValid &&
+      isOtherVenueValid && isOtherVehicleValid && isOtherEquipmentValid && isEquipmentQtyValid;
+  };
 
   return (
     <div className="flex min-h-screen bg-gray-50/50">

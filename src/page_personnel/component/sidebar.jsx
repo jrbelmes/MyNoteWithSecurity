@@ -269,7 +269,7 @@ const Sidebar = () => {
         </AnimatePresence>
 
         {/* Main Content Area */}
-        <div className="flex flex-1 pt-4 lg:pt-4">
+        <div className="flex flex-1 pt-4 lg:pt-4 w-full">
           {/* Desktop Sidebar */}
           <div className={`hidden lg:flex lg:flex-col h-screen fixed top-0 bg-white dark:bg-gray-900 shadow-lg z-50 transition-all duration-300 ${
             isDesktopSidebarOpen ? 'w-64' : 'w-16'
@@ -330,7 +330,7 @@ const Sidebar = () => {
               <MiniSidebarItem 
                 icon={FaComments} 
                 text="Chat" 
-                link="/personnel/chat"
+                link="/Personnel/Chat"
                 active={activeItem === '/personnel/chat'}
                 badge={unreadMessages}
                 isExpanded={isDesktopSidebarOpen}
@@ -392,8 +392,8 @@ const Sidebar = () => {
               <SidebarItem 
                 icon={FaComments} 
                 text="Chat" 
-                link="/personnel/chat" 
-                active={activeItem === '/personnel/chat'} 
+                link="/Personnel/Chat" 
+                active={activeItem === '/Personnel/Chat'} 
                 badge={unreadMessages}
               />
               
@@ -401,10 +401,10 @@ const Sidebar = () => {
           </div>
 
           {/* Main Content */}
-          <main className={`flex-1 bg-gray-50 dark:bg-gray-800 min-h-screen overflow-x-hidden transition-all duration-300 ${
+          <main className={`flex-1 bg-gray-50 dark:bg-gray-800 min-h-screen overflow-x-hidden w-full transition-all duration-300 ${
             !isDesktopSidebarOpen 
-              ? 'lg:ml-16 pl-0' 
-              : 'lg:ml-64 pl-0'
+              ? 'lg:ml-16' 
+              : 'lg:ml-64'
           }`}>
             {/* Content will be rendered here */}
           </main>

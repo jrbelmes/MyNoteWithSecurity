@@ -41,6 +41,9 @@ import AccountSettings from './pages/accountSettings';
 import { SecureStorage } from './utils/encryption';
 import NotificationUser from './page_user/notification';
 import NotificationRequest from './page_dean/notification';
+import ChatUser from './page_user/chat';
+import ChatDepartment from './page_dean/chat';
+import ChatPersonnel from './page_personnel/chat';
 
 
 export const ThemeContext = createContext();
@@ -81,11 +84,11 @@ const App = () => {
             '/equipmentCategory', '/condition', '/vehiclemodel',
             '/AssignPersonnel', '/LandCalendar', '/record',
             '/ViewRequest', '/Venue', '/equipmentCat',
-            '/archive', '/Department/Dashboard', '/Department/Myreservation',
-            '/departmentAddReservation', '/Department/ViewApproval', '/Faculty/Dashboard',
+            '/archive', '/Department/Dashboard', '/Department/Myreservation', '/Department/Chat', 
+            '/departmentAddReservation', '/Department/ViewApproval', '/Faculty/Dashboard', '/Faculty/Chat',
             '/Faculty/Myreservation', '/addReservation', '/profile1',
             '/settings', '/calendar', '/chat', '/Personnel/Dashboard',
-            '/Personnel/ViewTask', '/Master', '/vehicleCategory', '/',
+            '/Personnel/ViewTask', '/Personnel/Chat', '/Master', '/vehicleCategory', '/',
             '/Checklist', '/chatAdmin', '/AccountSettings', '/chatAdmin', '/Reports', '/Faculty/Notification', '/Department/Notification',
         ];
 
@@ -139,11 +142,13 @@ const App = () => {
                         <Route path="/departmentAddReservation" element={<ProtectedRoute allowedRoles={['Dean', 'Secretary', 'Department Head']}><DeanAddReservation /></ProtectedRoute>} />
                         <Route path="/Department/ViewApproval" element={<ProtectedRoute allowedRoles={['Dean', 'Secretary', 'Department Head']}><ViewApproval /></ProtectedRoute>} />
                         <Route path="/Department/Notification" element={<ProtectedRoute allowedRoles={['Dean', 'Secretary', 'Department Head']}><NotificationRequest /></ProtectedRoute>} />
+                        <Route path="/Department/Chat" element={<ProtectedRoute allowedRoles={['Dean', 'Secretary', 'Department Head']}><ChatDepartment /></ProtectedRoute>} />
                         
                         {/* User Routes */}
                         <Route path="/Faculty/Dashboard" element={<ProtectedRoute allowedRoles={['Faculty/Staff', 'School Head', 'SBO PRESIDENT', 'CSG PRESIDENT']}><Dashboard /></ProtectedRoute>} />
                         <Route path="/Faculty/Myreservation" element={<ProtectedRoute allowedRoles={['Faculty/Staff', 'School Head', 'SBO PRESIDENT', 'CSG PRESIDENT']}><ViewReserve /></ProtectedRoute>} />
                         <Route path="/addReservation" element={<ProtectedRoute allowedRoles={['Faculty/Staff', 'School Head', 'SBO PRESIDENT', 'CSG PRESIDENT']}><AddReservation /></ProtectedRoute>} />
+                        <Route path="/Faculty/Chat" element={<ProtectedRoute allowedRoles={['Faculty/Staff', 'School Head', 'SBO PRESIDENT', 'CSG PRESIDENT']}><ChatUser /></ProtectedRoute>} />
                         <Route path="/Faculty/Notification" element={<ProtectedRoute allowedRoles={['Faculty/Staff', 'School Head', 'SBO PRESIDENT', 'CSG PRESIDENT']}><NotificationUser /></ProtectedRoute>} />
                         {/* Shared Routes (accessible by all authenticated users) */}
                         
@@ -153,6 +158,8 @@ const App = () => {
                         {/* Personnel Routes */}
                         <Route path="/Personnel/Dashboard" element={<ProtectedRoute allowedRoles={['Personnel']}><PersonnelDashboard /></ProtectedRoute>} />
                         <Route path="/Personnel/ViewTask" element={<ProtectedRoute allowedRoles={['Personnel']}><ViewTask /></ProtectedRoute>} />
+                        <Route path="/Personnel/Chat" element={<ProtectedRoute allowedRoles={['Personnel']}><ChatPersonnel /></ProtectedRoute>} />
+
                         {/* chats */}
                         <Route path="/chatAdmin" element={<ProtectedRoute allowedRoles={['Personnel', 'Admin', 'Dean', 'Secretary', 'Faculty/Staff']}><Chat /></ProtectedRoute>} />
                     </Routes>

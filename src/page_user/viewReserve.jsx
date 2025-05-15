@@ -14,14 +14,15 @@ import {
     FaMapMarkedAlt,
     FaFileAlt,
     FaIdCard,
-    FaTags
+    FaTags,
+    FaSearch
 } from 'react-icons/fa';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Sidebar from './component/user_sidebar';
-import { Modal, Tabs, Table } from 'antd';
+import { Modal, Tabs, Table, Input, Button, Tag, Tooltip, Space } from 'antd';
 import { SecureStorage } from '../utils/encryption';
 import { InfoCircleOutlined, BuildOutlined, ToolOutlined, UserOutlined, TeamOutlined, CalendarOutlined, AppstoreOutlined } from '@ant-design/icons';
 
@@ -35,6 +36,9 @@ const ViewReserve = () => {
     const [reservationToCancel, setReservationToCancel] = useState(null);
     const [showViewModal, setShowViewModal] = useState(false);
     const [selectedReservation] = useState(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [pageSize, setPageSize] = useState(10);
+    const [loading, setLoading] = useState(false);
 
     const [detailedReservation] = useState(null);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -46,6 +50,113 @@ const ViewReserve = () => {
         pending: 'bg-yellow-100 text-yellow-800',
         cancelled: 'bg-red-100 text-red-800'
     };
+
+    // Table columns configuration
+    const columns = [
+        {
+            title: 'ID',
+            dataIndex: 'id',
+            key: 'id',
+            width: 80,
+            sorter: (a, b) => a.id - b.id,
+        },
+        {
+            title: 'Title',
+            dataIndex: 'title',
+            key: 'title',
+            sorter: (a, b) => a.title.localeCompare(b.title),
+            render: (text) => <span className="font-semibold text-blue-800">{text}</span>
+        },
+        {
+            title: 'Created At',
+            dataIndex: 'createdAt',
+            key: 'createdAt',
+            width: 170,
+            sorter: (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
+        },
+        {
+            title: 'Start Date',
+            dataIndex: 'startDate',
+            key: 'startDate',
+            width: 170,
+            sorter: (a, b) => new Date(a.startDate) - new Date(b.startDate),
+            render: (text) => format(new Date(text), 'MMM dd, yyyy h:mm a')
+        },
+        {
+            title: 'End Date',
+            dataIndex: 'endDate',
+            key: 'endDate',
+            width: 170,
+            sorter: (a, b) => new Date(a.endDate) - new Date(b.endDate),
+            render: (text) => format(new Date(text), 'MMM dd, yyyy h:mm a')
+        },
+        {
+            title: 'Participants',
+            dataIndex: 'participants',
+            key: 'participants',
+            width: 120,
+            render: (text) => text || 'Not specified'
+        },
+        {
+            title: 'Status',
+            dataIndex: 'status',
+            key: 'status',
+            width: 120,
+            render: (status) => (
+                <Tag 
+                    color={
+                        status === 'confirmed' ? 'success' : 
+                        status === 'pending' ? 'warning' : 
+                        'error'
+                    }
+                >
+                    {status.charAt(0).toUpperCase() + status.slice(1)}
+                </Tag>
+            ),
+            filters: [
+                { text: 'Confirmed', value: 'confirmed' },
+                { text: 'Pending', value: 'pending' },
+                { text: 'Cancelled', value: 'cancelled' }
+            ],
+            onFilter: (value, record) => record.status === value,
+        },
+        {
+            title: 'Actions',
+            key: 'actions',
+            fixed: 'right',
+            width: 150,
+            render: (_, record) => (
+                <Space>
+                    <Tooltip title="View Details">
+                        <Button 
+                            type="primary" 
+                            icon={<FaEye />} 
+                            onClick={() => handleViewReservation(record)}
+                            size="small"
+                            className="bg-blue-500 hover:bg-blue-600 border-blue-500"
+                        />
+                    </Tooltip>
+                    {record.status !== 'cancelled' && (
+                        <Tooltip title="Cancel Reservation">
+                            <Button 
+                                danger
+                                onClick={() => {
+                                    setReservationToCancel({
+                                        id: record.id,
+                                        name: record.title
+                                    });
+                                    setShowCancelModal(true);
+                                }}
+                                size="small"
+                                className="border-red-300 hover:border-red-400"
+                                icon={<FaTags />}
+                            />
+                        </Tooltip>
+                    )}
+                </Space>
+            )
+        }
+    ];
 
     useEffect(() => {
               const encryptedUserLevel = SecureStorage.getSessionItem("user_level_id"); 
@@ -219,6 +330,14 @@ const ViewReserve = () => {
             
             if (result.status === 'success') {
                 const details = result.data;
+                // Debug status history
+                if (statusResult.status === 'success' && statusResult.data) {
+                    console.log("Status History:", statusResult.data.map(s => ({
+                        status_id: s.status_id,
+                        status_name: s.status_name,
+                        active: s.active
+                    })));
+                }
                 setReservationDetails({
                     ...details,
                     statusHistory: statusResult.status === 'success' ? statusResult.data : [],
@@ -239,6 +358,8 @@ const ViewReserve = () => {
     const DetailModal = ({ visible, onClose, reservationDetails }) => {
         if (!reservationDetails) return null;
 
+        console.log("DetailModal rendering with reservationDetails:", JSON.stringify(reservationDetails, null, 2));
+
         const getStatusColor = () => {
             if (reservationDetails.active === "0") return "gold";
             switch (reservationDetails.reservation_status?.toLowerCase()) {
@@ -254,10 +375,25 @@ const ViewReserve = () => {
             status => status.status_name === "Cancelled"
         );
         
-        // Check if reservation is completed by looking for status_id "4"
+        // Check if reservation is completed by looking for status_id "4" or status_name "Completed"
+        // Modified to specifically check for the structure in the sample data
         const isCompleted = reservationDetails.statusHistory?.some(
-            status => status.status_id === "4" && status.active === "1"
-        );
+            status => {
+                // Log each status entry to debug
+                console.log("Checking status entry:", status);
+                // Check if this is a completed status (status_id 4) and it's the active status (active is 1)
+                const completedById = status.status_id === "4";
+                const completedByName = status.status_name === "Completed";
+                const isActiveStatus = status.active === "1";
+                
+                console.log(`Status ${status.status_id} (${status.status_name}): completedById=${completedById}, completedByName=${completedByName}, isActiveStatus=${isActiveStatus}`);
+                
+                return (completedById || completedByName) && isActiveStatus;
+            }
+        ) || (reservationDetails.reservation_status?.toLowerCase() === "completed");
+
+        console.log("Final isCompleted value:", isCompleted);
+        console.log("Reservation status from API:", reservationDetails.reservation_status);
 
         const handleShowCancelModal = () => {
             setReservationToCancel({
@@ -345,7 +481,30 @@ const ViewReserve = () => {
 
         // Format the maintenance resources if the reservation is completed
         const MaintenanceResourcesSummary = () => {
-            if (!isCompleted || !reservationDetails.maintenanceResources?.length) return null;
+            // Add console logs for debugging
+            console.log("MaintenanceResourcesSummary Debug:");
+            console.log("isCompleted:", isCompleted);
+            console.log("maintenanceResources:", reservationDetails.maintenanceResources);
+            console.log("Status History:", reservationDetails.statusHistory);
+            
+            // Force the component to render for debugging purposes
+            // Remove the conditional check temporarily to see if resources display correctly
+            const hasResources = Array.isArray(reservationDetails.maintenanceResources) && 
+                                reservationDetails.maintenanceResources.length > 0;
+            
+            console.log("hasResources:", hasResources);
+            console.log("Will show summary:", isCompleted && hasResources);
+            
+            // Restored original condition, but with better logging
+            if (!isCompleted) {
+                console.log("Not showing maintenance resources summary because reservation is not completed");
+                return null;
+            }
+            
+            if (!hasResources) {
+                console.log("Not showing maintenance resources summary because no resources available");
+                return null;
+            }
     
             return (
                 <div className="mt-6 bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -598,384 +757,144 @@ const ViewReserve = () => {
     };
 
     return (
-        <div className="flex h-screen bg-gray-50">
-            <Sidebar />
-            <div className="flex-1 overflow-auto mt-20">
-                <div className="p-8">
-                    <div className="max-w-7xl mx-auto">
-                        {/* Filter buttons */}
-                        <div className="flex gap-4 mb-6">
-                            {['all', 'confirmed', 'pending', 'cancelled'].map((filter) => (
-                                <button
-                                    key={filter}
-                                    onClick={() => setActiveFilter(filter)}
-                                    className={`px-4 py-2 rounded-full capitalize ${
-                                        activeFilter === filter
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-white text-gray-600 hover:bg-gray-100'
-                                    } transition duration-300 ease-in-out shadow-sm`}
-                                >
-                                    {filter}
-                                </button>
-                            ))}
+        <div className="flex h-screen bg-gradient-to-br from-blue-100 to-white overflow-hidden">
+            <div className="flex-none">
+                <Sidebar />
+            </div>
+            <div className="flex-1 overflow-y-auto bg-white bg-opacity-60 mt-20">
+                <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5 }}
+                    className="p-6 lg:p-10"
+                >
+                    <h2 className="text-4xl font-bold mb-6 text-blue-800 drop-shadow-sm">My Reservations</h2>
+                    <div className="bg-white rounded-lg shadow-md p-6 mb-6 border border-gray-100">
+                        <div className="flex flex-col md:flex-row items-center justify-between mb-6">
+                            <motion.div 
+                                whileHover={{ scale: 1.05 }}
+                                className="relative w-full md:w-64 mb-4 md:mb-0"
+                            >
+                                <input
+                                    type="text"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    placeholder="Search reservations..."
+                                    className="w-full pl-10 pr-4 py-2 rounded-full border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300"
+                                />
+                                <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-400" />
+                            </motion.div>
+                            
+                            <div className="flex gap-3">
+                                {['all', 'confirmed', 'pending', 'cancelled'].map((filter) => (
+                                    <motion.button
+                                        key={filter}
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                        onClick={() => setActiveFilter(filter)}
+                                        className={`px-4 py-2 rounded-full capitalize ${
+                                            activeFilter === filter
+                                                ? 'bg-blue-600 text-white'
+                                                : 'bg-white text-gray-600 hover:bg-gray-100'
+                                        } transition duration-300 ease-in-out shadow-sm`}
+                                    >
+                                        {filter}
+                                    </motion.button>
+                                ))}
+                            </div>
                         </div>
 
-                        {/* Enhanced Reservations Grid */}
-                        <div className="grid gap-6">
-                            {filteredReservations.map((reservation) => (
-                                <motion.div 
-                                    key={reservation.id}
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.3 }}
-                                    className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 border border-gray-100 overflow-hidden"
-                                >
-                                    <div className="p-6">
-                                        <div className="flex justify-between items-start mb-4">
-                                            <div>
-                                                <h3 className="text-xl font-semibold text-gray-800 mb-2">
-                                                    {reservation.title}
-                                                </h3>
-                                                <div className="flex items-center gap-2 text-sm text-gray-500">
-                                                    <FaCalendar size={14} className="text-blue-500" />
-                                                    <span>Created on {reservation.createdAt}</span>
-                                                </div>
+                        {loading ? (
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="flex justify-center items-center h-64"
+                            >
+                                <div className="loader"></div>
+                            </motion.div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <Table 
+                                    columns={columns} 
+                                    dataSource={filteredReservations}
+                                    rowKey="id"
+                                    pagination={{
+                                        pageSize: pageSize,
+                                        showSizeChanger: true,
+                                        pageSizeOptions: ['10', '20', '50'],
+                                        showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+                                        onChange: (page, pageSize) => {
+                                            setPageSize(pageSize);
+                                        }
+                                    }}
+                                    scroll={{ x: 1200 }}
+                                    bordered
+                                    size="middle"
+                                    className="reservation-table"
+                                    style={{ backgroundColor: 'white' }}
+                                    locale={{
+                                        emptyText: (
+                                            <div className="text-center py-8">
+                                                <FaCalendar className="mx-auto text-6xl text-gray-300 mb-4" />
+                                                <p className="text-xl text-gray-500">No reservations found</p>
                                             </div>
-                                            <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[reservation.status]}`}>
-                                                {reservation.status}
-                                            </span>
-                                        </div>
-
-                                        <div className="flex justify-end mt-4 gap-2">
-                                            <button
-                                                onClick={() => handleViewReservation(reservation)}
-                                                className="flex items-center gap-1 px-3 py-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-300"
-                                            >
-                                                <FaEye size={16} />
-                                                <span className="text-sm">View Details</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            ))}
-                        </div>
-
-                        {/* All modals */}
-                        {/* View Reservation Modal - VENUE */}
-                        {showViewModal && selectedReservation && detailedReservation && selectedReservation.type === 'venue' && (
-                            <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
-                                <motion.div
-                                    initial={{ scale: 0.8, opacity: 0 }}
-                                    animate={{ scale: 1, opacity: 1 }}
-                                    transition={{ duration: 0.3 }}
-                                    className="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden"
-                                >
-                                    {/* Header */}
-                                    <div className="bg-gradient-to-r from-green-600 to-green-400 px-8 py-4">
-                                        <div className="flex justify-between items-center">
-                                            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                                                <FaCalendar />
-                                                Venue Reservation Details
-                                            </h2>
-                                            <button 
-                                                onClick={() => setShowViewModal(false)} 
-                                                className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
-                                            >
-                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                </svg>
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Content */}
-                                    <div className="p-8">
-                                        <div className="grid grid-cols-2 gap-8">
-                                            {/* Left Column */}
-                                            <div className="space-y-6">
-                                                <div className="bg-gray-50 p-4 rounded-lg">
-                                                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Event Information</h3>
-                                                    <div className="space-y-4">
-                                                        <InfoField 
-                                                            icon={<FaCalendar className="text-green-500"/>}
-                                                            label="Event Title" 
-                                                            value={detailedReservation.venue_form_event_title || 'N/A'} 
-                                                        />
-                                                        <InfoField 
-                                                            icon={<FaUser className="text-green-500"/>}
-                                                            label="Department" 
-                                                            value={detailedReservation.departments_name} 
-                                                        />
-                                                        <InfoField 
-                                                            icon={<FaUsers className="text-green-500"/>}
-                                                            label="Participants" 
-                                                            value={detailedReservation.venue_participants || 'N/A'} 
-                                                        />
-                                                    </div>
-                                                </div>
-
-                                                <div className="bg-gray-50 p-4 rounded-lg">
-                                                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Venue & Equipment</h3>
-                                                    <div className="space-y-4">
-                                                        <InfoField 
-                                                            icon={<FaBuilding className="text-green-500"/>}
-                                                            label="Venue" 
-                                                            value={detailedReservation.venue_name || 'N/A'} 
-                                                        />
-                                                        <InfoField 
-                                                            icon={<FaTools className="text-green-500"/>}
-                                                            label="Equipment" 
-                                                            value={
-                                                                detailedReservation.equipment_name 
-                                                                    ? `${detailedReservation.equipment_name} (${detailedReservation.reservation_equipment_quantity})`
-                                                                    : 'No equipment requested'
-                                                            } 
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Right Column */}
-                                            <div className="space-y-6">
-                                                <div className="bg-gray-50 p-4 rounded-lg">
-                                                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Schedule</h3>
-                                                    <div className="space-y-4">
-                                                        <InfoField 
-                                                            icon={<FaClock className="text-green-500"/>}
-                                                            label="Start Date & Time" 
-                                                            value={format(new Date(detailedReservation.venue_form_start_date), 'MMM dd, yyyy HH:mm')} 
-                                                        />
-                                                        <InfoField 
-                                                            icon={<FaClock className="text-green-500"/>}
-                                                            label="End Date & Time" 
-                                                            value={format(new Date(detailedReservation.venue_form_end_date), 'MMM dd, yyyy HH:mm')} 
-                                                        />
-                                                    </div>
-                                                </div>
-
-                                                <div className="bg-gray-50 p-4 rounded-lg">
-                                                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Status Information</h3>
-                                                    <div className="space-y-4">
-                                                        <InfoField 
-                                                            icon={<FaCheckCircle className="text-green-500"/>}
-                                                            label="GSD Status" 
-                                                            value={detailedReservation.current_reservation_status || 'Pending'} 
-                                                            className={`px-3 py-1 rounded-full text-sm font-medium inline-block ${
-                                                                statusColors[detailedReservation.current_reservation_status?.toLowerCase() || 'pending']
-                                                            }`}
-                                                        />
-                                                        <InfoField 
-                                                            icon={<FaUserShield className="text-green-500"/>}
-                                                            label="Dean Status" 
-                                                            value={detailedReservation.status_approval_name || 'Pending'} 
-                                                            className={`px-3 py-1 rounded-full text-sm font-medium inline-block ${
-                                                                detailedReservation.status_approval_name?.toLowerCase() === 'approve' 
-                                                                    ? 'bg-green-100 text-green-800'
-                                                                    : 'bg-yellow-100 text-yellow-800'
-                                                            }`}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                       
-                                    </div>
-
-                                    {/* Footer */}
-                                    <div className="border-t border-gray-200 px-8 py-4">
-                                        <div className="flex justify-end">
-                                            <button 
-                                                onClick={() => setShowViewModal(false)} 
-                                                className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
-                                            >
-                                                Close
-                                            </button>
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            </div>
-                        )}
-
-                        {/* View Reservation Modal - VEHICLE */}
-                        {showViewModal && selectedReservation && detailedReservation && selectedReservation.type === 'vehicle' && (
-                            <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
-                                <motion.div
-                                    initial={{ scale: 0.8, opacity: 0 }}
-                                    animate={{ scale: 1, opacity: 1 }}
-                                    transition={{ duration: 0.3 }}
-                                    className="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden"
-                                >
-                                    {/* Header */}
-                                    <div className="bg-gradient-to-r from-blue-600 to-blue-400 px-8 py-4">
-                                        <div className="flex justify-between items-center">
-                                            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                                                <FaCar />
-                                                Vehicle Reservation Details
-                                            </h2>
-                                            <button 
-                                                onClick={() => setShowViewModal(false)} 
-                                                className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
-                                            >
-                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                </svg>
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Content */}
-                                    <div className="p-8">
-                                        <div className="grid grid-cols-2 gap-8">
-                                            {/* Left Column */}
-                                            <div className="space-y-6">
-                                                <div className="bg-gray-50 p-4 rounded-lg">
-                                                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Reservation Details</h3>
-                                                    <div className="space-y-4">
-                                                        <InfoField 
-                                                            icon={<FaUser className="text-blue-500"/>}
-                                                            label="Reserved By" 
-                                                            value={detailedReservation.vehicle_form_user_full_name} 
-                                                        />
-                                                        <InfoField 
-                                                            icon={<FaBuilding className="text-blue-500"/>}
-                                                            label="Department" 
-                                                            value={detailedReservation.departments_name} 
-                                                        />
-                                                        <InfoField 
-                                                            icon={<FaMapMarkedAlt className="text-blue-500"/>}
-                                                            label="Destination" 
-                                                            value={detailedReservation.vehicle_form_destination} 
-                                                        />
-                                                        <InfoField 
-                                                            icon={<FaFileAlt className="text-blue-500"/>}
-                                                            label="Purpose" 
-                                                            value={detailedReservation.vehicle_form_purpose} 
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Right Column */}
-                                            <div className="space-y-6">
-                                                <div className="bg-gray-50 p-4 rounded-lg">
-                                                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Vehicle Information</h3>
-                                                    <div className="space-y-4">
-                                                        <InfoField 
-                                                            icon={<FaCar className="text-blue-500"/>}
-                                                            label="Vehicle" 
-                                                            value={`${detailedReservation.vehicle_make} ${detailedReservation.vehicle_model}`} 
-                                                        />
-                                                        <InfoField 
-                                                            icon={<FaIdCard className="text-blue-500"/>}
-                                                            label="License Plate" 
-                                                            value={detailedReservation.vehicle_license} 
-                                                        />
-                                                        <InfoField 
-                                                            icon={<FaTags className="text-blue-500"/>}
-                                                            label="Category" 
-                                                            value={detailedReservation.vehicle_category} 
-                                                        />
-                                                    </div>
-                                                </div>
-
-                                                <div className="bg-gray-50 p-4 rounded-lg">
-                                                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Schedule</h3>
-                                                    <div className="space-y-4">
-                                                        <InfoField 
-                                                            icon={<FaClock className="text-blue-500"/>}
-                                                            label="Start Date & Time" 
-                                                            value={format(new Date(detailedReservation.vehicle_form_start_date), 'MMM dd, yyyy HH:mm')} 
-                                                        />
-                                                        <InfoField 
-                                                            icon={<FaClock className="text-blue-500"/>}
-                                                            label="End Date & Time" 
-                                                            value={format(new Date(detailedReservation.vehicle_form_end_date), 'MMM dd, yyyy HH:mm')} 
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {detailedReservation.passenger_names && (
-                                            <div className="mt-6 bg-gray-50 p-4 rounded-lg">
-                                                <h3 className="text-lg font-semibold text-gray-800 mb-2">Passengers</h3>
-                                                <div className="flex flex-wrap gap-2">
-                                                    {detailedReservation.passenger_names.split(',').map((passenger, index) => (
-                                                        <span key={index} className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
-                                                            {passenger.trim()}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Footer */}
-                                    <div className="border-t border-gray-200 px-8 py-4">
-                                        <div className="flex justify-end">
-                                            <button 
-                                                onClick={() => setShowViewModal(false)} 
-                                                className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
-                                            >
-                                                Close
-                                            </button>
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            </div>
-                        )}
-
-                        {/* Cancel Reservation Modal */}
-                        {showCancelModal && reservationToCancel && (
-                            <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-                                <motion.div 
-                                    initial={{ scale: 0.8, opacity: 0 }}
-                                    animate={{ scale: 1, opacity: 1 }}
-                                    transition={{ duration: 0.3 }}
-                                    className="bg-white rounded-2xl p-8 w-full max-w-md transform transition-all duration-300 ease-in-out"
-                                >
-                                    <div className="flex justify-between items-center mb-4">
-                                        <h2 className="text-xl font-bold">Confirm Cancellation</h2>
-                                        <button onClick={() => setShowCancelModal(false)} className="text-gray-400 hover:text-gray-600">
-                                            &times;
-                                        </button>
-                                    </div>
-                                    <p>Are you sure you want to cancel the reservation "{reservationToCancel.name}"?</p>
-                                    <div className="flex justify-end mt-6 gap-4">
-                                        <button 
-                                            className="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400"
-                                            onClick={() => setShowCancelModal(false)}
-                                        >
-                                            No, Keep Reservation
-                                        </button>
-                                        <button 
-                                            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
-                                            onClick={confirmCancelReservation}
-                                        >
-                                            Yes, Cancel Reservation
-                                        </button>
-                                    </div>
-                                </motion.div>
+                                        )
+                                    }}
+                                />
                             </div>
                         )}
                     </div>
-                </div>
+                </motion.div>
             </div>
 
+            {/* Detail Modal */}
             {isDetailModalOpen && (
-            <DetailModal 
-                visible={isDetailModalOpen}
-                onClose={() => {
-                    setIsDetailModalOpen(false);
-                    setCurrentRequest(null);
-                    setReservationDetails(null);
-                }}
-                reservationDetails={reservationDetails}
-            />
-        )}
+                <DetailModal 
+                    visible={isDetailModalOpen}
+                    onClose={() => {
+                        setIsDetailModalOpen(false);
+                        setCurrentRequest(null);
+                        setReservationDetails(null);
+                    }}
+                    reservationDetails={reservationDetails}
+                />
+            )}
+
+            {/* Cancel Reservation Modal */}
+            {showCancelModal && reservationToCancel && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+                    <motion.div 
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ duration: 0.3 }}
+                        className="bg-white rounded-2xl p-8 w-full max-w-md transform transition-all duration-300 ease-in-out"
+                    >
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-xl font-bold">Confirm Cancellation</h2>
+                            <button onClick={() => setShowCancelModal(false)} className="text-gray-400 hover:text-gray-600">
+                                &times;
+                            </button>
+                        </div>
+                        <p>Are you sure you want to cancel the reservation "{reservationToCancel.name}"?</p>
+                        <div className="flex justify-end mt-6 gap-4">
+                            <button 
+                                className="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400"
+                                onClick={() => setShowCancelModal(false)}
+                            >
+                                No, Keep Reservation
+                            </button>
+                            <button 
+                                className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
+                                onClick={confirmCancelReservation}
+                            >
+                                Yes, Cancel Reservation
+                            </button>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
         </div>
-        
     );
 };
 

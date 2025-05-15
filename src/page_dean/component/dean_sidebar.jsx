@@ -581,8 +581,8 @@ const Sidebar = () => {
               <MiniSidebarItem 
                 icon={FaComments} 
                 text="Chat" 
-                link="/chat" 
-                active={activeItem === '/chat'}
+                link="/Department/Chat" 
+                active={activeItem === '/Department/Chat'}
                 badge={unreadMessages}
                 isExpanded={isDesktopSidebarOpen}
               />
@@ -638,8 +638,8 @@ const Sidebar = () => {
               <SidebarItem 
                 icon={FaComments} 
                 text="Chat" 
-                link="/chat" 
-                active={activeItem === '/chat'} 
+                link="/Departmnet/Chat" 
+                active={activeItem === '/Department/Chat'} 
                 badge={unreadMessages}
               />
             </nav>

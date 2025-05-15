@@ -5,7 +5,7 @@ import { faEdit, faArchive, faSearch, faPlus, faUser, faTrashAlt, faEye } from '
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import axios from 'axios';
-import { Modal, Button, Form } from 'react-bootstrap';
+import { Modal, Button, Form, Alert } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DataTable } from 'primereact/datatable';
@@ -27,6 +27,8 @@ import { FileUpload } from 'primereact/fileupload';
 import { sanitizeInput, validateInput } from '../utils/sanitize';
 import { SecureStorage } from '../utils/encryption';
 import '../vehicle.css'; // Import vehicle.css which contains loader styles
+import { Alert as AntAlert, Empty, Pagination, Select } from 'antd';
+import { ExclamationCircleOutlined, DeleteOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
 
 const generateAvatarColor = (str) => {
     let hash = 0;
@@ -353,26 +355,26 @@ const Faculty = () => {
         };
 
         return (
-            <div className="flex gap-2 justify-center">
+            <div className="flex space-x-2">
                 <Tooltip target=".edit-btn" />
                 <Tooltip target=".archive-btn" />
 
-                <button 
-                    className="edit-btn bg-green-500 hover:bg-green-600 text-white p-2 rounded-md transition-colors"
+                <Button 
+                    type="primary"
+                    icon={<FontAwesomeIcon icon={faEdit} />}
+                    onClick={handleEditClick}
+                    className="edit-btn bg-green-900 hover:bg-lime-900"
                     data-pr-tooltip="Edit Faculty"
                     data-pr-position="top"
-                    onClick={handleEditClick}
-                >
-                    <FontAwesomeIcon icon={faEdit} />
-                </button>
-                <button 
-                    className="archive-btn text-yellow-600 hover:text-yellow-700 border border-yellow-300 hover:border-yellow-400 p-2 rounded-md transition-colors bg-white"
+                />
+                <Button 
+                    danger
+                    icon={<FontAwesomeIcon icon={faArchive} />}
+                    onClick={handleArchiveClick}
+                    className="archive-btn"
                     data-pr-tooltip="Archive Faculty"
                     data-pr-position="top"
-                    onClick={handleArchiveClick}
-                >
-                    <FontAwesomeIcon icon={faArchive} />
-                </button>
+                />
             </div>
         );
     };
@@ -414,7 +416,9 @@ const Faculty = () => {
         
     // Add custom styling to match Venue.jsx table
     const tableStyle = {
-        minWidth: '50rem',
+        width: '100%',
+        borderCollapse: 'separate',
+        borderSpacing: 0,
         boxShadow: '0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)',
         borderRadius: '0.5rem',
         overflow: 'hidden',
@@ -422,153 +426,158 @@ const Faculty = () => {
     };
 
     return (
-        <div className="flex flex-col lg:flex-row bg-gradient-to-br from-white to-green-100 min-h-screen">
-            <div className="flex-none">
+        <div className="flex h-screen overflow-hidden bg-gradient-to-br from-green-100 to-white">
+            <div className="flex-shrink-0">
                 <Sidebar />
             </div>
-            <div className="flex-grow p-8 lg:p-12 mt-20">
-                <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5 }}
-                    className="p-6 lg:p-10"
-                >
-                    <h2 className="text-4xl font-bold mb-6 text-green-800 drop-shadow-sm">Faculty Management</h2>
-                    <div className="bg-white rounded-lg shadow-md p-6 mb-6 border border-gray-100">
-                        <div className="flex flex-col md:flex-row items-center justify-between mb-4">
-                            <motion.div 
-                                whileHover={{ scale: 1.05 }}
-                                className="relative w-full md:w-64 mb-4 md:mb-0"
-                            >
-                                <InputText
-                                    value={filters.global.value || ''}
-                                    onChange={(e) => {
-                                        const value = e.target.value;
-                                        let _filters = { ...filters };
-                                        _filters['global'].value = value;
-                                        setFilters(_filters);
-                                    }}
-                                    placeholder="Search faculty..."
-                                    className="w-full pl-10 pr-4 py-2 rounded-full border border-green-300 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-300"
-                                />
-                                <FontAwesomeIcon icon={faSearch} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-400" />
-                            </motion.div>
-                            <div className="flex items-center gap-4">
-                                <select
-                                    className="p-2 border rounded-lg"
-                                    value={selectedRole}
-                                    onChange={(e) => setSelectedRole(e.target.value)}
-                                >
-                                    <option value="">All Roles</option>
-                                    <option value="Admin">Admin</option>
-                                    <option value="Faculty">Faculty</option>
-                                    <option value="Staff">Staff</option>
-                                </select>
-                                <motion.button 
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    onClick={() => setModalState({ isOpen: true, type: 'add', user: null })}
-                                    className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out flex items-center justify-center shadow-md"
-                                >
-                                    <FontAwesomeIcon icon={faPlus} className="mr-2" /> Add Faculty
-                                </motion.button>
+            <div className="flex-grow p-6 sm:p-8 overflow-y-auto">
+                <div className="p-[2.5rem] lg:p-12 min-h-screen">
+                    <motion.div 
+                        initial={{ opacity: 0, y: -50 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5 }}
+                        className="mb-8"
+                    >
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                            <h2 className="text-2xl font-bold text-green-900 mt-5">
+                                Faculty Management
+                            </h2>
+                        </div>
+                    </motion.div>
+                    <div className="bg-[#fafff4] p-4 rounded-lg shadow-sm mb-6">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                            <div className="flex flex-col md:flex-row gap-4 flex-1">
+                                <div className="flex-1">
+                                    <InputText
+                                        value={filters.global.value || ''}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            let _filters = { ...filters };
+                                            _filters['global'].value = value;
+                                            setFilters(_filters);
+                                        }}
+                                        placeholder="Search faculty..."
+                                        className="w-full pl-10 pr-4 py-2 rounded-full border border-green-300 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-300"
+                                    />
+                                    <FontAwesomeIcon icon={faSearch} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-400" />
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <select
+                                        className="p-2 border rounded-lg"
+                                        value={selectedRole}
+                                        onChange={(e) => setSelectedRole(e.target.value)}
+                                    >
+                                        <option value="">All Roles</option>
+                                        <option value="Admin">Admin</option>
+                                        <option value="Faculty">Faculty</option>
+                                        <option value="Staff">Staff</option>
+                                    </select>
+                                    <motion.button 
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                        onClick={() => setModalState({ isOpen: true, type: 'add', user: null })}
+                                        className="bg-lime-900 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out flex items-center justify-center shadow-md"
+                                    >
+                                        <FontAwesomeIcon icon={faPlus} className="mr-2" /> Add Faculty
+                                    </motion.button>
+                                </div>
                             </div>
                         </div>
-
-                        {loading ? (
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                className="flex justify-center items-center h-64"
-                            >
-                                <div className="loader"></div>
-                            </motion.div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <DataTable
-                                    value={filteredData}
-                                    paginator
-                                    rows={10}
-                                    rowsPerPageOptions={[10, 20, 50]}
-                                    dataKey="users_id"
-                                    filters={filters}
-                                    filterDisplay="row"
-                                    loading={loading}
-                                    emptyMessage={
-                                        <div className="text-center py-8">
-                                            <i className="pi pi-search text-6xl text-gray-300 mb-4"></i>
-                                            <p className="text-xl text-gray-500">No faculty members found</p>
-                                        </div>
-                                    }
-                                    className="p-datatable-users"
-                                    responsiveLayout="scroll"
-                                    showGridlines
-                                    stripedRows
-                                    size="small"
-                                    tableStyle={tableStyle}
-                                    rowClassName="hover:bg-gray-50 transition-colors duration-200"
-                                >
-                                    <Column 
-                                        header="Photo" 
-                                        body={imageBodyTemplate} 
-                                        style={{ width: '100px' }}
-                                        className="text-center"
-                                    />
-                                    <Column 
-                                        field="users_school_id" 
-                                        header="School ID" 
-                                        filter 
-                                        filterPlaceholder="Search ID"
-                                        sortable 
-                                        className="font-semibold"
-                                    />
-                                    <Column 
-                                        field="users_name" 
-                                        header="Full Name" 
-                                        body={(rowData) => `${rowData.users_fname} ${rowData.users_mname ? rowData.users_mname + ' ' : ''}${rowData.users_lname}`}
-                                        filter
-                                        filterField="global"
-                                        filterPlaceholder="Search name"
-                                        sortable
-                                    />
-                                    <Column 
-                                        field="departments_name" 
-                                        header="Department" 
-                                        body={departmentTemplate}
-                                        filter 
-                                        filterPlaceholder="Search department"
-                                        sortable 
-                                    />
-                                    <Column 
-                                        field="user_level_name" 
-                                        header="Role" 
-                                        body={userLevelTemplate}
-                                        sortable 
-                                        style={{ width: '150px' }}
-                                    />
-                                    <Column 
-                                        field="users_contact_number" 
-                                        header="Contact" 
-                                        sortable 
-                                        body={(rowData) => (
-                                            <div className="flex items-center gap-2">
-                                                <i className="pi pi-phone text-green-500" />
-                                                {rowData.users_contact_number}
-                                            </div>
-                                        )}
-                                    />
-                                    <Column 
-                                        header="Actions" 
-                                        body={actionsBodyTemplate} 
-                                        style={{ width: '150px' }}
-                                        className="text-center"
-                                    />
-                                </DataTable>
-                            </div>
-                        )}
                     </div>
-                </motion.div>
+
+                    {loading ? (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="flex justify-center items-center h-64"
+                        >
+                            <div className="loader"></div>
+                        </motion.div>
+                    ) : (
+                        <div className="relative overflow-x-auto shadow-md sm:rounded-lg bg-[#fafff4] dark:bg-green-100">
+                            <DataTable
+                                value={filteredData}
+                                paginator
+                                rows={10}
+                                rowsPerPageOptions={[10, 20, 50]}
+                                dataKey="users_id"
+                                filters={filters}
+                                filterDisplay="row"
+                                loading={loading}
+                                emptyMessage={
+                                    <div className="text-center py-8">
+                                        <i className="pi pi-search text-6xl text-gray-300 mb-4"></i>
+                                        <p className="text-xl text-gray-500">No faculty members found</p>
+                                    </div>
+                                }
+                                className="p-datatable-users"
+                                responsiveLayout="scroll"
+                                showGridlines
+                                stripedRows
+                                size="small"
+                                tableStyle={tableStyle}
+                                rowClassName="hover:bg-gray-50 transition-colors duration-200"
+                            >
+                                <Column 
+                                    header="Photo" 
+                                    body={imageBodyTemplate} 
+                                    style={{ width: '100px' }}
+                                    className="text-center"
+                                />
+                                <Column 
+                                    field="users_school_id" 
+                                    header="School ID" 
+                                    filter 
+                                    filterPlaceholder="Search ID"
+                                    sortable 
+                                    className="font-semibold"
+                                />
+                                <Column 
+                                    field="users_name" 
+                                    header="Full Name" 
+                                    body={(rowData) => `${rowData.users_fname} ${rowData.users_mname ? rowData.users_mname + ' ' : ''}${rowData.users_lname}`}
+                                    filter
+                                    filterField="global"
+                                    filterPlaceholder="Search name"
+                                    sortable
+                                />
+                                <Column 
+                                    field="departments_name" 
+                                    header="Department" 
+                                    body={departmentTemplate}
+                                    filter 
+                                    filterPlaceholder="Search department"
+                                    sortable 
+                                />
+                                <Column 
+                                    field="user_level_name" 
+                                    header="Role" 
+                                    body={userLevelTemplate}
+                                    sortable 
+                                    style={{ width: '150px' }}
+                                />
+                                <Column 
+                                    field="users_contact_number" 
+                                    header="Contact" 
+                                    sortable 
+                                    body={(rowData) => (
+                                        <div className="flex items-center gap-2">
+                                            <i className="pi pi-phone text-green-500" />
+                                            {rowData.users_contact_number}
+                                        </div>
+                                    )}
+                                />
+                                <Column 
+                                    header="Actions" 
+                                    body={actionsBodyTemplate} 
+                                    style={{ width: '150px' }}
+                                    className="text-center"
+                                />
+                            </DataTable>
+                        </div>
+                    )}
+                </div>
             </div>
 
             <FacultyModal 
@@ -1101,7 +1110,7 @@ const FacultyModal = ({
 
     return (
         <Modal show={show} onHide={onHide} centered size="lg" className="rounded-xl faculty-modal">
-            <Modal.Header closeButton className="bg-gradient-to-r from-green-600 to-green-700 text-white">
+            <Modal.Header closeButton className="bg-green-900 text-white">
                 <Modal.Title className="flex items-center gap-2">
                     <FontAwesomeIcon icon={faUser} className="text-xl" />
                     <span className="font-bold">
@@ -1109,14 +1118,17 @@ const FacultyModal = ({
                     </span>
                 </Modal.Title>
             </Modal.Header>
-            <Modal.Body className="bg-green-50 p-4">
+            <Modal.Body className="bg-[#fafff4] p-4">
                 {type === 'archive' ? (
                     <div className="text-center p-6">
-                        <div className="bg-yellow-100 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4">
-                            <FontAwesomeIcon icon={faArchive} className="text-4xl text-yellow-500" />
-                        </div>
-                        <h4 className="text-xl font-bold mb-2">Archive Confirmation</h4>
-                        <p className="text-gray-700 mb-4">Are you sure you want to archive this faculty member? This action will remove them from active lists.</p>
+                        <Alert 
+                            message="Warning" 
+                            description={`Are you sure you want to archive this faculty member? This action cannot be undone.`}
+                            type="warning" 
+                            showIcon 
+                            icon={<ExclamationCircleOutlined />}
+                            className="mb-4"
+                        />
                         <div className="flex justify-center gap-4 mt-6">
                             <Button variant="outline-secondary" onClick={onHide} className="px-4 py-2">
                                 Cancel
@@ -1124,9 +1136,11 @@ const FacultyModal = ({
                             <Button 
                                 variant="warning" 
                                 onClick={() => onArchive(user.users_id, user.user_level_name)}
-                                className="bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-500 px-4 py-2"
+                                danger
+                                icon={<DeleteOutlined />}
+                                className="px-4 py-2"
                             >
-                                Confirm Archive
+                                Archive
                             </Button>
                         </div>
                     </div>
@@ -1339,14 +1353,14 @@ const FacultyModal = ({
                 )}
             </Modal.Body>
             {!type.includes('archive') && (
-                <Modal.Footer className="bg-green-50 border-t border-green-100">
+                <Modal.Footer className="bg-[#fafff4] border-t border-green-100">
                     <Button variant="outline-secondary" onClick={onHide} className="px-4">
                         Cancel
                     </Button>
                     <Button 
                         variant="success" 
                         onClick={handleSubmit} 
-                        className="bg-green-600 hover:bg-green-700 border-green-600 px-4"
+                        className="bg-green-900 hover:bg-lime-900 border-green-900 px-4"
                         disabled={duplicateFields && (duplicateFields.email || duplicateFields.schoolId)}
                     >
                         {type === 'add' ? 'Add Faculty' : 'Save Changes'}

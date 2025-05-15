@@ -27,7 +27,7 @@ const Sidebar = () => {
     return savedMode ? JSON.parse(savedMode) : false;
   });
   const [searchQuery, setSearchQuery] = useState('');
-  const [unreadMessages, setUnreadMessages] = useState(3);
+  const [unreadMessages, setUnreadMessages] = useState('');
   const [notifications, setNotifications] = useState(5);
   const [showProfileModal, setShowProfileModal] = useState(false);
 
@@ -221,12 +221,12 @@ const Sidebar = () => {
         {/* Mobile Header */}
         <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-3 fixed top-0 left-0 right-0 z-30 lg:hidden flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <button onClick={toggleMobileSidebar} className="text-green-600 dark:text-green-400 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+            <button onClick={toggleMobileSidebar} className="text-[#145414] dark:text-[#d4f4dc] p-2 rounded-lg hover:bg-[#d4f4dc] dark:hover:bg-[#145414]">
               <FaBars size={20} />
             </button>
-            <div className="flex items-center">
+                          <div className="flex items-center">
               <img src="/images/assets/phinma.png" alt="Logo" className="w-8 h-8" />
-              <span className="ml-2 font-bold text-green-600 dark:text-green-400">GSD Portal</span>
+              <span className="ml-2 font-bold text-black dark:text-white">GSD Portal</span>
             </div>
           </div>
 
@@ -347,41 +347,27 @@ const Sidebar = () => {
             isDesktopSidebarOpen ? 'w-64' : 'w-16'
           }`}>
             {/* Sidebar Header */}
-            <div className={`flex items-center p-4 border-b border-green-100 dark:border-green-800 ${
+            <div className={`flex items-center p-4 border-b border-[#d4f4dc] dark:border-[#145414] ${
               isDesktopSidebarOpen ? 'justify-between' : 'justify-center'
             }`}>
               {isDesktopSidebarOpen ? (
                 <>
                   <div className="flex items-center space-x-2">
                     <img src="/images/assets/phinma.png" alt="Logo" className="w-8 h-8" />
-                    <span className="font-bold text-green-600 dark:text-green-400">GSD Portal</span>
+                    <span className="font-bold text-black dark:text-white">GSD Portal</span>
                   </div>
-                  <button onClick={toggleDesktopSidebar} className="text-green-600 dark:text-green-400 p-1 rounded-full hover:bg-green-50 dark:hover:bg-green-900">
+                  <button onClick={toggleDesktopSidebar} className="text-[#0b2a0b] dark:text-[#202521] p-1 rounded-full hover:bg-[#538c4c] dark:hover:bg-[#83b383]">
                     <FaAngleLeft size={16} />
                   </button>
                 </>
               ) : (
-                <button onClick={toggleDesktopSidebar} className="text-green-600 dark:text-green-400 p-1 rounded-full hover:bg-green-50 dark:hover:bg-green-900">
-                  <FaAngleRight size={16} />
+                <button onClick={toggleDesktopSidebar} className="text-[#082308] dark:text-[#1b1e1b] p-1 rounded-full hover:bg-[#538c4c] dark:hover:bg-[#83b383]">
+                  <FaAngleRight size={16} className="text-black" />
                 </button>
               )}
             </div>
 
-            {/* Search Input - Only show when expanded */}
-            {isDesktopSidebarOpen && (
-              <div className="px-4 my-3">
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Search..."
-                    className="w-full bg-gray-100 dark:bg-gray-800 rounded-lg py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                  <FaSearch className="absolute left-3 top-2.5 text-gray-400" size={14} />
-                </div>
-              </div>
-            )}
+           
             
             {/* Navigation */}
             <nav className={`flex-grow overflow-y-auto ${isDesktopSidebarOpen ? 'px-3' : 'px-2'} py-1 space-y-1`}>
@@ -507,6 +493,9 @@ const Sidebar = () => {
                 isExpanded={isDesktopSidebarOpen}
               />
             </nav>
+
+            {/* User Profile - Show only icon when collapsed */}
+            
           </div>
 
           {/* Mobile Sidebar */}
@@ -524,19 +513,7 @@ const Sidebar = () => {
               </button>
             </div>
 
-            {/* Search Input */}
-            <div className="px-4 mb-3">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  className="w-full bg-gray-100 dark:bg-gray-800 rounded-lg py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                <FaSearch className="absolute left-3 top-2.5 text-gray-400" size={14} />
-              </div>
-            </div>
+            
 
             {/* Navigation - Same as desktop but separate instance */}
             <nav className="flex-grow overflow-y-auto px-3 py-1 space-y-1">
@@ -640,9 +617,9 @@ const Sidebar = () => {
 
           {/* Main Content */}
           <main className={`flex-1 bg-gray-50 dark:bg-gray-800 min-h-screen overflow-x-hidden transition-all duration-300 ${
-            !isDesktopSidebarOpen 
+            isDesktopSidebarOpen 
               ? 'lg:ml-64 pl-0 mb-[300px]' 
-              : 'lg:ml-64 pl-0 mb-[300px]'
+              : 'lg:ml-16 pl-0 mb-[300px]'
           }`}>
 
 
@@ -656,6 +633,16 @@ const Sidebar = () => {
           isOpen={showProfileModal} 
           onClose={() => setShowProfileModal(false)} 
         />
+
+        {/* Toggle Button - Always visible when sidebar is closed */}
+        {!isDesktopSidebarOpen && (
+          <button
+            onClick={toggleDesktopSidebar}
+            className="hidden lg:flex fixed top-4 left-4 z-50 bg-[#829e89] dark:bg-gray-100 shadow-md rounded-full p-2 text-[#0f380f] dark:text-[#193c21] hover:bg-[#beffb6] dark:hover:bg-[#9dff9d]"
+          >
+            <FaAngleRight size={20} />
+          </button>
+        )}
       </div>
     </SidebarContext.Provider>
   );
@@ -677,23 +664,23 @@ const SidebarItem = React.memo(({ icon: Icon, text, link, active, badge }) => {
       to={link} 
       className={`flex items-center justify-between p-2.5 rounded-lg transition-all ${
         active 
-          ? 'bg-green-100 dark:bg-green-800/50 text-green-700 dark:text-green-200 font-medium' 
-          : 'text-gray-600 dark:text-gray-300 hover:bg-green-50 dark:hover:bg-green-900/30 hover:text-green-600'
+          ? 'bg-[#145414] text-white font-medium' 
+          : 'text-black hover:bg-[#d4f4dc] hover:text-[#145414]'
       }`}
     >
       <div className="flex items-center space-x-3">
-        <Icon size={16} className={active ? 'text-green-600 dark:text-green-400' : 'text-gray-400'} />
+        <Icon size={16} className={active ? 'text-white' : 'text-[#145414]'} />
         <span className="text-sm">{text}</span>
       </div>
       
       {badge && (
-        <span className="px-1.5 py-0.5 text-xs font-bold text-red-100 bg-red-500 rounded-full">
+        <span className="px-1.5 py-0.5 text-xs font-bold text-white bg-red-500 rounded-full">
           {badge}
         </span>
       )}
       
       {active && (
-        <div className="absolute left-0 w-1 h-7 bg-green-500 rounded-r-full" />
+        <div className="absolute left-0 w-1 h-7 bg-[#145414] rounded-r-full" />
       )}
     </Link>
   );
@@ -714,15 +701,15 @@ const SidebarDropdown = React.memo(({ icon: Icon, text, active, children }) => {
         onClick={() => setIsOpen(!isOpen)}
         className={`w-full flex items-center justify-between p-2.5 rounded-lg transition-all ${
           active 
-            ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 font-medium' 
-            : 'text-gray-600 dark:text-gray-300 hover:bg-green-50 dark:hover:bg-green-900/30'
+            ? 'bg-[#145414] text-white font-medium' 
+            : 'text-black hover:bg-[#d4f4dc] hover:text-[#145414]'
         }`}
       >
         <div className="flex items-center space-x-3">
-          <Icon size={16} className={active ? 'text-green-600 dark:text-green-400' : 'text-gray-400'} />
+          <Icon size={16} className={active ? 'text-white' : 'text-[#145414]'} />
           <span className="text-sm">{text}</span>
         </div>
-        <FaChevronDown className={`transition-transform ${isOpen ? 'rotate-180' : ''} text-gray-400`} size={12} />
+        <FaChevronDown className={`transition-transform ${isOpen ? 'rotate-180' : ''} text-[#145414]`} size={12} />
       </button>
       <AnimatePresence>
         {isOpen && (
@@ -748,11 +735,11 @@ const SidebarSubItem = React.memo(({ icon: Icon, text, link, active }) => {
       to={link} 
       className={`flex items-center space-x-2.5 p-2 pl-4 ml-2 rounded-md transition-all ${
         active 
-          ? 'bg-green-100 dark:bg-green-800/40 text-green-700 dark:text-green-300 font-medium' 
-          : 'text-gray-500 dark:text-gray-400 hover:bg-green-50 dark:hover:bg-green-900/20'
+          ? 'bg-[#145414] text-white font-medium' 
+          : 'text-black hover:bg-[#d4f4dc] hover:text-[#145414]'
       }`}
     >
-      <Icon size={14} className={active ? 'text-green-600 dark:text-green-400' : 'text-gray-400'} />
+      <Icon size={14} className={active ? 'text-white' : 'text-[#145414]'} />
       <span className="text-xs">{text}</span>
     </Link>
   );
@@ -764,18 +751,18 @@ const MiniSidebarItem = React.memo(({ icon: Icon, text, link, active, isExpanded
       to={link} 
       className={`flex items-center ${isExpanded ? 'justify-between p-2.5' : 'justify-center p-2'} rounded-lg transition-all ${
         active 
-          ? 'bg-green-100 dark:bg-green-800/50 text-green-700 dark:text-green-200 font-medium' 
-          : 'text-gray-600 dark:text-gray-300 hover:bg-green-50 dark:hover:bg-green-900/30 hover:text-green-600'
+          ? 'bg-[#145414] text-white font-medium' 
+          : 'text-black hover:bg-[#d4f4dc] hover:text-[#145414]'
       }`}
       title={!isExpanded ? text : undefined}
     >
       <div className={`flex items-center ${isExpanded ? 'space-x-3' : ''}`}>
-        <Icon size={16} className={active ? 'text-green-600 dark:text-green-400' : 'text-gray-400'} />
+        <Icon size={16} className={active ? 'text-white' : 'text-[#145414]'} />
         {isExpanded && <span className="text-sm">{text}</span>}
       </div>
       
       {badge && isExpanded && (
-        <span className="px-1.5 py-0.5 text-xs font-bold text-red-100 bg-red-500 rounded-full">
+        <span className="px-1.5 py-0.5 text-xs font-bold text-white bg-red-500 rounded-full">
           {badge}
         </span>
       )}
@@ -802,12 +789,12 @@ const MiniSidebarDropdown = React.memo(({ icon: Icon, text, active, children, is
             <Popover.Button
               className={`w-full flex items-center justify-center p-2 rounded-lg transition-all ${
                 active 
-                  ? 'bg-green-100 dark:bg-green-800/50 text-green-700 dark:text-green-200' 
-                  : 'text-gray-600 dark:text-gray-300 hover:bg-green-50 dark:hover:bg-green-900/30'
+                  ? 'bg-[#145414] text-white' 
+                  : 'text-black hover:bg-[#d4f4dc] hover:text-[#145414]'
               }`}
               title={text}
             >
-              <Icon size={16} className={active ? 'text-green-600 dark:text-green-400' : 'text-gray-400'} />
+              <Icon size={16} className={active ? 'text-white' : 'text-[#145414]'} />
             </Popover.Button>
             <Transition
               as={React.Fragment}
@@ -836,15 +823,15 @@ const MiniSidebarDropdown = React.memo(({ icon: Icon, text, active, children, is
         onClick={() => setIsOpen(!isOpen)}
         className={`w-full flex items-center justify-between p-2.5 rounded-lg transition-all ${
           active 
-            ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 font-medium' 
-            : 'text-gray-600 dark:text-gray-300 hover:bg-green-50 dark:hover:bg-green-900/30'
+            ? 'bg-[#145414] text-white font-medium' 
+            : 'text-black hover:bg-[#d4f4dc] hover:text-[#145414]'
         }`}
       >
         <div className="flex items-center space-x-3">
-          <Icon size={16} className={active ? 'text-green-600 dark:text-green-400' : 'text-gray-400'} />
+          <Icon size={16} className={active ? 'text-white' : 'text-[#145414]'} />
           <span className="text-sm">{text}</span>
         </div>
-        <FaChevronDown className={`transition-transform ${isOpen ? 'rotate-180' : ''} text-gray-400`} size={12} />
+        <FaChevronDown className={`transition-transform ${isOpen ? 'rotate-180' : ''} text-[#145414]`} size={12} />
       </button>
       <AnimatePresence>
         {isOpen && (
@@ -867,13 +854,13 @@ const MiniSidebarSubItem = React.memo(({ icon: Icon, text, link, active, isExpan
   return (
     <Link 
       to={link} 
-      className={`flex items-center ${isExpanded ? 'space-x-2.5 p-2 pl-4 ml-2' : 'p-2'} rounded-md transition-all ${
+      className={`flex items-center space-x-2.5 p-2 pl-4 ml-2 rounded-md transition-all ${
         active 
-          ? 'bg-green-100 dark:bg-green-800/40 text-green-700 dark:text-green-300 font-medium' 
-          : 'text-gray-500 dark:text-gray-400 hover:bg-green-50 dark:hover:bg-green-900/20'
+          ? 'bg-[#145414] text-white font-medium' 
+          : 'text-black hover:bg-[#d4f4dc] hover:text-[#145414]'
       }`}
     >
-      <Icon size={14} className={active ? 'text-green-600 dark:text-green-400' : 'text-gray-400'} />
+      <Icon size={14} className={active ? 'text-white' : 'text-[#145414]'} />
       {isExpanded && <span className="text-xs">{text}</span>}
     </Link>
   );

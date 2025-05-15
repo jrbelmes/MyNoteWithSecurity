@@ -105,23 +105,45 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
     const timeRanges = [];
     const reservedHours = new Set();
     
+    // Get all reservations for this date
     const dayReservations = reservations.filter(res => 
       res.isReserved && isSameDay(new Date(res.startDate), date)
     );
-  
+
+    // Create a Map to track unique time slots by their start and end times
+    const uniqueTimeSlots = new Map();
+    
     dayReservations.forEach(res => {
       const start = new Date(res.startDate);
       const end = new Date(res.endDate);
-      timeRanges.push({
-        start: start,
-        end: end
-      });
       
-      for (let hour = start.getHours(); hour <= end.getHours(); hour++) {
-        reservedHours.add(hour);
+      // Create a unique key for this time slot
+      const timeKey = `${start.getHours()}-${start.getMinutes()}-${end.getHours()}-${end.getMinutes()}`;
+      
+      // Only add this time range if we haven't seen it before
+      if (!uniqueTimeSlots.has(timeKey)) {
+        uniqueTimeSlots.set(timeKey, {
+          start,
+          end,
+          reservation: res
+        });
+        
+        // Add hours to the set of reserved hours
+        for (let hour = start.getHours(); hour <= end.getHours(); hour++) {
+          reservedHours.add(hour);
+        }
       }
     });
-  
+    
+    // Convert the map values to our timeRanges array
+    uniqueTimeSlots.forEach(item => {
+      timeRanges.push({
+        start: item.start,
+        end: item.end,
+        reservation: item.reservation
+      });
+    });
+    
     return {
       hours: Array.from(reservedHours),
       timeRanges: timeRanges
@@ -705,16 +727,16 @@ const renderCalendarGrid = () => {
                 {isCurrentMonth && selectedResource.type !== 'equipment' && (
                   <div className="mt-1 space-y-1">
                     {getReservedTimeSlots(day).timeRanges.map((range, idx) => {
-                      const reservation = reservations.find(res => 
-                        isSameDay(new Date(res.startDate), range.start) && 
-                        new Date(res.startDate).getHours() === range.start.getHours()
-                      );
+                      // We already have the reservation stored in the range object
+                      const reservation = range.reservation;
+                      
+                      if (!reservation) return null;
                       
                       // Determine what to display based on resource type
                       let displayText = '';
-                      if (reservation?.resourceType === 'venue') {
+                      if (reservation.resourceType === 'venue') {
                         displayText = reservation.venueName;
-                      } else if (reservation?.resourceType === 'vehicle') {
+                      } else if (reservation.resourceType === 'vehicle') {
                         displayText = `${reservation.vehicleMake} ${reservation.vehicleModel}`;
                         if (reservation.vehicleLicense) {
                           displayText += ` (${reservation.vehicleLicense})`;
@@ -1063,10 +1085,8 @@ const renderCalendarGrid = () => {
                               {getReservedTimeSlots(day).timeRanges
                                 .filter(range => new Date(range.start).getHours() === hour)
                                 .map((range, idx) => {
-                                  const reservation = reservations.find(res => 
-                                    isSameDay(new Date(res.startDate), range.start) && 
-                                    new Date(res.startDate).getHours() === hour
-                                  );
+                                  // We already have the reservation stored in the range object
+                                  const reservation = range.reservation;
                                   
                                   if (!reservation) return null;
 
@@ -1969,222 +1989,284 @@ const checkConflicts = (attemptedStart, attemptedEnd) => {
   );
 
   // Add this new date-time selection modal component
-  const renderDateTimeSelectionModal = () => (
-    <Dialog
-      open={isDatePickerModalOpen}
-      onClose={() => setIsDatePickerModalOpen(false)}
-      className="relative z-50"
-    >
-      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" aria-hidden="true" />
-      <div className="fixed inset-0 flex items-center justify-center p-4">
-        <Dialog.Panel className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-5 sm:p-6 w-full max-w-md border border-gray-200 dark:border-gray-700/30">
-          <div className="flex items-center justify-between mb-5">
-            <Dialog.Title className="text-lg sm:text-xl font-semibold">
-              Schedule Reservation
-            </Dialog.Title>
-            <button
-              onClick={() => setIsDatePickerModalOpen(false)}
-              className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M4.293 4.293a1 1 011.414 0L10 8.586l4.293-4.293a1 1 011.414 0L11.414 10l4.293 4.293a1 1 01-1.414 1.414z" clipRule="evenodd" />
-              </svg>
-            </button>
-          </div>
-
-          <div className="space-y-5">
-            {/* Start Date Display (not editable) */}
-            <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-xl border border-blue-100 dark:border-blue-800/30">
-              <label className="block text-xs sm:text-sm font-medium mb-2 text-blue-700 dark:text-blue-300">Selected Date</label>
-              <div className="text-base sm:text-lg font-medium text-blue-800 dark:text-blue-200">
-                {dayjs(selectedStartDate).format('dddd, MMMM D, YYYY')}
-              </div>
-              <div className="mt-2 text-xs text-blue-600 dark:text-blue-400 flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0 1 16 0zm-7-4a1 1 011-2 0 1 1-2 0 1 1 012 0zM9 9a1 1 000 2v3a1 1 001 1h1a1 1 100-2v-3a1 1 00-1-1H9z" clipRule="evenodd" />
+  const renderDateTimeSelectionModal = () => {
+    // Get current time for validation
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    const isToday = selectedStartDate && isSameDay(selectedStartDate, now);
+    
+    return (
+      <Dialog
+        open={isDatePickerModalOpen}
+        onClose={() => setIsDatePickerModalOpen(false)}
+        className="relative z-50"
+      >
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" aria-hidden="true" />
+        <div className="fixed inset-0 flex items-center justify-center p-4">
+          <Dialog.Panel className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-5 sm:p-6 w-full max-w-md border border-gray-200 dark:border-gray-700/30">
+            <div className="flex items-center justify-between mb-5">
+              <Dialog.Title className="text-lg sm:text-xl font-semibold">
+                Schedule Reservation
+              </Dialog.Title>
+              <button
+                onClick={() => setIsDatePickerModalOpen(false)}
+                className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 01.414 0L10 8.586l4.293-4.293a1 1 014.14 1.414L11.414 10l4.293 4.293a1 1 01-1.414 1.414z" clipRule="evenodd" />
                 </svg>
-                Business hours: 5:00 AM - 7:00 PM
+              </button>
+            </div>
+
+            <div className="space-y-5">
+              {/* Start Date Display (not editable) */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-xl border border-blue-100 dark:border-blue-800/30">
+                <label className="block text-xs sm:text-sm font-medium mb-2 text-blue-700 dark:text-blue-300">Selected Date</label>
+                <div className="text-base sm:text-lg font-medium text-blue-800 dark:text-blue-200">
+                  {dayjs(selectedStartDate).format('dddd, MMMM D, YYYY')}
+                </div>
+                <div className="mt-2 text-xs text-blue-600 dark:text-blue-400 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0 1 16 0zm-7-4a1 1 011-2 0 1 1-2 0 1 1 012 0zM9 9a1 1 000 2v3a1 1 001 1h1a1 1 100-2v-3a1 1 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  Business hours: 5:00 AM - 7:00 PM
+                </div>
+                {isToday && (
+                  <div className="mt-1 text-xs font-medium text-blue-700 dark:text-blue-300 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                    </svg>
+                    Current time: {format(now, 'h:mm a')}
+                  </div>
+                )}
               </div>
-            </div>
 
-            {/* End Date Selection */}
-            <div>
-              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">End Date</label>
-              <DatePicker
-                className="w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg"
-                value={selectedEndDate ? dayjs(selectedEndDate) : null}
-                onChange={(date) => setSelectedEndDate(date.toDate())}
-                disabledDate={(current) => {
-                  // Disable weekends
-                  if (current && (current.day() === 0 || current.day() === 6)) {
-                    return true;
-                  }
-                  // Disable dates before start date or past dates
-                  return current < dayjs(selectedStartDate).startOf('day') ||
-                         current < dayjs().startOf('day') ||
-                         !isWithinSevenDays(current.toDate(), selectedStartDate);
-                }}
-              />
-            </div>
-
-            {/* Time Selection */}
-            <div className="grid grid-cols-2 gap-4">
+              {/* End Date Selection */}
               <div>
-                <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Start Time</label>
-                <TimePicker
+                <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">End Date</label>
+                <DatePicker
                   className="w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg"
-                  format="HH:mm"
-                  minuteStep={30}
-                  popupClassName="text-xs sm:text-sm"
-                  value={selectedTimes.startTime ? 
-                    dayjs().hour(selectedTimes.startTime).minute(selectedTimes.startMinute || 0) : 
-                    null
-                  }
-                  disabledTime={() => ({
-                    disabledHours: () => [...Array(24)].map((_, i) => i).filter(h => h < 5 || h >= 20),
-                    disabledMinutes: () => []
-                  })}
-                  onChange={(time) => {
-                    if (time) {
-                      setSelectedTimes(prev => ({
-                        ...prev,
-                        startTime: time.hour(),
-                        startMinute: time.minute()
-                      }));
+                  value={selectedEndDate ? dayjs(selectedEndDate) : null}
+                  onChange={(date) => setSelectedEndDate(date.toDate())}
+                  disabledDate={(current) => {
+                    // Disable weekends
+                    if (current && (current.day() === 0 || current.day() === 6)) {
+                      return true;
                     }
+                    
+                    // Check if it's a holiday
+                    const formattedDate = current.format('YYYY-MM-DD');
+                    if (holidays.some(holiday => holiday.date === formattedDate)) {
+                      return true;
+                    }
+                    
+                    // Disable dates before start date or past dates
+                    return current < dayjs(selectedStartDate).startOf('day') ||
+                           current < dayjs().startOf('day') ||
+                           !isWithinSevenDays(current.toDate(), selectedStartDate);
                   }}
-                  placeholder="5:00 AM - 7:00 PM"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">End Time</label>
-                <TimePicker
-                  className="w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg"
-                  format="HH:mm"
-                  minuteStep={30}
-                  popupClassName="text-xs sm:text-sm"
-                  value={selectedTimes.endTime ? 
-                    dayjs().hour(selectedTimes.endTime).minute(selectedTimes.endMinute || 0) : 
-                    null
-                  }
-                  disabledTime={() => ({
-                    disabledHours: () => [...Array(24)].map((_, i) => i).filter(h => h < 5 || h >= 20),
-                    disabledMinutes: (selectedHour) => {
-                      if (isSameDay(selectedStartDate, selectedEndDate) &&
-                          selectedHour === selectedTimes.startTime) {
-                        return [...Array(60)].map((_, i) => i)
-                          .filter(m => m <= selectedTimes.startMinute);
+
+              {/* Time Selection */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Start Time</label>
+                  <TimePicker
+                    className="w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg"
+                    format="HH:mm"
+                    minuteStep={30}
+                    popupClassName="text-xs sm:text-sm"
+                    value={selectedTimes.startTime ? 
+                      dayjs().hour(selectedTimes.startTime).minute(selectedTimes.startMinute || 0) : 
+                      null
+                    }
+                    disabledTime={() => ({
+                      disabledHours: () => {
+                        // Disable hours before current hour if today is selected
+                        const baseDisabled = [...Array(24)].map((_, i) => i).filter(h => h < 5 || h >= 20);
+                        if (isToday) {
+                          return [...baseDisabled, ...Array.from({length: currentHour}, (_, i) => i)];
+                        }
+                        return baseDisabled;
+                      },
+                      disabledMinutes: (selectedHour) => {
+                        // If today is selected and the user is selecting the current hour,
+                        // disable minutes that are in the past
+                        if (isToday && selectedHour === currentHour) {
+                          return Array.from({length: 60}, (_, i) => i).filter(m => m < currentMinute);
+                        }
+                        return [];
                       }
-                      return [];
+                    })}
+                    onChange={(time) => {
+                      if (time) {
+                        setSelectedTimes(prev => ({
+                          ...prev,
+                          startTime: time.hour(),
+                          startMinute: time.minute()
+                        }));
+                      }
+                    }}
+                    placeholder="5:00 AM - 7:00 PM"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">End Time</label>
+                  <TimePicker
+                    className="w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg"
+                    format="HH:mm"
+                    minuteStep={30}
+                    popupClassName="text-xs sm:text-sm"
+                    value={selectedTimes.endTime ? 
+                      dayjs().hour(selectedTimes.endTime).minute(selectedTimes.endMinute || 0) : 
+                      null
                     }
-                  })}
-                  onChange={(time) => {
-                    if (time) {
-                      setSelectedTimes(prev => ({
-                        ...prev,
-                        endTime: time.hour(),
-                        endMinute: time.minute()
-                      }));
-                    }
-                  }}
-                  placeholder="5:00 AM - 7:00 PM"
-                />
+                    disabledTime={() => ({
+                      disabledHours: () => {
+                        // Disable hours before current hour if today is selected
+                        const baseDisabled = [...Array(24)].map((_, i) => i).filter(h => h < 5 || h >= 20);
+                        if (isToday) {
+                          return [...baseDisabled, ...Array.from({length: currentHour}, (_, i) => i)];
+                        }
+                        return baseDisabled;
+                      },
+                      disabledMinutes: (selectedHour) => {
+                        // Multiple conditions for disabling minutes
+                        const disabledMinutes = [];
+                        
+                        // If today is selected and user is selecting the current hour
+                        if (isToday && selectedHour === currentHour) {
+                          disabledMinutes.push(...Array.from({length: 60}, (_, i) => i).filter(m => m < currentMinute));
+                        }
+                        
+                        // If same day and same hour as start time, prevent selecting same or earlier minutes
+                        if (isSameDay(selectedStartDate, selectedEndDate) &&
+                            selectedHour === selectedTimes.startTime) {
+                          // Prevent selecting a minute that's the same or earlier than start time
+                          disabledMinutes.push(...Array.from({length: 60}, (_, i) => i).filter(m => m <= selectedTimes.startMinute));
+                        }
+                        
+                        return [...new Set(disabledMinutes)]; // Remove duplicates
+                      }
+                    })}
+                    onChange={(time) => {
+                      if (time) {
+                        setSelectedTimes(prev => ({
+                          ...prev,
+                          endTime: time.hour(),
+                          endMinute: time.minute()
+                        }));
+                      }
+                    }}
+                    placeholder="5:00 AM - 7:00 PM"
+                  />
+                </div>
               </div>
-            </div>
-            
-            {/* Validation guidelines */}
-            <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg border border-gray-200 dark:border-gray-600/30 text-xs text-gray-600 dark:text-gray-400 space-y-1.5">
-              <div className="flex items-start">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 010 1.414l-8 8a1 1 01-1.414 0l-4-4a1 1 011.414-1.414L8 12.586l7.293-7.293a1 1 011.414 1.414z" clipRule="evenodd" />
-                </svg>
-                <span>Select a time between 5:00 AM and 7:00 PM</span>
-              </div>
-              <div className="flex items-start">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 010 1.414l-8 8a1 1 01-1.414 0l-4-4a1 1 011.414-1.414L8 12.586l7.293-7.293a1 1 011.414 1.414z" clipRule="evenodd" />
-                </svg>
-                <span>End time must be after start time</span>
-              </div>
-              {selectedStartDate !== selectedEndDate && (
+              
+              {/* Validation guidelines */}
+              <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg border border-gray-200 dark:border-gray-600/30 text-xs text-gray-600 dark:text-gray-400 space-y-1.5">
                 <div className="flex items-start">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 010 1.414l-8 8a1 1 01-1.414 0l-4-4a1 1 011.414-1.414L8 12.586l7.293-7.293a1 1 011.414 1.414z" clipRule="evenodd" />
                   </svg>
-                  <span>You've selected a multi-day reservation</span>
+                  <span>Select a time between 5:00 AM and 7:00 PM</span>
                 </div>
-              )}
+                <div className="flex items-start">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 010 1.414l-8 8a1 1 01-1.414 0l-4-4a1 1 011.414-1.414L8 12.586l7.293-7.293a1 1 011.414 1.414z" clipRule="evenodd" />
+                  </svg>
+                  <span>End time must be after start time</span>
+                </div>
+                {isToday && (
+                  <div className="flex items-start">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 mt-0.5 flex-shrink-0 text-amber-500" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-amber-700 dark:text-amber-300">Times before {format(now, 'h:mm a')} are disabled for today</span>
+                  </div>
+                )}
+                {selectedStartDate !== selectedEndDate && (
+                  <div className="flex items-start">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 010 1.414l-8 8a1 1 01-1.414 0l-4-4a1 1 011.414-1.414L8 12.586l7.293-7.293a1 1 011.414 1.414z" clipRule="evenodd" />
+                    </svg>
+                    <span>You've selected a multi-day reservation</span>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
 
-          {/* Action Buttons */}
-          <div className="mt-6 flex gap-3">
-            <button
-              className="w-1/3 px-3 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700
-                       hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors border border-gray-200 dark:border-gray-600"
-              onClick={() => setIsDatePickerModalOpen(false)}
-            >
-              Cancel
-            </button>
-            <button
-              className="w-2/3 px-3 py-2.5 text-sm font-medium text-white bg-blue-500 
-                       hover:bg-blue-600 rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={() => {
-                // Validate date selection
-                if (!selectedStartDate || !selectedEndDate) {
-                  toast.error('Please select both start and end dates');
-                  return;
-                }
+            {/* Action Buttons */}
+            <div className="mt-6 flex gap-3">
+              <button
+                className="w-1/3 px-3 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700
+                         hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors border border-gray-200 dark:border-gray-600"
+                onClick={() => setIsDatePickerModalOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="w-2/3 px-3 py-2.5 text-sm font-medium text-white bg-blue-500 
+                         hover:bg-blue-600 rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => {
+                  // Validate date selection
+                  if (!selectedStartDate || !selectedEndDate) {
+                    toast.error('Please select both start and end dates');
+                    return;
+                  }
 
-                // Validate time selection
-                if (!selectedTimes.startTime || !selectedTimes.endTime) {
-                  toast.error('Please select both start and end times');
-                  return;
-                }
+                  // Validate time selection
+                  if (!selectedTimes.startTime || !selectedTimes.endTime) {
+                    toast.error('Please select both start and end times');
+                    return;
+                  }
 
-                const startDateTime = dayjs(selectedStartDate)
-                  .hour(selectedTimes.startTime)
-                  .minute(selectedTimes.startMinute || 0)
-                  .toDate();
+                  const startDateTime = dayjs(selectedStartDate)
+                    .hour(selectedTimes.startTime)
+                    .minute(selectedTimes.startMinute || 0)
+                    .toDate();
 
-                const endDateTime = dayjs(selectedEndDate)
-                  .hour(selectedTimes.endTime)
-                  .minute(selectedTimes.endMinute || 0)
-                  .toDate();
+                  const endDateTime = dayjs(selectedEndDate)
+                    .hour(selectedTimes.endTime)
+                    .minute(selectedTimes.endMinute || 0)
+                    .toDate();
 
-                // Validate date-time combination
-                if (endDateTime <= startDateTime) {
-                  toast.error('End date-time must be after start date-time');
-                  return;
-                }
+                  // Validate date-time combination
+                  if (endDateTime <= startDateTime) {
+                    toast.error('End date-time must be after start date-time');
+                    return;
+                  }
 
-                // Check for conflicts
-                const conflicts = checkConflicts(startDateTime, endDateTime);
-                if (conflicts.length > 0) {
-                  setConflictDetails({
-                    conflicts,
-                    attemptedBooking: {
-                      start: dayjs(startDateTime).format('MMM DD, YYYY HH:mm'),
-                      end: dayjs(endDateTime).format('MMM DD, YYYY HH:mm')
-                    }
-                  });
-                  setShowConflictModal(true);
-                  return;
-                }
+                  // Check for conflicts
+                  const conflicts = checkConflicts(startDateTime, endDateTime);
+                  if (conflicts.length > 0) {
+                    setConflictDetails({
+                      conflicts,
+                      attemptedBooking: {
+                        start: dayjs(startDateTime).format('MMM DD, YYYY HH:mm'),
+                        end: dayjs(endDateTime).format('MMM DD, YYYY HH:mm')
+                      }
+                    });
+                    setShowConflictModal(true);
+                    return;
+                  }
 
-                // If all validations pass, proceed with the selection
-                onDateSelect(startDateTime, endDateTime);
-                setIsDatePickerModalOpen(false);
-              }}
-              disabled={!selectedStartDate || !selectedEndDate || !selectedTimes.startTime || !selectedTimes.endTime}
-            >
-              Confirm Reservation
-            </button>
-          </div>
-        </Dialog.Panel>
-      </div>
-    </Dialog>
-  );
+                  // If all validations pass, proceed with the selection
+                  onDateSelect(startDateTime, endDateTime);
+                  setIsDatePickerModalOpen(false);
+                }}
+                disabled={!selectedStartDate || !selectedEndDate || !selectedTimes.startTime || !selectedTimes.endTime}
+              >
+                Confirm Reservation
+              </button>
+            </div>
+          </Dialog.Panel>
+        </div>
+      </Dialog>
+    );
+  };
 
   // Add this new function before the return statement
   const renderTimeSelectionModal = () => (
