@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
-import NotAuthorize from '../components/NotAuthorize';
+import NotAuthorize from '../pages/NotAuthorize';
 import { SecureStorage } from './encryption';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
     const [showModal, setShowModal] = useState(false);
     const [shouldNavigate, setShouldNavigate] = useState(false);
-    // Check both regular localStorage and SecureStorage for backward compatibility
-    const isLoggedIn = SecureStorage.getLocalItem('loggedIn') === 'true' || SecureStorage.getSessionItem('loggedIn');
-    const userRole = SecureStorage.getSessionItem('user_level');
+
+    const isLoggedIn = SecureStorage.getLocalItem('isLoggedIn') === 'true' || SecureStorage.getSessionItem('isLoggedIn');
+    const userRole = SecureStorage.getSessionItem('user_role');
 
     useEffect(() => {
         if (allowedRoles && !allowedRoles.includes(userRole)) {
@@ -25,15 +25,14 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     };
 
     if (!isLoggedIn) {
-        return <Navigate to="/gsd" replace />;
+        return <Navigate to="/landing-page" replace />;
     }
 
     const getRedirectPath = () => {
-        if (userRole === 'Super Admin' || userRole === 'Admin') return '/adminDashboard';
-        if (userRole === 'Personnel') return '/personnelDashboard';
-        if (userRole === 'Dean' || userRole === 'Secretary' || userRole === 'Department Head') return '7Department/Dashboard';
-        if (userRole === 'Faculty/Staff' || userRole === 'School Head' || userRole === 'SBO PRESIDENT' || userRole === 'CSG PRESIDENT') return '/Faculty/Dashboard';
-        return '/gsd';
+        if (userRole === 'Admin') return '/admin/dashboard';
+        if (userRole === 'User') return '/user/dashboard';
+
+        return '/landing-page';
     };
 
     if (!allowedRoles.includes(userRole)) {

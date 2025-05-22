@@ -1,50 +1,17 @@
 import React, { useState, createContext, useCallback, useEffect } from 'react';
-import { Route, Routes, Navigate, useNavigate, useLocation } from 'react-router-dom';
-// import Sidebar from './pages/Sidebar';
-// import Login from './pages/Login';
-import VehicleEntry from './pages/VehicleEntry';
-import PersonnelDashboard from './page_personnel/dashboard';
-import ViewTask from './page_personnel/ViewPersonnelTask';
-import Venue from './pages/Venue';
-import  Dashboard from './page_user/dashboard';
-import Equipment from './pages/Equipment';
-import ViewRequest from './pages/viewRequest';
-import AddReservation from './page_user/AddReservation'; // Import the AddReservation component
+import { Route, Routes, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import './App.css'; 
-import Logins from './pages/logins';
-import AdminDashboard from './pages/adminDashboard';
-import Faculty from './pages/Faculty';  // Updated casing to match file name
-import Master from './pages/Master';
-import Vehiclem from './pages/vehiclemake';
-import Departments from './pages/departments';
-import Vehiclec from './pages/vehiclecategory';
-import Equipmentc from './pages/equipmentCategory';
-import Userlevel from './pages/condition';
-import VehicleModel from './pages/vehiclemodel';
-import ViewReserve from './page_user/viewReserve';
-import Calendar from './pages/calendar';    
-import Record from './pages/Record';
-import ViewApproval from './page_dean/viewApproval';
-import DeanViewReserve from './page_dean/viewReserve';
-import DeanAddReservation from './page_dean/AddReservation';
-import DeanDashboard from './page_dean/dashboard';
-import Chat from './pages/chat';
-import ProtectedRoute from './utils/ProtectedRoute';
-import AssignPersonnel from './pages/AssignPersonnel';
-import LandCalendar from './pages/landCalendar';
-import Archive from './pages/archive';
-import NotFound from './components/NotFound';
-import Checklists from './pages/Checklist';
-import Reports from './pages/Reports';
-import AccountSettings from './pages/accountSettings';
+import Logins from './pages/landing_page';
+import NotFound from './pages/NotFound';
 import { SecureStorage } from './utils/encryption';
-import NotificationUser from './page_user/notification';
-import NotificationRequest from './page_dean/notification';
-import ChatUser from './page_user/chat';
-import ChatDepartment from './page_dean/chat';
-import ChatPersonnel from './page_personnel/chat';
-
+import Login from './pages/Auth/Login';
+import Signup from './pages/Auth/Signup';
+import AdminDashboard from './pages/admin/admin_dashboard'; 
+import UserDashboard from './pages/user/user_dashboard';
+import ProtectedRoute from './utils/ProtectedRoute';
+import ViewNotes from './pages/user/view_note';
+import Record from './pages/admin/record';
 
 export const ThemeContext = createContext();
 
@@ -71,97 +38,63 @@ const App = () => {
         });
     }, []);
 
+    
+
     const [isNotFoundVisible, setIsNotFoundVisible] = useState(false);
-    const navigate = useNavigate();
+
     const location = useLocation();
 
     // Add URL validation
     useEffect(() => {
         const validPaths = [
-            '/gsd', '/Admin', '/adminDashboard', '/VehicleEntry',
-            '/Equipment', '/Faculty', '/departments', '/master',
-            '/vehiclemake', '/vehiclecategory', '/position',
-            '/equipmentCategory', '/condition', '/vehiclemodel',
-            '/AssignPersonnel', '/LandCalendar', '/record',
-            '/ViewRequest', '/Venue', '/equipmentCat',
-            '/archive', '/Department/Dashboard', '/Department/Myreservation', '/Department/Chat', 
-            '/departmentAddReservation', '/Department/ViewApproval', '/Faculty/Dashboard', '/Faculty/Chat',
-            '/Faculty/Myreservation', '/addReservation', '/profile1',
-            '/settings', '/calendar', '/chat', '/Personnel/Dashboard',
-            '/Personnel/ViewTask', '/Personnel/Chat', '/Master', '/vehicleCategory', '/',
-            '/Checklist', '/chatAdmin', '/AccountSettings', '/chatAdmin', '/Reports', '/Faculty/Notification', '/Department/Notification',
+            '/',
+            '/landing-page',
+            '/signin',
+            '/signup',
+            '/admin/dashboard',
+            '/user/dashboard',
+            '/user/view-notes',
+            '/admin/record',
         ];
+        
+        // Check if any valid path matches the current pathname
+        const isValidPath = validPaths.some(path => {
+            // Exact match or matches the base path for nested routes
+            return location.pathname === path || 
+                   (path !== '/meow' && location.pathname.startsWith(path));
+        });
 
-        if (!validPaths.includes(location.pathname)) {
-            setIsNotFoundVisible(true);
-        }
+        setIsNotFoundVisible(!isValidPath);
     }, [location]);
+
+
 
     return (
         <ThemeContext.Provider value={{ theme, toggleTheme }}>
             <div className={`app-container ${theme}`}>
                 <Toaster richColors position='top-center' duration={1500} />
-                <NotFound 
-                    isVisible={isNotFoundVisible} 
-                    onClose={() => setIsNotFoundVisible(false)} 
-                />
+                {isNotFoundVisible && (
+                    <NotFound 
+                        isVisible={true}
+                        onClose={() => setIsNotFoundVisible(false)} 
+                    />
+                )}
                 <main className="main-content">
                     <Routes>
-                        <Route path="/" element={<Navigate to="/gsd" replace />} />
-                        <Route path="/gsd" element={<Logins />} />
+                        <Route path="/" element={<Navigate to="/landing-page" replace />} />
+                        <Route path="/landing-page" element={<Logins />} />
+                        <Route path="/signin" element={<Login />} />
+                        <Route path="/signup" element={<Signup />} />
+
+                        <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={['Admin']}><AdminDashboard /></ProtectedRoute>} />
+                        <Route path="/admin/record" element={<ProtectedRoute allowedRoles={['Admin']}><Record /></ProtectedRoute>} />
                         
-            
-                       
-                        <Route path="/adminDashboard" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><AdminDashboard /></ProtectedRoute>} />
-                        <Route path="/VehicleEntry" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><VehicleEntry /></ProtectedRoute>} />
-                        <Route path="/Equipment" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><Equipment /></ProtectedRoute>} />
-                        <Route path="/Faculty" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><Faculty /></ProtectedRoute>} />
-                        <Route path="/departments" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><Departments /></ProtectedRoute>} />
-                        <Route path="/master" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><Master /></ProtectedRoute>} />
-                        <Route path="/vehiclemake" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><Vehiclem /></ProtectedRoute>} />
-                        <Route path="/vehiclecategory" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><Vehiclec /></ProtectedRoute>} />
-                        <Route path="/equipmentCategory" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><Equipmentc /></ProtectedRoute>} />
-                        <Route path="/condition" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><Userlevel /></ProtectedRoute>} />
-                        <Route path="/vehiclemodel" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><VehicleModel /></ProtectedRoute>} />
-                        <Route path="/AssignPersonnel" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><AssignPersonnel /></ProtectedRoute>} />
-                        <Route path="/LandCalendar" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><LandCalendar /></ProtectedRoute>} />
-                        <Route path="/Checklist" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><Checklists /></ProtectedRoute>} />
+                        {/* Add more admin routes here */}
+                        <Route path="/user/dashboard" element={<ProtectedRoute allowedRoles={['User']}><UserDashboard /></ProtectedRoute>} />
+                        <Route path="/user/view-notes" element={<ProtectedRoute allowedRoles={['User']}><ViewNotes /></ProtectedRoute>} />
 
-                        <Route path="/record" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><Record /></ProtectedRoute>} />
-                        <Route path="/ViewRequest" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><ViewRequest /></ProtectedRoute>} />
-
-                        <Route path="/Venue" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><Venue /></ProtectedRoute>} />
-                        <Route path="/equipmentCat" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><Equipmentc /></ProtectedRoute>} />
-                        <Route path="/archive" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><Archive /></ProtectedRoute>} />
-                        <Route path="/Reports" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><Reports /></ProtectedRoute>} />
-                        <Route path="/AccountSettings" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><AccountSettings /></ProtectedRoute>} />
-                                                            
-                        {/* Dean/Secretary Routes */}
-                        <Route path="/Department/Dashboard" element={<ProtectedRoute allowedRoles={['Dean', 'Secretary', 'Department Head']}><DeanDashboard /></ProtectedRoute>} />
-                        <Route path="/Department/Myreservation" element={<ProtectedRoute allowedRoles={['Dean', 'Secretary', 'Department Head']}><DeanViewReserve /></ProtectedRoute>} />
-                        <Route path="/departmentAddReservation" element={<ProtectedRoute allowedRoles={['Dean', 'Secretary', 'Department Head']}><DeanAddReservation /></ProtectedRoute>} />
-                        <Route path="/Department/ViewApproval" element={<ProtectedRoute allowedRoles={['Dean', 'Secretary', 'Department Head']}><ViewApproval /></ProtectedRoute>} />
-                        <Route path="/Department/Notification" element={<ProtectedRoute allowedRoles={['Dean', 'Secretary', 'Department Head']}><NotificationRequest /></ProtectedRoute>} />
-                        <Route path="/Department/Chat" element={<ProtectedRoute allowedRoles={['Dean', 'Secretary', 'Department Head']}><ChatDepartment /></ProtectedRoute>} />
-                        
-                        {/* User Routes */}
-                        <Route path="/Faculty/Dashboard" element={<ProtectedRoute allowedRoles={['Faculty/Staff', 'School Head', 'SBO PRESIDENT', 'CSG PRESIDENT']}><Dashboard /></ProtectedRoute>} />
-                        <Route path="/Faculty/Myreservation" element={<ProtectedRoute allowedRoles={['Faculty/Staff', 'School Head', 'SBO PRESIDENT', 'CSG PRESIDENT']}><ViewReserve /></ProtectedRoute>} />
-                        <Route path="/addReservation" element={<ProtectedRoute allowedRoles={['Faculty/Staff', 'School Head', 'SBO PRESIDENT', 'CSG PRESIDENT']}><AddReservation /></ProtectedRoute>} />
-                        <Route path="/Faculty/Chat" element={<ProtectedRoute allowedRoles={['Faculty/Staff', 'School Head', 'SBO PRESIDENT', 'CSG PRESIDENT']}><ChatUser /></ProtectedRoute>} />
-                        <Route path="/Faculty/Notification" element={<ProtectedRoute allowedRoles={['Faculty/Staff', 'School Head', 'SBO PRESIDENT', 'CSG PRESIDENT']}><NotificationUser /></ProtectedRoute>} />
-                        {/* Shared Routes (accessible by all authenticated users) */}
-                        
-                        <Route path="/calendar" element={<ProtectedRoute allowedRoles={['Admin', 'Dean', 'Secretary', 'Faculty/Staff']}><Calendar /></ProtectedRoute>} />
-                        <Route path="/chat" element={<ProtectedRoute allowedRoles={['Admin', 'Dean', 'Secretary', 'Faculty/Staff']}><Chat /></ProtectedRoute>} />
-
-                        {/* Personnel Routes */}
-                        <Route path="/Personnel/Dashboard" element={<ProtectedRoute allowedRoles={['Personnel']}><PersonnelDashboard /></ProtectedRoute>} />
-                        <Route path="/Personnel/ViewTask" element={<ProtectedRoute allowedRoles={['Personnel']}><ViewTask /></ProtectedRoute>} />
-                        <Route path="/Personnel/Chat" element={<ProtectedRoute allowedRoles={['Personnel']}><ChatPersonnel /></ProtectedRoute>} />
-
-                        {/* chats */}
-                        <Route path="/chatAdmin" element={<ProtectedRoute allowedRoles={['Personnel', 'Admin', 'Dean', 'Secretary', 'Faculty/Staff']}><Chat /></ProtectedRoute>} />
+                        {/* Catch-all route for 404 */}
+                    
                     </Routes>
                 </main>
             </div>

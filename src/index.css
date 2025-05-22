@@ -4,23 +4,36 @@
 
 /* Custom styles for modern modal */
 .modern-modal .ant-modal-content {
-  border-radius: 20px;
+  background-color: #1f2937;
+  border-radius: 1rem;
   overflow: hidden;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
-  border: 1px solid rgba(16, 185, 129, 0.1);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(107, 33, 168, 0.1);
+  color: #fff;
+}
+
+.modern-modal .ant-modal-header {
+  background-color: #1f2937;
+  border-bottom: 1px solid rgba(107, 33, 168, 0.2);
+  padding: 1rem 1.5rem;
+}
+
+.modern-modal .ant-modal-title {
+  color: #fff !important;
 }
 
 .modern-modal .ant-modal-body {
-  padding: 0;
+  padding: 1.5rem;
+  background-color: #1f2937;
 }
 
 .modern-modal .ant-modal-close {
-  color: #047857;
+  color: #9ca3af;
 }
 
 .modern-modal .ant-modal-close:hover {
-  color: #059669;
-  background-color: rgba(16, 185, 129, 0.1);
+  color: #fff;
+  background-color: rgba(107, 33, 168, 0.1);
 }
 
 /* Custom animations for the login page */
