@@ -20,43 +20,17 @@ const Login = () => {
   };
 
   const generateMathProblem = () => {
-    const operators = ['+', '-', '*'];
-    const operator = operators[Math.floor(Math.random() * operators.length)];
-    let num1, num2;
+  const num1 = Math.floor(Math.random() * 10) + 1;
+  const num2 = Math.floor(Math.random() * 10) + 1;
+  setMathProblem({ num1, num2, operator: '+' });
+};
 
-    switch (operator) {
-      case '+':
-        num1 = Math.floor(Math.random() * 10) + 1;
-        num2 = Math.floor(Math.random() * 10) + 1;
-        break;
-      case '-':
-        // Ensure num1 is always greater than num2 to avoid negative results
-        num1 = Math.floor(Math.random() * 10) + 6; // Start from 6 to ensure we have room for subtraction
-        num2 = Math.floor(Math.random() * (num1 - 1)) + 1; // num2 will always be less than num1
-        break;
-      case '*':
-        num1 = Math.floor(Math.random() * 5) + 1; // Keep multiplication numbers small
-        num2 = Math.floor(Math.random() * 5) + 1;
-        break;
-      default:
-        num1 = 1;
-        num2 = 1;
-    }
-
-    setMathProblem({ num1, num2, operator });
-  };
 
   const checkCaptchaAnswer = (answer) => {
     let correctAnswer;
     switch (mathProblem.operator) {
       case '+':
         correctAnswer = mathProblem.num1 + mathProblem.num2;
-        break;
-      case '-':
-        correctAnswer = mathProblem.num1 - mathProblem.num2;
-        break;
-      case '*':
-        correctAnswer = mathProblem.num1 * mathProblem.num2;
         break;
       default:
         correctAnswer = 0;
@@ -85,16 +59,19 @@ const Login = () => {
   };
 
   useEffect(() => {
-    const isLoggedIn = SecureStorage.getSessionItem('isLoggedIn');
-    if (isLoggedIn === 'true') {
-      const userLevelName = SecureStorage.getSessionItem('user_role');
-      if (userLevelName === 'Admin') {
-        navigate('/admin/dashboard');
-      } else if (userLevelName === 'User') {
-        navigate('/user/dashboard');
-      }
+  const isLoggedIn = SecureStorage.getSessionItem('isLoggedIn');
+  
+  if (isLoggedIn === true || isLoggedIn === 'true') {
+    const userLevelName = SecureStorage.getSessionItem('user_role');
+
+    if (userLevelName === 'Admin') {
+      navigate('/admin/dashboard');
+    } else if (userLevelName === 'User') {
+      navigate('/user/dashboard');
     }
-  }, [navigate]);
+  }
+}, [navigate]);
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();

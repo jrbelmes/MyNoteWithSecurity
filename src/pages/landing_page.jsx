@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { SecureStorage } from '../utils/encryption'
+
 
 const LandingPage = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -13,6 +16,26 @@ const LandingPage = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  const location = useLocation();
+const navigate = useNavigate();
+
+// Redirect if already logged in
+useEffect(() => {
+    const isLoggedIn = SecureStorage.getSessionItem('isLoggedIn');
+    const userRole = SecureStorage.getSessionItem('user_role');
+
+    if ((isLoggedIn === 'true' || isLoggedIn === true) && userRole) {
+        if (location.pathname === '/signin' || location.pathname === '/signup' || location.pathname === '/landing-page') {
+            if (userRole === 'Admin') {
+                navigate('/admin/dashboard');
+            } else if (userRole === 'User') {
+                navigate('/user/dashboard');
+            }
+        }
+    }
+}, [location, navigate]);
+
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-black text-white">
